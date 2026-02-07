@@ -73,6 +73,9 @@ pub extern "C" fn bridge_abi_version() -> u32 {
     ABI_VERSION
 }
 
+// 使用静态字符串避免内存泄露
+static VERSION_STR: &str = env!("CARGO_PKG_VERSION");
+
 #[no_mangle]
 pub extern "C" fn bridge_engine_version(ptr_out: *mut *const c_char, len_out: *mut usize) -> c_int {
     ffi_guard!({
@@ -80,15 +83,25 @@ pub extern "C" fn bridge_engine_version(ptr_out: *mut *const c_char, len_out: *m
             return Err(BridgeError::InvalidArgument("Null output pointers".into()));
         }
         
-        let version = CString::new(env!("CARGO_PKG_VERSION")).unwrap();
         unsafe {
-            *ptr_out = version.as_ptr();
-            *len_out = version.as_bytes().len();
+            *ptr_out = VERSION_STR.as_ptr() as *const c_char;
+            *len_out = VERSION_STR.len();
         }
-        std::mem::forget(version);
         Ok(0)
     })
 }
+
+// 使用静态字符串避免内存泄露
+static CAPABILITIES_STR: &str = r#"{
+    "abi_version": 1,
+    "min_plan_version_supported": 1,
+    "max_plan_version_supported": 1,
+    "supported_nodes": ["MemoryScan", "Project", "Filter", "WithColumns", "Limit"],
+    "supported_exprs": ["Col", "Lit", "Binary", "Alias", "IsNull", "Not", "Wildcard", "Cast", "StrLenBytes", "StrLenChars", "StrContains", "StrStartsWith", "StrEndsWith", "StrExtract", "StrReplace", "StrReplaceAll", "StrToLowercase", "StrToUppercase", "StrStripChars", "StrSlice", "StrSplit", "StrPadStart", "StrPadEnd"],
+    "supported_dtypes": ["Int64", "Float64", "Bool", "Utf8"],
+    "execution_modes": ["collect"],
+    "copy_behavior": "copy_on_boundary"
+}"#;
 
 #[no_mangle]
 pub extern "C" fn bridge_capabilities(ptr_out: *mut *const c_char, len_out: *mut usize) -> c_int {
@@ -97,23 +110,10 @@ pub extern "C" fn bridge_capabilities(ptr_out: *mut *const c_char, len_out: *mut
             return Err(BridgeError::InvalidArgument("Null output pointers".into()));
         }
         
-        let caps = r#"{
-            "abi_version": 1,
-            "min_plan_version_supported": 1,
-            "max_plan_version_supported": 1,
-            "supported_nodes": ["MemoryScan", "Project", "Filter", "WithColumns", "Limit"],
-            "supported_exprs": ["Col", "Lit", "Binary", "Alias", "IsNull", "Not", "Wildcard", "Cast", "StrLenBytes", "StrLenChars", "StrContains", "StrStartsWith", "StrEndsWith", "StrExtract", "StrReplace", "StrReplaceAll", "StrToLowercase", "StrToUppercase", "StrStripChars", "StrSlice", "StrSplit", "StrPadStart", "StrPadEnd"],
-            "supported_dtypes": ["Int64", "Float64", "Bool", "Utf8"],
-            "execution_modes": ["collect"],
-            "copy_behavior": "copy_on_boundary"
-        }"#;
-        
-        let caps_cstr = CString::new(caps).unwrap();
         unsafe {
-            *ptr_out = caps_cstr.as_ptr();
-            *len_out = caps_cstr.as_bytes().len();
+            *ptr_out = CAPABILITIES_STR.as_ptr() as *const c_char;
+            *len_out = CAPABILITIES_STR.len();
         }
-        std::mem::forget(caps_cstr);
         Ok(0)
     })
 }

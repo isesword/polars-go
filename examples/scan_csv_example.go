@@ -17,7 +17,7 @@ func main() {
 
 	fmt.Println("=== Polars Go Bridge - CSV Scan Example ===")
 
-	// 示例 1: 基本 CSV 扫描
+	// 示例 1: 基本 CSV 扫描（Print 模式不需要 Free）
 	fmt.Println("📖 示例 1: 基本 CSV 扫描")
 	fmt.Println("代码: ScanCSV(\"testdata/sample.csv\").Print()")
 	lf := polars.ScanCSV("testdata/sample.csv")
@@ -54,6 +54,19 @@ func main() {
 		Select(polars.Col("name"), polars.Col("salary")).
 		Limit(3)
 	err = lf4.Print(brg)
+	if err != nil {
+		log.Fatalf("Failed to print: %v", err)
+	}
+
+	// 示例 6: 使用 Collect 获取 DataFrame（需要显式 Free）
+	fmt.Println("\n📖 示例 6: 资源管理 - 使用 Collect 必须调用 Free")
+	fmt.Println("代码: df, _ := ScanCSV().Collect(brg); defer df.Free()")
+	df, err := polars.ScanCSV("testdata/sample.csv").Limit(3).Collect(brg)
+	if err != nil {
+		log.Fatalf("Failed to collect: %v", err)
+	}
+	defer df.Free() // ⚠️ 重要：必须调用 Free 释放资源
+	err = df.Print()
 	if err != nil {
 		log.Fatalf("Failed to print: %v", err)
 	}

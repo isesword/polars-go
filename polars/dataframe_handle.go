@@ -25,13 +25,20 @@ func newDataFrame(handle uint64, brg *bridge.Bridge) *DataFrame {
 }
 
 // Free releases the Rust-side DataFrame handle.
+// It's safe to call multiple times. After calling Free, the DataFrame becomes invalid.
 func (df *DataFrame) Free() {
-	if df == nil || df.handle == 0 || df.brg == nil {
+	if df == nil || df.brg == nil {
 		return
 	}
-	df.brg.FreeDataFrame(df.handle)
+	// Store handle locally and clear it atomically to prevent double-free
+	handle := df.handle
+	if handle == 0 {
+		return
+	}
 	df.handle = 0
+	// Clear finalizer before freeing to prevent race
 	runtime.SetFinalizer(df, nil)
+	df.brg.FreeDataFrame(handle)
 }
 
 // Rows exports the DataFrame to Arrow IPC and parses it into rows.

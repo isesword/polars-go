@@ -72,12 +72,15 @@ func main() {
     }
 
     // 使用 Map 创建 DataFrame（类似 py-polars）
-    df, _ := polars.NewDataFrameFromMap(brg, map[string]interface{}{
+    df, err := polars.NewDataFrameFromMap(brg, map[string]interface{}{
         "name":   []string{"Alice", "Bob", "Charlie"},
         "age":    []int64{25, 30, 35},
         "salary": []float64{50000, 60000, 70000},
     })
-    defer df.Free()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer df.Free()  // ⚠️ 重要：必须调用 Free
 
     // 链式操作
     result, _ := df.
@@ -141,7 +144,7 @@ func main() {
         log.Fatal(err)
     }
 
-    // 方式 1: 直接打印结果（使用 Polars 原生格式）
+    // 方式 1: 直接打印结果（使用 Polars 原生格式，不需要 Free）
     polars.ScanCSV("data.csv").
         Filter(polars.Col("age").Gt(polars.Lit(25))).
         Select(polars.Col("name"), polars.Col("age")).
@@ -159,7 +162,7 @@ func main() {
         Limit(10).
         Print(brg)
 
-    // 方式 4: 获取 Go 原生数据结构
+    // 方式 4: 获取 Go 原生数据结构（内部会自动 Free）
     rows, err := polars.ScanCSV("data.csv").
         Filter(polars.Col("age").Gt(polars.Lit(25))).
         CollectRows(brg)
@@ -167,6 +170,15 @@ func main() {
         log.Fatal(err)
     }
     fmt.Println(rows)
+    
+    // 方式 5: 获取 DataFrame 对象（必须显式 Free）
+    df, err := polars.ScanCSV("data.csv").Collect(brg)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer df.Free()  // ⚠️ 重要：必须调用 Free 释放 Rust 端资源
+    
+    df.Print()
 }
 ```
 
@@ -415,6 +427,133 @@ go test -v ./polars -run TestScanCSV
 - Polars 原生格式打印
 - 表达式展开：`Cols()` 多列选择、`All()` 选择所有列
 - 类型转换：`Cast()` 和 `StrictCast()` 支持所有数值类型转换
+
+## ⚠️ 资源管理最佳实践
+
+由于本库通过 FFI 桥接 Rust，需要注意正确的资源管理以避免内存泄露。
+
+### 规则 1: Print() 不需要 Free
+
+```go
+✅ 正确：Print() 自动管理资源
+polars.ScanCSV("data.csv").
+    Filter(polars.Col("age").Gt(polars.Lit(25))).
+    Print(brg)
+// 无需调用 Free
+```
+
+### 规则 2: CollectRows() 不需要 Free
+
+```go
+✅ 正确：CollectRows() 内部自动 Free
+rows, err := polars.ScanCSV("data.csv").
+    Filter(polars.Col("age").Gt(polars.Lit(25))).
+    CollectRows(brg)
+// 数据已复制到 Go，内部已自动释放 DataFrame
+```
+
+### 规则 3: Collect() 必须 Free
+
+```go
+✅ 正确：使用 defer 确保释放
+df, err := polars.ScanCSV("data.csv").Collect(brg)
+if err != nil {
+    log.Fatal(err)
+}
+defer df.Free()  // 必须调用！
+
+df.Print()
+
+❌ 错误：忘记调用 Free 会导致 Rust 端内存泄露
+df, _ := polars.ScanCSV("data.csv").Collect(brg)
+df.Print()  // 泄露！
+```
+
+### 规则 4: NewDataFrameFromMap() 必须 Free
+
+```go
+✅ 正确
+df, err := polars.NewDataFrameFromMap(brg, map[string]interface{}{
+    "name": []string{"Alice", "Bob"},
+    "age":  []int64{25, 30},
+})
+if err != nil {
+    log.Fatal(err)
+}
+defer df.Free()  // 必须调用！
+
+df.Print()
+```
+
+### 规则 5: DataFrame 链式操作返回 LazyFrame
+
+```go
+✅ 正确：链式操作后使用 CollectRows 或 Print
+df, _ := polars.ScanCSV("data.csv").Collect(brg)
+defer df.Free()
+
+// DataFrame 的 Filter/Select 返回 LazyFrame
+// 使用 CollectRows 会自动管理资源
+result, _ := df.Filter(polars.Col("age").Gt(polars.Lit(30))).
+    CollectRows(brg)
+
+❌ 错误：如果再次 Collect()，会创建新的 DataFrame
+df2, _ := df.Filter(polars.Col("age").Gt(polars.Lit(30))).
+    Collect(brg)
+defer df2.Free()  // 需要再次 Free！
+```
+
+### 规则 6: Arrow C Data Interface 资源
+
+```go
+✅ 正确：使用 defer 释放 Arrow 资源
+outSchema, outArray, err := brg.ExecuteArrow(handle, nil, nil)
+if err != nil {
+    log.Fatal(err)
+}
+defer bridge.ReleaseArrowSchema(outSchema)
+defer bridge.ReleaseArrowArray(outArray)
+
+// 使用 Arrow 数据...
+```
+
+### 内存泄露检测
+
+在开发时可以使用以下代码检测是否有内存泄露：
+
+```go
+func TestMemoryLeak(t *testing.T) {
+    brg, _ := bridge.LoadBridge("")
+    
+    var m1, m2 runtime.MemStats
+    runtime.GC()
+    runtime.ReadMemStats(&m1)
+    
+    // 创建和释放大量 DataFrame
+    for i := 0; i < 10000; i++ {
+        df, _ := polars.ScanCSV("testdata/sample.csv").Collect(brg)
+        df.Free()
+    }
+    
+    runtime.GC()
+    runtime.ReadMemStats(&m2)
+    
+    // 检查内存是否有明显增长
+    if m2.Alloc > m1.Alloc*2 {
+        t.Errorf("Possible memory leak: %v -> %v", m1.Alloc, m2.Alloc)
+    }
+}
+```
+
+### 总结
+
+| 方法 | 是否需要 Free | 说明 |
+|------|--------------|------|
+| `Print()` | ❌ 否 | 内部管理资源 |
+| `CollectRows()` | ❌ 否 | 内部自动 Free |
+| `Collect()` | ✅ 是 | 返回 DataFrame，必须手动 Free |
+| `NewDataFrameFromMap()` | ✅ 是 | 创建 DataFrame，必须手动 Free |
+| `ExecuteArrow()` | ✅ 是 | 输出需要 ReleaseArrow* |
 
 ## 📂 项目结构
 

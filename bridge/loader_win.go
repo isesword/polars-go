@@ -214,8 +214,12 @@ func (b *Bridge) ExecuteSimple(handle uint64, inputJSON string) ([]byte, error) 
 }
 
 // ExecuteArrow 执行计划并通过 Arrow C Data Interface 返回结果（零拷贝）。
-// 输入的 schema/array 所有权会转移给 Rust，调用方不要再释放它们。
-// 调用方负责在消费完成后释放 outSchema/outArray（ReleaseArrowSchema/ReleaseArrowArray）。
+//
+// 重要的所有权规则：
+// - 输入的 schema/array 所有权会转移给 Rust（无论成功还是失败）
+// - 调用方不应在调用后访问或释放输入的 schema/array
+// - 如果成功，调用方必须在使用完输出后调用 ReleaseArrowSchema/ReleaseArrowArray
+// - 如果失败，输出的 schema/array 无需释放（未初始化）
 func (b *Bridge) ExecuteArrow(
 	handle uint64,
 	inputSchema *ArrowSchema,
@@ -237,6 +241,8 @@ func (b *Bridge) ExecuteArrow(
 	)
 
 	if ret != 0 {
+		// 注意：输入的资源已被 Rust 接管（无论成功失败）
+		// 输出资源未初始化，无需释放
 		return nil, nil, b.getLastError()
 	}
 
