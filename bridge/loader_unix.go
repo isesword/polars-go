@@ -32,6 +32,7 @@ type Bridge struct {
 	lastErrorFree                    func(uintptr, uintptr)
 	planCompile                      func(*byte, uintptr, *uint64) int32
 	planFree                         func(uint64)
+	planExplain                      func(uint64, *uint64, uintptr, int32, *uintptr, *uintptr) int32
 	planExecutePrint                 func(uint64) int32
 	planExecuteArrow                 func(uint64, *ArrowSchema, *ArrowArray, *ArrowSchema, *ArrowArray) int32
 	planCollectDF                    func(uint64, *uint64, uintptr, *uint64) int32
@@ -40,6 +41,7 @@ type Bridge struct {
 	dfFree                           func(uint64)
 	dfFromColumns                    func(*byte, uintptr, *uint64) int32
 	dfFromArrow                      func(*ArrowSchema, *ArrowArray, *uint64) int32
+	dfPivot                          func(uint64, *byte, uintptr, *uint64) int32
 	sqlCollectDF                     func(*byte, uintptr, *byte, uintptr, *uint64, uintptr, *uint64) int32
 	sqlCollectDFFromPlans            func(*byte, uintptr, *byte, uintptr, *uint64, uintptr, *uint64, uintptr, *uintptr, uintptr, *uint64) int32
 	setMemoryLimitBytes              func(int64) int32
@@ -86,6 +88,7 @@ func loadBridge(libPath string) (*Bridge, error) {
 	purego.RegisterLibFunc(&b.lastErrorFree, lib, "bridge_last_error_free")
 	purego.RegisterLibFunc(&b.planCompile, lib, "bridge_plan_compile")
 	purego.RegisterLibFunc(&b.planFree, lib, "bridge_plan_free")
+	purego.RegisterLibFunc(&b.planExplain, lib, "bridge_plan_explain")
 	purego.RegisterLibFunc(&b.planExecutePrint, lib, "bridge_plan_execute_and_print")
 	purego.RegisterLibFunc(&b.planExecuteArrow, lib, "bridge_plan_execute_arrow")
 	purego.RegisterLibFunc(&b.planCollectDF, lib, "bridge_plan_collect_df")
@@ -94,6 +97,7 @@ func loadBridge(libPath string) (*Bridge, error) {
 	purego.RegisterLibFunc(&b.dfFree, lib, "bridge_df_free")
 	purego.RegisterLibFunc(&b.dfFromColumns, lib, "bridge_df_from_columns")
 	purego.RegisterLibFunc(&b.dfFromArrow, lib, "bridge_df_from_arrow")
+	purego.RegisterLibFunc(&b.dfPivot, lib, "bridge_df_pivot")
 	purego.RegisterLibFunc(&b.sqlCollectDF, lib, "bridge_sql_collect_df")
 	purego.RegisterLibFunc(&b.sqlCollectDFFromPlans, lib, "bridge_sql_collect_df_from_plans")
 	purego.RegisterLibFunc(&b.setMemoryLimitBytes, lib, "bridge_set_memory_limit_bytes")
@@ -238,6 +242,27 @@ func (b *Bridge) FreePlan(handle uint64) {
 	b.planFree(handle)
 }
 
+// ExplainPlan returns the plan explanation string.
+func (b *Bridge) ExplainPlan(handle uint64, inputDFHandles []uint64, optimized bool) (string, error) {
+	var ptr uintptr
+	var length uintptr
+	var inputPtr *uint64
+	if len(inputDFHandles) > 0 {
+		inputPtr = &inputDFHandles[0]
+	}
+	var optimizedFlag int32
+	if optimized {
+		optimizedFlag = 1
+	}
+	ret := b.planExplain(handle, inputPtr, uintptr(len(inputDFHandles)), optimizedFlag, &ptr, &length)
+	runtime.KeepAlive(inputDFHandles)
+	if ret != 0 {
+		return "", b.getLastError()
+	}
+	defer b.lastErrorFree(ptr, length)
+	return ptrToString(ptr, int(length)), nil
+}
+
 // ExecuteArrow 执行计划并通过 Arrow C Data Interface 返回结果（零拷贝）。
 //
 // 重要的所有权规则：
@@ -337,6 +362,24 @@ func (b *Bridge) CreateDataFrameFromArrow(
 
 	var dfHandle uint64
 	ret := b.dfFromArrow(inputSchema, inputArray, &dfHandle)
+	if ret != 0 {
+		return 0, b.getLastError()
+	}
+	return dfHandle, nil
+}
+
+// PivotDataFrame performs an eager pivot operation on the given dataframe handle.
+func (b *Bridge) PivotDataFrame(handle uint64, optsJSON []byte) (uint64, error) {
+	if handle == 0 {
+		return 0, fmt.Errorf("dataframe handle must not be zero")
+	}
+	if len(optsJSON) == 0 {
+		return 0, fmt.Errorf("pivot options are empty")
+	}
+
+	var dfHandle uint64
+	ret := b.dfPivot(handle, &optsJSON[0], uintptr(len(optsJSON)), &dfHandle)
+	runtime.KeepAlive(optsJSON)
 	if ret != 0 {
 		return 0, b.getLastError()
 	}
@@ -492,5 +535,6 @@ func ptrToString(ptr uintptr, length int) string {
 	if ptr == 0 || length == 0 {
 		return ""
 	}
-	return unsafe.String((*byte)(unsafe.Pointer(ptr)), length)
+	bytes := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), length)
+	return string(bytes)
 }

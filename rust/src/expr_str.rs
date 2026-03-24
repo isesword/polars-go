@@ -31,6 +31,11 @@ pub fn build_string_expr(kind: &proto::expr::Kind) -> Option<Result<Expr, Bridge
         Kind::StrSplit(split) => Some(build_split(split)),
         Kind::StrPadStart(pad) => Some(build_pad_start(pad)),
         Kind::StrPadEnd(pad) => Some(build_pad_end(pad)),
+        Kind::StrStripPrefix(affix) => Some(build_strip_prefix(affix)),
+        Kind::StrStripSuffix(affix) => Some(build_strip_suffix(affix)),
+        Kind::StrExtractAll(pattern) => Some(build_extract_all(pattern)),
+        Kind::StrCountMatches(pattern) => Some(build_count_matches(pattern)),
+        Kind::StrReplaceN(replace) => Some(build_replace_n(replace)),
         _ => None,
     }
 }
@@ -126,6 +131,38 @@ fn build_pad_end(pad: &proto::StringPad) -> Result<Expr, BridgeError> {
     let expr = build_inner_expr(&pad.expr, "StrPadEnd")?;
     let fill_char = parse_fill_char(&pad.fill_char, "StrPadEnd")?;
     Ok(expr.str().pad_end(lit(pad.length), fill_char))
+}
+
+fn build_strip_prefix(affix: &proto::StringAffix) -> Result<Expr, BridgeError> {
+    let expr = build_inner_expr(&affix.expr, "StrStripPrefix")?;
+    Ok(expr.str().strip_prefix(lit(affix.value.as_str())))
+}
+
+fn build_strip_suffix(affix: &proto::StringAffix) -> Result<Expr, BridgeError> {
+    let expr = build_inner_expr(&affix.expr, "StrStripSuffix")?;
+    Ok(expr.str().strip_suffix(lit(affix.value.as_str())))
+}
+
+fn build_extract_all(pattern: &proto::StringPattern) -> Result<Expr, BridgeError> {
+    let expr = build_inner_expr(&pattern.expr, "StrExtractAll")?;
+    Ok(expr.str().extract_all(lit(pattern.pattern.as_str())))
+}
+
+fn build_count_matches(pattern: &proto::StringContains) -> Result<Expr, BridgeError> {
+    let expr = build_inner_expr(&pattern.expr, "StrCountMatches")?;
+    Ok(expr
+        .str()
+        .count_matches(lit(pattern.pattern.as_str()), pattern.literal))
+}
+
+fn build_replace_n(replace: &proto::StringReplaceN) -> Result<Expr, BridgeError> {
+    let expr = build_inner_expr(&replace.expr, "StrReplaceN")?;
+    Ok(expr.str().replace_n(
+        lit(replace.pattern.as_str()),
+        lit(replace.value.as_str()),
+        replace.literal,
+        replace.n,
+    ))
 }
 
 fn build_inner_expr(expr: &Option<Box<proto::Expr>>, name: &str) -> Result<Expr, BridgeError> {

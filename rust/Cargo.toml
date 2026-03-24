@@ -7,8 +7,9 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-polars = { version = "0.52", features = ["lazy", "json", "timezones", "csv", "parquet", "ipc", "strings", "regex", "string_pad", "semi_anti_join", "cross_join", "rank", "cum_agg", "dtype-struct", "diff", "abs", "temporal", "dtype-date", "dtype-datetime", "dtype-time", "month_start", "month_end", "sql"] }
+polars = { version = "0.52", features = ["lazy", "json", "timezones", "csv", "parquet", "ipc", "strings", "regex", "string_pad", "semi_anti_join", "cross_join", "rank", "cum_agg", "dtype-struct", "diff", "abs", "temporal", "dtype-date", "dtype-datetime", "dtype-time", "month_start", "month_end", "sql", "pivot"] }
 polars-arrow = { package = "polars-arrow", version = "0.52" }
+polars-ops = { package = "polars-ops", version = "0.52", features = ["pivot"] }
 prost = "0.13"
 arrow = { version = "53", features = ["ffi"] }
 libc = "0.2"

@@ -216,3 +216,77 @@ func (e Expr) StrPadEnd(length uint64, fillChar string) Expr {
 		},
 	}
 }
+
+// StrStripPrefix removes a prefix if present.
+func (e Expr) StrStripPrefix(prefix string) Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_StrStripPrefix{
+				StrStripPrefix: &pb.StringAffix{
+					Expr:  e.inner,
+					Value: prefix,
+				},
+			},
+		},
+	}
+}
+
+// StrStripSuffix removes a suffix if present.
+func (e Expr) StrStripSuffix(suffix string) Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_StrStripSuffix{
+				StrStripSuffix: &pb.StringAffix{
+					Expr:  e.inner,
+					Value: suffix,
+				},
+			},
+		},
+	}
+}
+
+// StrExtractAll extracts all regex matches into a list column.
+func (e Expr) StrExtractAll(pattern string) Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_StrExtractAll{
+				StrExtractAll: &pb.StringPattern{
+					Expr:    e.inner,
+					Pattern: pattern,
+				},
+			},
+		},
+	}
+}
+
+// StrCountMatches counts regex or literal matches.
+func (e Expr) StrCountMatches(pattern string, literal bool) Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_StrCountMatches{
+				StrCountMatches: &pb.StringContains{
+					Expr:    e.inner,
+					Pattern: pattern,
+					Literal: literal,
+				},
+			},
+		},
+	}
+}
+
+// StrReplaceN replaces the first n matches.
+func (e Expr) StrReplaceN(pattern string, value string, literal bool, n int64) Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_StrReplaceN{
+				StrReplaceN: &pb.StringReplaceN{
+					Expr:    e.inner,
+					Pattern: pattern,
+					Value:   value,
+					Literal: literal,
+					N:       n,
+				},
+			},
+		},
+	}
+}

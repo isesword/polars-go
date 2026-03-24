@@ -31,6 +31,7 @@ type Bridge struct {
 	lastErrorFree                    *syscall.Proc
 	planCompile                      *syscall.Proc
 	planFree                         *syscall.Proc
+	planExplain                      *syscall.Proc
 	planExecutePrint                 *syscall.Proc
 	planExecuteArrow                 *syscall.Proc
 	planCollectDF                    *syscall.Proc
@@ -39,6 +40,7 @@ type Bridge struct {
 	dfFree                           *syscall.Proc
 	dfFromColumns                    *syscall.Proc
 	dfFromArrow                      *syscall.Proc
+	dfPivot                          *syscall.Proc
 	sqlCollectDF                     *syscall.Proc
 	sqlCollectDFFromPlans            *syscall.Proc
 	setMemoryLimitBytes              *syscall.Proc
@@ -99,6 +101,9 @@ func loadBridge(libPath string) (*Bridge, error) {
 	if b.planFree, err = lib.FindProc("bridge_plan_free"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_plan_free: %w", err)
 	}
+	if b.planExplain, err = lib.FindProc("bridge_plan_explain"); err != nil {
+		return nil, fmt.Errorf("failed to find bridge_plan_explain: %w", err)
+	}
 	if b.planExecutePrint, err = lib.FindProc("bridge_plan_execute_and_print"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_plan_execute_and_print: %w", err)
 	}
@@ -122,6 +127,9 @@ func loadBridge(libPath string) (*Bridge, error) {
 	}
 	if b.dfFromArrow, err = lib.FindProc("bridge_df_from_arrow"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_df_from_arrow: %w", err)
+	}
+	if b.dfPivot, err = lib.FindProc("bridge_df_pivot"); err != nil {
+		return nil, fmt.Errorf("failed to find bridge_df_pivot: %w", err)
 	}
 	if b.sqlCollectDF, err = lib.FindProc("bridge_sql_collect_df"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_sql_collect_df: %w", err)
@@ -230,6 +238,13 @@ func getLibName() string {
 	}
 }
 
+func boolToUintptr(v bool) uintptr {
+	if v {
+		return 1
+	}
+	return 0
+}
+
 // AbiVersion 获取 ABI 版本
 func (b *Bridge) AbiVersion() uint32 {
 	ret, _, _ := b.abiVersion.Call()
@@ -277,6 +292,30 @@ func (b *Bridge) CompilePlan(planBytes []byte) (uint64, error) {
 // FreePlan 释放计划
 func (b *Bridge) FreePlan(handle uint64) {
 	b.planFree.Call(uintptr(handle))
+}
+
+// ExplainPlan returns the plan explanation string.
+func (b *Bridge) ExplainPlan(handle uint64, inputDFHandles []uint64, optimized bool) (string, error) {
+	var ptr uintptr
+	var length uintptr
+	var inputPtr *uint64
+	if len(inputDFHandles) > 0 {
+		inputPtr = &inputDFHandles[0]
+	}
+	ret, _, _ := b.planExplain.Call(
+		uintptr(handle),
+		uintptr(unsafe.Pointer(inputPtr)),
+		uintptr(len(inputDFHandles)),
+		boolToUintptr(optimized),
+		uintptr(unsafe.Pointer(&ptr)),
+		uintptr(unsafe.Pointer(&length)),
+	)
+	runtime.KeepAlive(inputDFHandles)
+	if ret != 0 {
+		return "", b.getLastError()
+	}
+	defer b.lastErrorFree.Call(ptr, length)
+	return ptrToString(ptr, int(length)), nil
 }
 
 // ExecuteArrow 执行计划并通过 Arrow C Data Interface 返回结果（零拷贝）。
@@ -435,6 +474,29 @@ func (b *Bridge) CreateDataFrameFromArrow(
 		uintptr(unsafe.Pointer(inputArray)),
 		uintptr(unsafe.Pointer(&dfHandle)),
 	)
+	if ret != 0 {
+		return 0, b.getLastError()
+	}
+	return dfHandle, nil
+}
+
+// PivotDataFrame performs an eager pivot operation on the given dataframe handle.
+func (b *Bridge) PivotDataFrame(handle uint64, optsJSON []byte) (uint64, error) {
+	if handle == 0 {
+		return 0, fmt.Errorf("dataframe handle must not be zero")
+	}
+	if len(optsJSON) == 0 {
+		return 0, fmt.Errorf("pivot options are empty")
+	}
+
+	var dfHandle uint64
+	ret, _, _ := b.dfPivot.Call(
+		uintptr(handle),
+		uintptr(unsafe.Pointer(&optsJSON[0])),
+		uintptr(len(optsJSON)),
+		uintptr(unsafe.Pointer(&dfHandle)),
+	)
+	runtime.KeepAlive(optsJSON)
 	if ret != 0 {
 		return 0, b.getLastError()
 	}

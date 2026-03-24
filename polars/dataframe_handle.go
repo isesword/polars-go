@@ -93,6 +93,16 @@ func (df *EagerFrame) ToArrow() (arrow.RecordBatch, error) {
 	return recordBatch, nil
 }
 
+// Describe returns a summary dataframe for the eager frame.
+func (df *EagerFrame) Describe() (*DataFrame, error) {
+	return describeEagerFrame(df)
+}
+
+// Explain returns the plan description for the lazy projection of the eager frame.
+func (df *EagerFrame) Explain(optimized ...bool) (string, error) {
+	return df.Lazy().Explain(optimized...)
+}
+
 // Print outputs the DataFrame using Polars' Display implementation.
 func (df *EagerFrame) Print() error {
 	if df == nil || df.handle == 0 || df.brg == nil {
@@ -131,6 +141,16 @@ func (df *EagerFrame) Select(exprs ...Expr) *LazyFrame {
 	return df.Lazy().Select(exprs...)
 }
 
+// Drop removes columns and returns a LazyFrame for further chaining.
+func (df *EagerFrame) Drop(columns ...string) *LazyFrame {
+	return df.Lazy().Drop(columns...)
+}
+
+// Rename renames columns and returns a LazyFrame for further chaining.
+func (df *EagerFrame) Rename(mapping map[string]string, strict ...bool) *LazyFrame {
+	return df.Lazy().Rename(mapping, strict...)
+}
+
 // WithColumns adds or modifies columns and returns a LazyFrame for further chaining.
 func (df *EagerFrame) WithColumns(exprs ...Expr) *LazyFrame {
 	return df.Lazy().WithColumns(exprs...)
@@ -139,6 +159,56 @@ func (df *EagerFrame) WithColumns(exprs ...Expr) *LazyFrame {
 // Limit limits the number of rows and returns a LazyFrame for further chaining.
 func (df *EagerFrame) Limit(n uint64) *LazyFrame {
 	return df.Lazy().Limit(n)
+}
+
+// Slice slices rows using offset and length semantics.
+func (df *EagerFrame) Slice(offset int64, length uint64) *LazyFrame {
+	return df.Lazy().Slice(offset, length)
+}
+
+// Head returns the first n rows.
+func (df *EagerFrame) Head(n uint64) *LazyFrame {
+	return df.Lazy().Head(n)
+}
+
+// Tail returns the last n rows.
+func (df *EagerFrame) Tail(n uint64) *LazyFrame {
+	return df.Lazy().Tail(n)
+}
+
+// FFill forward-fills null values across all columns.
+func (df *EagerFrame) FFill(limit ...uint64) *LazyFrame {
+	return df.Lazy().FFill(limit...)
+}
+
+// BFill backward-fills null values across all columns.
+func (df *EagerFrame) BFill(limit ...uint64) *LazyFrame {
+	return df.Lazy().BFill(limit...)
+}
+
+// FillNull fills null values across all columns.
+func (df *EagerFrame) FillNull(value interface{}) *LazyFrame {
+	return df.Lazy().FillNull(value)
+}
+
+// DropNulls drops rows containing nulls in the provided subset.
+func (df *EagerFrame) DropNulls(subset ...string) *LazyFrame {
+	return df.Lazy().DropNulls(subset...)
+}
+
+// Explode explodes list-like columns.
+func (df *EagerFrame) Explode(columns ...string) *LazyFrame {
+	return df.Lazy().Explode(columns...)
+}
+
+// Unpivot reshapes wide data to long format.
+func (df *EagerFrame) Unpivot(opts UnpivotOptions) *LazyFrame {
+	return df.Lazy().Unpivot(opts)
+}
+
+// Melt is an alias for Unpivot for pandas users.
+func (df *EagerFrame) Melt(opts UnpivotOptions) *LazyFrame {
+	return df.Lazy().Melt(opts)
 }
 
 // GroupBy groups rows by one or more column names.
@@ -172,4 +242,12 @@ func (df *EagerFrame) Unique(opts UniqueOptions) *LazyFrame {
 // Concat concatenates the eager frame with additional lazy inputs.
 func (df *EagerFrame) Concat(others ...*LazyFrame) *LazyFrame {
 	return df.Lazy().Concat(others...)
+}
+
+// Pivot performs an eager pivot operation aligned with Polars' eager-only pivot semantics.
+func (df *EagerFrame) Pivot(opts PivotOptions) (*EagerFrame, error) {
+	if df == nil || df.handle == 0 || df.brg == nil {
+		return nil, fmt.Errorf("dataframe is nil")
+	}
+	return pivotEagerFrame(df.brg, df.handle, opts)
 }

@@ -13,6 +13,11 @@ var (
 			return make([]arrowColumnDecoder, 0, 16)
 		},
 	}
+	anySlicePool = sync.Pool{
+		New: func() any {
+			return make([]any, 0, 16)
+		},
+	}
 )
 
 func getStringSlice(size int) []string {
@@ -43,4 +48,19 @@ func putArrowColumnDecoders(buf []arrowColumnDecoder) {
 		buf[i] = nil
 	}
 	columnDecoderSlicePool.Put(buf[:0])
+}
+
+func getAnySlice(size int) []any {
+	buf := anySlicePool.Get().([]any)
+	if cap(buf) < size {
+		return make([]any, size)
+	}
+	return buf[:size]
+}
+
+func putAnySlice(buf []any) {
+	for i := range buf {
+		buf[i] = nil
+	}
+	anySlicePool.Put(buf[:0])
 }

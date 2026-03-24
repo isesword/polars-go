@@ -1,4 +1,6 @@
 use polars::datatypes::{DataType, TimeUnit};
+use polars::lazy::frame::pivot::{pivot, pivot_stable};
+use polars::prelude::col;
 use polars::prelude::{AnyValue, DataFrame, IntoLazy, Series};
 use polars::sql::SQLContext;
 use prost::Message;
@@ -51,8 +53,24 @@ fn enforce_memory_limit(df: &DataFrame, context: &str) -> Result<(), BridgeError
 
     let estimated = df.estimated_size() as i64;
     if estimated > limit {
-        return Err(BridgeError::Execution(format!(
+        return Err(BridgeError::Oom(format!(
             "memory limit exceeded during {}: estimated {} bytes exceeds configured limit {} bytes",
+            context, estimated, limit
+        )));
+    }
+    Ok(())
+}
+
+fn enforce_input_memory_limit(input_dfs: &[&DataFrame], context: &str) -> Result<(), BridgeError> {
+    let limit = MEMORY_LIMIT_BYTES.load(Ordering::Relaxed);
+    if limit <= 0 || input_dfs.is_empty() {
+        return Ok(());
+    }
+
+    let estimated: i64 = input_dfs.iter().map(|df| df.estimated_size() as i64).sum();
+    if estimated > limit {
+        return Err(BridgeError::Oom(format!(
+            "memory limit exceeded before {}: input estimate {} bytes exceeds configured limit {} bytes",
             context, estimated, limit
         )));
     }
@@ -229,6 +247,59 @@ pub extern "C" fn bridge_plan_free(plan_handle: u64) {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn bridge_plan_explain(
+    plan_handle: u64,
+    input_df_handles_ptr: *const u64,
+    input_df_handles_len: usize,
+    optimized: c_int,
+    out_ptr: *mut *const c_char,
+    out_len: *mut usize,
+) -> c_int {
+    ffi_guard!({
+        if plan_handle == 0 || out_ptr.is_null() || out_len.is_null() {
+            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        }
+
+        let plan = unsafe { &*(plan_handle as *const proto::Plan) };
+        let input_df_handles = if input_df_handles_len == 0 {
+            &[][..]
+        } else {
+            if input_df_handles_ptr.is_null() {
+                return Err(BridgeError::InvalidArgument(
+                    "Input dataframe handles pointer is null".into(),
+                ));
+            }
+            unsafe { slice::from_raw_parts(input_df_handles_ptr, input_df_handles_len) }
+        };
+        let input_dfs: Vec<&DataFrame> = input_df_handles
+            .iter()
+            .map(|handle| {
+                if *handle == 0 {
+                    return Err(BridgeError::InvalidArgument(
+                        "Input dataframe handle must not be zero".into(),
+                    ));
+                }
+                Ok(unsafe { &*(*handle as *const DataFrame) })
+            })
+            .collect::<Result<_, _>>()?;
+        let lf = executor::build_plan_lazy_frame(plan, &input_dfs)?;
+        let optimized = optimized != 0;
+        let explanation = lf
+            .explain(optimized)
+            .map_err(|e| BridgeError::Execution(format!("Failed to explain plan: {}", e)))?;
+        let cstr = CString::new(explanation)
+            .map_err(|e| BridgeError::Execution(format!("Failed to encode explanation: {}", e)))?;
+        let len = cstr.as_bytes().len();
+        let ptr = cstr.into_raw();
+        unsafe {
+            *out_ptr = ptr;
+            *out_len = len;
+        }
+        Ok(0)
+    })
+}
+
 // 4b. 执行并返回 DataFrame（句柄）
 #[no_mangle]
 pub extern "C" fn bridge_plan_collect_df(
@@ -265,6 +336,7 @@ pub extern "C" fn bridge_plan_collect_df(
             })
             .collect::<Result<_, _>>()?;
 
+        enforce_input_memory_limit(&input_dfs, "collect")?;
         let df = executor::execute_plan_df(plan, &input_dfs)?;
         enforce_memory_limit(&df, "collect")?;
         let handle = Box::into_raw(Box::new(df)) as u64;
@@ -420,6 +492,7 @@ pub extern "C" fn bridge_plan_execute_arrow(
         };
 
         let input_dfs: Vec<&DataFrame> = input_df.as_ref().into_iter().collect();
+        enforce_input_memory_limit(&input_dfs, "arrow execution")?;
         let df = executor::execute_plan_df(plan, &input_dfs)?;
         enforce_memory_limit(&df, "arrow execution")?;
         arrow_bridge::export_dataframe_to_arrow(&df, output_schema, output_array)?;
@@ -529,6 +602,113 @@ pub extern "C" fn bridge_df_from_arrow(
     })
 }
 
+#[derive(serde::Deserialize)]
+struct PivotRequest {
+    on: Vec<String>,
+    #[serde(default)]
+    index: Vec<String>,
+    #[serde(default)]
+    values: Vec<String>,
+    #[serde(default)]
+    aggregate: String,
+    #[serde(default)]
+    sort_columns: bool,
+    #[serde(default)]
+    maintain_order: bool,
+    #[serde(default)]
+    separator: String,
+}
+
+fn build_pivot_agg_expr(name: &str) -> Result<Option<polars::prelude::Expr>, BridgeError> {
+    let expr = match name {
+        "" => return Ok(None),
+        "first" => col("").first(),
+        "last" => col("").last(),
+        "sum" => col("").sum(),
+        "min" => col("").min(),
+        "max" => col("").max(),
+        "mean" => col("").mean(),
+        "median" => col("").median(),
+        "count" | "len" => col("").count(),
+        other => {
+            return Err(BridgeError::Unsupported(format!(
+                "unsupported pivot aggregate {}",
+                other
+            )))
+        }
+    };
+    Ok(Some(expr))
+}
+
+#[no_mangle]
+pub extern "C" fn bridge_df_pivot(
+    df_handle: u64,
+    options_ptr: *const c_char,
+    options_len: usize,
+    out_df_handle: *mut u64,
+) -> c_int {
+    ffi_guard!({
+        if df_handle == 0 || options_ptr.is_null() || out_df_handle.is_null() {
+            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        }
+
+        let df = unsafe { &*(df_handle as *const DataFrame) };
+        let options_slice = unsafe { slice::from_raw_parts(options_ptr as *const u8, options_len) };
+        let opts: PivotRequest = serde_json::from_slice(options_slice).map_err(|e| {
+            BridgeError::InvalidArgument(format!("Invalid pivot options JSON: {}", e))
+        })?;
+
+        if opts.on.is_empty() {
+            return Err(BridgeError::InvalidArgument(
+                "pivot options require at least one 'on' column".into(),
+            ));
+        }
+        let index = if opts.index.is_empty() {
+            None
+        } else {
+            Some(opts.index.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+        };
+        let values = if opts.values.is_empty() {
+            None
+        } else {
+            Some(opts.values.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+        };
+        let agg_expr = build_pivot_agg_expr(opts.aggregate.as_str())?;
+        let separator = if opts.separator.is_empty() {
+            None
+        } else {
+            Some(opts.separator.as_str())
+        };
+
+        let result = if opts.maintain_order {
+            pivot_stable(
+                df,
+                opts.on.iter().map(|s| s.as_str()),
+                index.as_ref().map(|items| items.iter().copied()),
+                values.as_ref().map(|items| items.iter().copied()),
+                opts.sort_columns,
+                agg_expr,
+                separator,
+            )
+        } else {
+            pivot(
+                df,
+                opts.on.iter().map(|s| s.as_str()),
+                index.as_ref().map(|items| items.iter().copied()),
+                values.as_ref().map(|items| items.iter().copied()),
+                opts.sort_columns,
+                agg_expr,
+                separator,
+            )
+        }
+        .map_err(|e| BridgeError::Execution(format!("Pivot failed: {}", e)))?;
+
+        let handle = Box::into_raw(Box::new(result)) as u64;
+        unsafe { *out_df_handle = handle };
+        Ok(0)
+    })
+}
+
 #[no_mangle]
 pub extern "C" fn bridge_sql_collect_df(
     query_ptr: *const c_char,
@@ -584,6 +764,12 @@ pub extern "C" fn bridge_sql_collect_df(
             let df = unsafe { &*(*handle as *const DataFrame) };
             ctx.register(name, df.clone().lazy());
         }
+
+        let input_dfs: Vec<&DataFrame> = input_df_handles
+            .iter()
+            .map(|handle| unsafe { &*(*handle as *const DataFrame) })
+            .collect();
+        enforce_input_memory_limit(&input_dfs, "sql collect")?;
 
         let lf = ctx
             .execute(query)
@@ -706,6 +892,8 @@ pub extern "C" fn bridge_sql_collect_df_from_plans(
                     Ok(unsafe { &*(*handle as *const DataFrame) })
                 })
                 .collect::<Result<_, _>>()?;
+
+            enforce_input_memory_limit(&input_dfs, "sql collect")?;
 
             let lf = executor::build_plan_lazy_frame(plan, &input_dfs)?;
             ctx.register(name, lf);

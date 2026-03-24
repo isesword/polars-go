@@ -188,8 +188,11 @@ defer result.Close()
 
 说明：
 
+- 这是一个**可选**执行保护配置，默认关闭；不设置时行为与之前一致
 - `MemoryLimitBytes <= 0` 表示关闭限制
+- 这是本项目提供的执行保护能力，不是 Python Polars 主库现成同名 API 的直接镜像
 - 当前第一版由 Go 提供配置入口，Rust 在 collect / SQL / Arrow 导入导出结果上做超限检查
+- 超限时会返回 `ERR_OOM`
 - 这是一版最小可用的 memory limit，不是完整的 spill-to-disk 方案
 
 ## 📦 安装
@@ -521,6 +524,29 @@ uniqueDepartments := lf.Select(polars.Col("department")).Unique(polars.UniqueOpt
     Keep:   "first",
 })
 
+// Forward fill
+ffilled := lf.Select(
+    polars.Col("id"),
+    polars.Col("value").FFill().Alias("value_ffill"),
+)
+
+// Basic dataframe utilities
+trimmed := df.Drop("bonus").Rename(map[string]string{
+    "name": "person_name",
+})
+head := df.Head(5)
+tail := df.Tail(5)
+filled := df.FillNull(int64(0))
+backfilled := df.BFill()
+nonNull := df.DropNulls("age", "salary")
+exploded := df.Explode("tags")
+unpivoted := df.Unpivot(polars.UnpivotOptions{
+    On:           []string{"math", "english"},
+    Index:        []string{"name"},
+    VariableName: "subject",
+    ValueName:    "score",
+})
+
 // When / Then / Otherwise
 labeled := lf.Select(
     polars.Col("name"),
@@ -569,10 +595,29 @@ exprMappedMany, _ := df.Select(
     }).Alias("age_bonus"),
 ).Collect()
 
+// Pivot (eager-only, aligned with Polars eager pivot semantics)
+pivoted, _ := df.Pivot(polars.PivotOptions{
+    On:            []string{"subject"},
+    Index:         []string{"name"},
+    Values:        []string{"score"},
+    Aggregate:     "first",
+    MaintainOrder: true,
+})
+defer pivoted.Close()
+
 // 避免示例里未使用变量
 _ = summary
 _ = sorted
 _ = uniqueDepartments
+_ = ffilled
+_ = trimmed
+_ = head
+_ = tail
+_ = filled
+_ = backfilled
+_ = nonNull
+_ = exploded
+_ = unpivoted
 _ = labeled
 _ = mappedDF
 _ = batchMappedDF
@@ -1446,12 +1491,14 @@ EagerFrame（新的结果）
 - [x] Parquet 文件懒加载扫描
 - [x] CSV / Parquet 扫描参数：HasHeader / Separator / SkipRows / InferSchemaLength / NullValue / TryParseDates / QuoteChar / CommentPrefix / Schema / Encoding / IgnoreErrors / Rechunk
 - [x] Filter / Select / WithColumns / Limit 操作
+- [x] Drop / Rename / Slice / Head / Tail 操作
+- [x] FillNull / BFill / DropNulls / Explode / Unpivot(Melt) 操作
 - [x] 完整的表达式系统：
   - 算术操作：Add, Sub, Mul, Div, **Mod, Pow**
   - 比较操作：Eq, Ne, Gt, Ge, Lt, Le
   - 逻辑操作：And, Or, **Not, Xor**
   - 类型转换：Cast, StrictCast
-  - 其他：Alias, IsNull, Cols, All
+  - 其他：Alias, IsNull, Cols, All, Exclude, FillNull, FFill, BFill
 - [x] 字符串表达式：
   - StrLenBytes, StrLenChars
   - StrContains, StrStartsWith, StrEndsWith
@@ -1474,6 +1521,8 @@ EagerFrame（新的结果）
 - [x] Semi / Anti Join 操作
 - [x] Cross Join 操作
 - [x] Sort / Unique 操作
+- [x] Pivot 操作（eager）
+- [x] Forward fill (`FFill`)
 - [x] Concat / Union 风格的数据联合操作
 - [x] 完善的测试用例
 

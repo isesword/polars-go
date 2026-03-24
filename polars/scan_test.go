@@ -1027,6 +1027,310 @@ func TestTemporalExpressions(t *testing.T) {
 	}
 }
 
+func TestForwardFillExpression(t *testing.T) {
+	df, err := NewDataFrame([]map[string]any{
+		{"id": int64(1), "value": int64(10)},
+		{"id": int64(2), "value": nil},
+		{"id": int64(3), "value": int64(30)},
+	})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer df.Close()
+
+	rows, err := collectToMaps(t, df.Select(
+		Col("id"),
+		Col("value").FFill().Alias("value_ffill"),
+	))
+	if err != nil {
+		t.Fatalf("collectToMaps failed: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows, got %d", len(rows))
+	}
+	if rows[1]["value_ffill"] != int64(10) {
+		t.Fatalf("unexpected forward fill rows: %#v", rows)
+	}
+}
+
+func TestDataFramePivot(t *testing.T) {
+	df, err := NewDataFrame([]map[string]any{
+		{"name": "Alice", "subject": "math", "score": int64(90)},
+		{"name": "Alice", "subject": "english", "score": int64(85)},
+		{"name": "Bob", "subject": "math", "score": int64(70)},
+	})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer df.Close()
+
+	pivoted, err := df.Pivot(PivotOptions{
+		On:            []string{"subject"},
+		Index:         []string{"name"},
+		Values:        []string{"score"},
+		Aggregate:     "first",
+		MaintainOrder: true,
+	})
+	if err != nil {
+		t.Fatalf("Pivot failed: %v", err)
+	}
+	defer pivoted.Close()
+
+	rows, err := pivoted.ToMaps()
+	//fmt.Println(rows)
+	if err != nil {
+		t.Fatalf("pivoted.ToMaps failed: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(rows))
+	}
+	if rows[0]["name"] != "Alice" || rows[0]["math"] != int64(90) || rows[0]["english"] != int64(85) {
+		t.Fatalf("unexpected pivot rows: %#v", rows)
+	}
+}
+
+func TestBasicFrameOperations(t *testing.T) {
+	df, err := NewDataFrame([]map[string]any{
+		{"id": int64(1), "name": "Alice", "age": int64(10), "score": nil},
+		{"id": int64(2), "name": "Bob", "age": nil, "score": int64(20)},
+		{"id": int64(3), "name": "Cara", "age": int64(30), "score": int64(40)},
+	})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer df.Close()
+
+	t.Run("DropAndRename", func(t *testing.T) {
+		rows, err := collectToMaps(t, df.Drop("score").Rename(map[string]string{
+			"name": "person_name",
+		}))
+		if err != nil {
+			t.Fatalf("collectToMaps failed: %v", err)
+		}
+		if _, ok := rows[0]["score"]; ok {
+			t.Fatalf("expected score column to be dropped: %#v", rows[0])
+		}
+		if rows[0]["person_name"] != "Alice" {
+			t.Fatalf("unexpected renamed rows: %#v", rows[0])
+		}
+	})
+
+	t.Run("SliceHeadTail", func(t *testing.T) {
+		sliceRows, err := collectToMaps(t, df.Slice(1, 2))
+		if err != nil {
+			t.Fatalf("Slice collect failed: %v", err)
+		}
+		if len(sliceRows) != 2 || sliceRows[0]["id"] != int64(2) || sliceRows[1]["id"] != int64(3) {
+			t.Fatalf("unexpected slice rows: %#v", sliceRows)
+		}
+
+		headRows, err := collectToMaps(t, df.Head(1))
+		if err != nil {
+			t.Fatalf("Head collect failed: %v", err)
+		}
+		if len(headRows) != 1 || headRows[0]["id"] != int64(1) {
+			t.Fatalf("unexpected head rows: %#v", headRows)
+		}
+
+		tailRows, err := collectToMaps(t, df.Tail(1))
+		if err != nil {
+			t.Fatalf("Tail collect failed: %v", err)
+		}
+		if len(tailRows) != 1 || tailRows[0]["id"] != int64(3) {
+			t.Fatalf("unexpected tail rows: %#v", tailRows)
+		}
+	})
+
+	t.Run("FillNullBFillDropNulls", func(t *testing.T) {
+		fillRows, err := collectToMaps(t, df.FillNull(int64(0)))
+		if err != nil {
+			t.Fatalf("FillNull collect failed: %v", err)
+		}
+		if fillRows[1]["age"] != int64(0) || fillRows[0]["score"] != int64(0) {
+			t.Fatalf("unexpected fill null rows: %#v", fillRows)
+		}
+
+		bfillRows, err := collectToMaps(t, df.Select(
+			Col("id"),
+			Col("age").BFill().Alias("age_bfill"),
+		))
+		if err != nil {
+			t.Fatalf("BFill collect failed: %v", err)
+		}
+		if bfillRows[1]["age_bfill"] != int64(30) {
+			t.Fatalf("unexpected bfill rows: %#v", bfillRows)
+		}
+
+		dropNullRows, err := collectToMaps(t, df.DropNulls("age", "score"))
+		if err != nil {
+			t.Fatalf("DropNulls collect failed: %v", err)
+		}
+		if len(dropNullRows) != 1 || dropNullRows[0]["id"] != int64(3) {
+			t.Fatalf("unexpected drop null rows: %#v", dropNullRows)
+		}
+	})
+}
+
+func TestExplodeAndUnpivot(t *testing.T) {
+	t.Run("Explode", func(t *testing.T) {
+		schema := arrow.NewSchema([]arrow.Field{
+			{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+			{Name: "tags", Type: arrow.ListOf(arrow.BinaryTypes.String), Nullable: true},
+		}, nil)
+		df, err := NewDataFrame([]map[string]any{
+			{"id": int64(1), "tags": []any{"go", "polars"}},
+			{"id": int64(2), "tags": []any{"arrow"}},
+		}, WithArrowSchema(schema))
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		rows, err := collectToMaps(t, df.Explode("tags"))
+		if err != nil {
+			t.Fatalf("Explode collect failed: %v", err)
+		}
+		if len(rows) != 3 || rows[0]["tags"] != "go" || rows[2]["tags"] != "arrow" {
+			t.Fatalf("unexpected explode rows: %#v", rows)
+		}
+	})
+
+	t.Run("Unpivot", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"name": "Alice", "math": int64(90), "english": int64(85)},
+			{"name": "Bob", "math": int64(70), "english": int64(88)},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		rows, err := collectToMaps(t, df.Unpivot(UnpivotOptions{
+			On:           []string{"math", "english"},
+			Index:        []string{"name"},
+			VariableName: "subject",
+			ValueName:    "score",
+		}))
+		if err != nil {
+			t.Fatalf("Unpivot collect failed: %v", err)
+		}
+		if len(rows) != 4 || rows[0]["subject"] != "math" || rows[0]["score"] != int64(90) {
+			t.Fatalf("unexpected unpivot rows: %#v", rows)
+		}
+	})
+}
+
+func TestAdvancedConvenienceOperations(t *testing.T) {
+	t.Run("RegexSelectExcludeAndSortNullsLast", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"age": int64(10), "bonus": int64(1), "name": "Alice"},
+			{"age": nil, "bonus": int64(2), "name": "Bob"},
+			{"age": int64(5), "bonus": int64(3), "name": "Cara"},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		regexRows, err := collectToMaps(t, df.Select(ColRegex("^(age|bonus)$")))
+		if err != nil {
+			t.Fatalf("regex select failed: %v", err)
+		}
+		if _, ok := regexRows[0]["name"]; ok {
+			t.Fatalf("expected regex selection to exclude name: %#v", regexRows[0])
+		}
+
+		excludeRows, err := collectToMaps(t, df.Select(All().Exclude("bonus")))
+		if err != nil {
+			t.Fatalf("exclude failed: %v", err)
+		}
+		if _, ok := excludeRows[0]["bonus"]; ok {
+			t.Fatalf("expected exclude selection to drop bonus: %#v", excludeRows[0])
+		}
+
+		sortedRows, err := collectToMaps(t, df.Sort(SortOptions{
+			By:        []Expr{Col("age")},
+			NullsLast: []bool{true},
+		}))
+		if err != nil {
+			t.Fatalf("sort nulls_last failed: %v", err)
+		}
+		if sortedRows[0]["age"] != int64(5) || sortedRows[2]["age"] != nil {
+			t.Fatalf("unexpected nulls_last sort rows: %#v", sortedRows)
+		}
+	})
+
+	t.Run("StringHelpers", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"text": "pre_foo_foo_suf", "raw": "abc123def456"},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		rows, err := collectToMaps(t, df.Select(
+			Col("text").StrStripPrefix("pre_").Alias("strip_prefix"),
+			Col("text").StrStripSuffix("_suf").Alias("strip_suffix"),
+			Col("text").StrReplaceN("foo", "bar", true, 1).Alias("replace_n"),
+			Col("raw").StrExtractAll("\\d+").Alias("extract_all"),
+			Col("text").StrCountMatches("foo", true).Alias("count_matches"),
+		))
+		if err != nil {
+			t.Fatalf("string helper collect failed: %v", err)
+		}
+		row := rows[0]
+		if row["strip_prefix"] != "foo_foo_suf" || row["strip_suffix"] != "pre_foo_foo" {
+			t.Fatalf("unexpected strip results: %#v", row)
+		}
+		if row["replace_n"] != "pre_bar_foo_suf" {
+			t.Fatalf("unexpected replace/count results: %#v", row)
+		}
+		matchCount, ok := asFloat64(row["count_matches"])
+		if !ok || matchCount != 2 {
+			t.Fatalf("unexpected count_matches result: %#v", row["count_matches"])
+		}
+		values, ok := row["extract_all"].([]any)
+		if !ok || len(values) != 2 || values[0] != "123" || values[1] != "456" {
+			t.Fatalf("unexpected extract_all result: %#v", row["extract_all"])
+		}
+	})
+
+	t.Run("ExplainAndDescribe", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"name": "Alice", "age": int64(10)},
+			{"name": "Bob", "age": int64(20)},
+			{"name": "Cara", "age": nil},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		explain, err := df.Filter(Col("age").IsNull().Not()).Explain()
+		if err != nil {
+			t.Fatalf("Explain failed: %v", err)
+		}
+		if explain == "" || !strings.Contains(strings.ToUpper(explain), "FILTER") {
+			t.Fatalf("unexpected explain output: %q", explain)
+		}
+
+		described, err := df.Describe()
+		if err != nil {
+			t.Fatalf("Describe failed: %v", err)
+		}
+		defer described.Close()
+
+		describeRows, err := described.df.ToMaps()
+		if err != nil {
+			t.Fatalf("Describe ToMaps failed: %v", err)
+		}
+		if len(describeRows) == 0 || describeRows[0]["statistic"] != "count" {
+			t.Fatalf("unexpected describe rows: %#v", describeRows)
+		}
+	})
+}
+
 func TestStringOperations(t *testing.T) {
 	t.Run("StringOpsBasic", func(t *testing.T) {
 		lf := ScanCSV("../testdata/sample.csv").Select(
@@ -3500,7 +3804,7 @@ func TestExecutionOptionsMemoryLimitCollect(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected Collect to fail under tiny memory limit")
 	}
-	if !strings.Contains(err.Error(), "memory limit exceeded") {
+	if !strings.Contains(err.Error(), "ERR_OOM") || !strings.Contains(err.Error(), "memory limit exceeded") {
 		t.Fatalf("unexpected memory limit error: %v", err)
 	}
 }
@@ -3527,8 +3831,38 @@ func TestExecutionOptionsMemoryLimitDisabled(t *testing.T) {
 	}
 }
 
+func TestExecutionOptionsMemoryLimitSQL(t *testing.T) {
+	df, err := NewDataFrame([]map[string]any{
+		{"name": "Alice", "age": int64(25)},
+		{"name": "Bob", "age": int64(35)},
+	})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer df.Close()
+
+	if err := SetExecutionOptions(ExecutionOptions{MemoryLimitBytes: 1}); err != nil {
+		t.Fatalf("SetExecutionOptions failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := SetExecutionOptions(ExecutionOptions{}); err != nil {
+			t.Fatalf("reset execution options failed: %v", err)
+		}
+	})
+
+	_, err = NewSQLContext(map[string]any{
+		"people": df,
+	}).Execute("SELECT * FROM people")
+	if err == nil {
+		t.Fatal("expected SQL Execute to fail under tiny memory limit")
+	}
+	if !strings.Contains(err.Error(), "ERR_OOM") || !strings.Contains(err.Error(), "memory limit exceeded") {
+		t.Fatalf("unexpected SQL memory limit error: %v", err)
+	}
+}
+
 func TestDataFrameFreeBehavior(t *testing.T) {
-	brg, err := bridge.LoadBridge("/Users/esword/GolandProjects/src/polars-go-bridge/libpolars_bridge.dylib")
+	brg, err := bridge.LoadBridge("")
 	if err != nil {
 		t.Fatalf("Failed to load bridge: %v", err)
 	}

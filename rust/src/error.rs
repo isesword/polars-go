@@ -42,6 +42,7 @@ pub enum BridgeError {
     PlanSemantic(String),
     ArrowImport(String),
     ArrowExport(String),
+    Oom(String),
     Execution(String),
     Unsupported(String),
 }
@@ -58,6 +59,7 @@ impl std::fmt::Display for BridgeError {
             BridgeError::PlanSemantic(s) => write!(f, "Plan semantic error: {}", s),
             BridgeError::ArrowImport(s) => write!(f, "Arrow import error: {}", s),
             BridgeError::ArrowExport(s) => write!(f, "Arrow export error: {}", s),
+            BridgeError::Oom(s) => write!(f, "Out of memory: {}", s),
             BridgeError::Execution(s) => write!(f, "Execution error: {}", s),
             BridgeError::Unsupported(s) => write!(f, "Unsupported: {}", s),
         }
@@ -77,6 +79,7 @@ pub fn bridge_error_to_code(err: &BridgeError) -> (ErrorCode, String) {
         BridgeError::PlanSemantic(s) => (ErrorCode::PlanSemantic, s.clone()),
         BridgeError::ArrowImport(s) => (ErrorCode::ArrowImport, s.clone()),
         BridgeError::ArrowExport(s) => (ErrorCode::ArrowExport, s.clone()),
+        BridgeError::Oom(s) => (ErrorCode::Oom, s.clone()),
         BridgeError::Execution(s) => (ErrorCode::Execution, s.clone()),
         BridgeError::Unsupported(s) => (ErrorCode::Unsupported, s.clone()),
     }

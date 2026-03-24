@@ -4,6 +4,7 @@ use crate::expr_str;
 use crate::expr_temporal;
 use crate::proto;
 use polars::lazy::dsl::concat as concat_lf;
+use polars::lazy::dsl::{all, by_name};
 use polars::prelude::IntoLazy;
 use polars::prelude::NullValues;
 use polars::prelude::PlPath;
@@ -188,6 +189,26 @@ fn build_lazy_frame(
 
             Ok(lf.select(&exprs))
         }
+        Kind::Drop(drop) => {
+            let input_node = drop
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Drop has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            Ok(lf.drop(by_name(drop.columns.iter().cloned(), true)))
+        }
+        Kind::Rename(rename) => {
+            let input_node = rename
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Rename has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            Ok(lf.rename(
+                rename.existing.iter().map(|s| s.as_str()),
+                rename.new.iter().map(|s| s.as_str()),
+                rename.strict,
+            ))
+        }
         Kind::Filter(filter) => {
             let input_node = filter
                 .input
@@ -226,6 +247,14 @@ fn build_lazy_frame(
             let lf = build_lazy_frame(input_node, input_dfs)?;
 
             Ok(lf.limit(limit.n as u32))
+        }
+        Kind::Slice(slice) => {
+            let input_node = slice
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Slice has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            Ok(lf.slice(slice.offset, slice.len as IdxSize))
         }
         Kind::GroupBy(group_by) => {
             let input_node = group_by
@@ -302,8 +331,9 @@ fn build_lazy_frame(
                 .map(|e| build_expr(e))
                 .collect::<Result<_, _>>()?;
 
-            let options =
-                SortMultipleOptions::default().with_order_descending_multi(sort.descending.clone());
+            let options = SortMultipleOptions::default()
+                .with_order_descending_multi(sort.descending.clone())
+                .with_nulls_last_multi(sort.nulls_last.clone());
 
             Ok(lf.sort_by_exprs(by, options))
         }
@@ -360,6 +390,49 @@ fn build_lazy_frame(
             };
             concat_lf(inputs, args)
                 .map_err(|e| BridgeError::Execution(format!("Failed to concat LazyFrames: {}", e)))
+        }
+        Kind::Explode(explode) => {
+            let input_node = explode
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Explode has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            Ok(lf.explode(by_name(explode.columns.iter().cloned(), true)))
+        }
+        Kind::DropNulls(drop_nulls) => {
+            let input_node = drop_nulls
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("DropNulls has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            let subset = if drop_nulls.subset.is_empty() {
+                None
+            } else {
+                Some(by_name(drop_nulls.subset.iter().cloned(), true))
+            };
+            Ok(lf.drop_nulls(subset))
+        }
+        Kind::Unpivot(unpivot) => {
+            let input_node = unpivot
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Unpivot has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            let args = UnpivotArgsDSL {
+                on: by_name(unpivot.on.iter().cloned(), true),
+                index: by_name(unpivot.index.iter().cloned(), true),
+                variable_name: if unpivot.variable_name.is_empty() {
+                    None
+                } else {
+                    Some(unpivot.variable_name.clone().into())
+                },
+                value_name: if unpivot.value_name.is_empty() {
+                    None
+                } else {
+                    Some(unpivot.value_name.clone().into())
+                },
+            };
+            Ok(lf.unpivot(args))
         }
         Kind::SqlQuery(sql_query) => {
             if sql_query.query.is_empty() {
@@ -481,11 +554,19 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
             // Wildcard 表示选择所有列
             Ok(polars::prelude::col("*"))
         }
-        Kind::Exclude(_) => {
-            // Exclude 功能暂未实现
-            Err(BridgeError::Unsupported(
-                "Exclude operation is not yet supported".into(),
-            ))
+        Kind::Exclude(exclude) => {
+            let expr = exclude
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Exclude has no expr".into()))?;
+            match expr.kind.as_ref() {
+                Some(proto::expr::Kind::Wildcard(_)) => {
+                    Ok(all().exclude_cols(exclude.columns.clone()).as_expr())
+                }
+                _ => Err(BridgeError::Unsupported(
+                    "Exclude currently supports wildcard expressions only".into(),
+                )),
+            }
         }
         Kind::Cast(cast) => {
             // 处理类型转换
@@ -783,6 +864,39 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
                 }
             };
             Ok(e.diff(lit(diff.periods), null_behavior))
+        }
+        Kind::ForwardFill(fill) => {
+            let expr = fill
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("ForwardFill has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.fill_null_with_strategy(FillNullStrategy::Forward(
+                fill.limit.map(|v| v as IdxSize),
+            )))
+        }
+        Kind::FillNull(fill) => {
+            let expr = fill
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("FillNull has no expr".into()))?;
+            let fill_value = fill
+                .fill_value
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("FillNull has no fill_value".into()))?;
+            let e = build_expr(expr)?;
+            let fv = build_expr(fill_value)?;
+            Ok(e.fill_null(fv))
+        }
+        Kind::BackwardFill(fill) => {
+            let expr = fill
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("BackwardFill has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.fill_null_with_strategy(FillNullStrategy::Backward(
+                fill.limit.map(|v| v as IdxSize),
+            )))
         }
         _ => Err(BridgeError::Unsupported(
             "Expression type is not yet supported".into(),

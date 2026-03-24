@@ -53,6 +53,7 @@ type JoinOptions struct {
 type SortOptions struct {
 	By         []Expr
 	Descending []bool
+	NullsLast  []bool
 }
 
 type UniqueOptions struct {
@@ -67,6 +68,23 @@ type ConcatOptions struct {
 	Parallel      bool
 	Diagonal      bool
 	MaintainOrder bool
+}
+
+type PivotOptions struct {
+	On            []string `json:"on"`
+	Index         []string `json:"index"`
+	Values        []string `json:"values"`
+	Aggregate     string   `json:"aggregate"`
+	SortColumns   bool     `json:"sort_columns"`
+	MaintainOrder bool     `json:"maintain_order"`
+	Separator     string   `json:"separator"`
+}
+
+type UnpivotOptions struct {
+	On           []string
+	Index        []string
+	VariableName string
+	ValueName    string
 }
 
 type CSVScanOptions struct {
@@ -328,6 +346,58 @@ func (lf *LazyFrame) Select(exprs ...Expr) *LazyFrame {
 	return lf.withRoot(newNode)
 }
 
+// Drop removes columns from the lazy frame.
+func (lf *LazyFrame) Drop(columns ...string) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Drop{
+			Drop: &pb.Drop{
+				Input:   lf.root,
+				Columns: columns,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// Rename renames columns using mapping semantics similar to Python Polars.
+func (lf *LazyFrame) Rename(mapping map[string]string, strict ...bool) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	existing := make([]string, 0, len(mapping))
+	newNames := make([]string, 0, len(mapping))
+	for oldName, newName := range mapping {
+		existing = append(existing, oldName)
+		newNames = append(newNames, newName)
+	}
+	isStrict := true
+	if len(strict) > 0 {
+		isStrict = strict[0]
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Rename{
+			Rename: &pb.Rename{
+				Input:    lf.root,
+				Existing: existing,
+				New:      newNames,
+				Strict:   isStrict,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
 // WithColumns 添加或修改列
 func (lf *LazyFrame) WithColumns(exprs ...Expr) *LazyFrame {
 	if lf == nil {
@@ -371,6 +441,138 @@ func (lf *LazyFrame) Limit(n uint64) *LazyFrame {
 		},
 	}
 	return lf.withRoot(newNode)
+}
+
+// Slice returns a slice of rows using offset and length semantics.
+func (lf *LazyFrame) Slice(offset int64, length uint64) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Slice{
+			Slice: &pb.Slice{
+				Input:  lf.root,
+				Offset: offset,
+				Len:    length,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// Head returns the first n rows.
+func (lf *LazyFrame) Head(n uint64) *LazyFrame {
+	return lf.Slice(0, n)
+}
+
+// Tail returns the last n rows.
+func (lf *LazyFrame) Tail(n uint64) *LazyFrame {
+	return lf.Slice(-int64(n), n)
+}
+
+// FFill forward-fills null values across all columns.
+func (lf *LazyFrame) FFill(limit ...uint64) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	return lf.WithColumns(All().FFill(limit...))
+}
+
+// BFill backward-fills null values across all columns.
+func (lf *LazyFrame) BFill(limit ...uint64) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	return lf.WithColumns(All().BFill(limit...))
+}
+
+// FillNull fills null values across all columns with the provided value.
+func (lf *LazyFrame) FillNull(value interface{}) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	return lf.WithColumns(All().FillNull(value))
+}
+
+// DropNulls drops rows that contain nulls in the provided subset.
+func (lf *LazyFrame) DropNulls(subset ...string) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_DropNulls{
+			DropNulls: &pb.DropNulls{
+				Input:  lf.root,
+				Subset: subset,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// Explode explodes list-like columns.
+func (lf *LazyFrame) Explode(columns ...string) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Explode{
+			Explode: &pb.Explode{
+				Input:   lf.root,
+				Columns: columns,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// Unpivot reshapes wide data to long format.
+func (lf *LazyFrame) Unpivot(opts UnpivotOptions) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Unpivot{
+			Unpivot: &pb.Unpivot{
+				Input:        lf.root,
+				On:           opts.On,
+				Index:        opts.Index,
+				VariableName: opts.VariableName,
+				ValueName:    opts.ValueName,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// Melt is an alias for Unpivot for pandas users.
+func (lf *LazyFrame) Melt(opts UnpivotOptions) *LazyFrame {
+	return lf.Unpivot(opts)
 }
 
 // GroupBy groups rows by one or more column names.
@@ -469,7 +671,7 @@ func (lf *LazyFrame) Sort(opts SortOptions) *LazyFrame {
 	if lf.err != nil {
 		return lf.withErr(lf.err)
 	}
-	exprs, flags, err := normalizeSortOptions(opts)
+	exprs, flags, nullsLast, err := normalizeSortOptions(opts)
 	if err != nil {
 		return lf.withErr(err)
 	}
@@ -484,6 +686,7 @@ func (lf *LazyFrame) Sort(opts SortOptions) *LazyFrame {
 				Input:      lf.root,
 				By:         protoExprs,
 				Descending: flags,
+				NullsLast:  nullsLast,
 			},
 		},
 	}
@@ -539,19 +742,7 @@ func (lf *LazyFrame) Collect() (*EagerFrame, error) {
 			return nil, fmt.Errorf("bridge mismatch for memory source %d", i)
 		}
 	}
-	// 1. 构建 Plan
-	plan := &pb.Plan{
-		PlanVersion: 1,
-		Root:        lf.root,
-	}
-
-	// 2. 编译 Plan
-	planBytes, err := proto.Marshal(plan)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal plan: %w", err)
-	}
-
-	handle, err := brg.CompilePlan(planBytes)
+	handle, err := lf.compilePlan(brg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile plan: %w", err)
 	}
@@ -591,19 +782,7 @@ func (lf *LazyFrame) Print() error {
 		return df.Print()
 	}
 
-	// 1. 构建 Plan
-	plan := &pb.Plan{
-		PlanVersion: 1,
-		Root:        lf.root,
-	}
-
-	// 2. 编译 Plan
-	planBytes, err := proto.Marshal(plan)
-	if err != nil {
-		return fmt.Errorf("failed to marshal plan: %w", err)
-	}
-
-	handle, err := brg.CompilePlan(planBytes)
+	handle, err := lf.compilePlan(brg)
 	if err != nil {
 		return fmt.Errorf("failed to compile plan: %w", err)
 	}
@@ -616,6 +795,52 @@ func (lf *LazyFrame) Print() error {
 	}
 
 	return nil
+}
+
+// Explain returns the logical or optimized plan description.
+func (lf *LazyFrame) Explain(optimized ...bool) (string, error) {
+	if lf == nil {
+		return "", fmt.Errorf("lazyframe is nil")
+	}
+	if lf.err != nil {
+		return "", lf.err
+	}
+	brg, err := resolveBridge(nil)
+	if err != nil {
+		return "", err
+	}
+	handle, err := lf.compilePlan(brg)
+	if err != nil {
+		return "", fmt.Errorf("failed to compile plan: %w", err)
+	}
+	defer brg.FreePlan(handle)
+
+	useOptimized := true
+	if len(optimized) > 0 {
+		useOptimized = optimized[0]
+	}
+	inputHandles := make([]uint64, len(lf.memorySources))
+	for i, src := range lf.memorySources {
+		if src == nil || src.handle == 0 {
+			return "", fmt.Errorf("memory source %d is nil", i)
+		}
+		inputHandles[i] = src.handle
+	}
+	return brg.ExplainPlan(handle, inputHandles, useOptimized)
+}
+
+func (lf *LazyFrame) compilePlan(brg interface {
+	CompilePlan([]byte) (uint64, error)
+}) (uint64, error) {
+	plan := &pb.Plan{
+		PlanVersion: 1,
+		Root:        lf.root,
+	}
+	planBytes, err := proto.Marshal(plan)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal plan: %w", err)
+	}
+	return brg.CompilePlan(planBytes)
 }
 
 // Agg finalizes a group-by pipeline and returns a LazyFrame.
@@ -687,17 +912,21 @@ func normalizeJoinOptions(opts JoinOptions) ([]Expr, []Expr, JoinType, string, e
 	return opts.LeftOn, opts.RightOn, how, suffix, nil
 }
 
-func normalizeSortOptions(opts SortOptions) ([]Expr, []bool, error) {
+func normalizeSortOptions(opts SortOptions) ([]Expr, []bool, []bool, error) {
 	if len(opts.By) == 0 {
-		return nil, nil, fmt.Errorf("sort options require at least one expression in By")
+		return nil, nil, nil, fmt.Errorf("sort options require at least one expression in By")
 	}
-	flags := make([]bool, len(opts.By))
-	for i := range flags {
+	descending := make([]bool, len(opts.By))
+	nullsLast := make([]bool, len(opts.By))
+	for i := range descending {
 		if i < len(opts.Descending) {
-			flags[i] = opts.Descending[i]
+			descending[i] = opts.Descending[i]
+		}
+		if i < len(opts.NullsLast) {
+			nullsLast[i] = opts.NullsLast[i]
 		}
 	}
-	return opts.By, flags, nil
+	return opts.By, descending, nullsLast, nil
 }
 
 func normalizeUniqueKeep(keep string) (UniqueKeepStrategy, error) {

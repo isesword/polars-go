@@ -27,6 +27,12 @@ message Node {
     Unique unique = 20;
     Concat concat = 21;
     SqlQuery sql_query = 22;
+    Drop drop = 23;
+    Rename rename = 24;
+    Slice slice = 25;
+    Explode explode = 26;
+    DropNulls drop_nulls = 27;
+    Unpivot unpivot = 28;
   }
 
   reserved 50 to 99;   // window reserved
@@ -120,6 +126,7 @@ message Sort {
   Node input = 1;
   repeated Expr by = 2;
   repeated bool descending = 3;
+  repeated bool nulls_last = 4;
 }
 
 enum UniqueKeepStrategy {
@@ -149,6 +156,42 @@ message SqlQuery {
   string query = 1;
   repeated string table_names = 2;
   repeated Node inputs = 3;
+}
+
+message Drop {
+  Node input = 1;
+  repeated string columns = 2;
+}
+
+message Rename {
+  Node input = 1;
+  repeated string existing = 2;
+  repeated string new = 3;
+  bool strict = 4;
+}
+
+message Slice {
+  Node input = 1;
+  int64 offset = 2;
+  uint64 len = 3;
+}
+
+message Explode {
+  Node input = 1;
+  repeated string columns = 2;
+}
+
+message DropNulls {
+  Node input = 1;
+  repeated string subset = 2;
+}
+
+message Unpivot {
+  Node input = 1;
+  repeated string on = 2;
+  repeated string index = 3;
+  string variable_name = 4;
+  string value_name = 5;
 }
 
 // 表达式
@@ -199,6 +242,9 @@ message Expr {
     TemporalUnary dt_month_start = 118;
     TemporalUnary dt_month_end = 119;
     TemporalParse str_to_time = 120;
+    ForwardFill forward_fill = 121;
+    FillNull fill_null = 122;
+    BackwardFill backward_fill = 123;
     
     // 字符串函数 (50-99)
     StringFunction str_len_bytes = 50;
@@ -217,10 +263,15 @@ message Expr {
     StringSplit str_split = 63;
     StringPad str_pad_start = 64;
     StringPad str_pad_end = 65;
+    StringAffix str_strip_prefix = 66;
+    StringAffix str_strip_suffix = 67;
+    StringPattern str_extract_all = 68;
+    StringContains str_count_matches = 69;
+    StringReplaceN str_replace_n = 70;
   }
   
-  reserved 66 to 99;   // 预留更多字符串函数
-  reserved 121 to 149; // more temporal/window functions reserved
+  reserved 71 to 99;   // 预留更多字符串函数
+  reserved 124 to 149; // more temporal/window functions reserved
 }
 
 // 列引用
@@ -395,6 +446,21 @@ message Diff {
   DiffNullBehavior null_behavior = 3;
 }
 
+message ForwardFill {
+  Expr expr = 1;
+  optional uint64 limit = 2;
+}
+
+message FillNull {
+  Expr expr = 1;
+  Expr fill_value = 2;
+}
+
+message BackwardFill {
+  Expr expr = 1;
+  optional uint64 limit = 2;
+}
+
 message TemporalUnary {
   Expr expr = 1;
 }
@@ -462,6 +528,24 @@ message StringReplace {
   string pattern = 2;
   string value = 3;
   bool literal = 4;  // true: 字面字符串, false: 正则表达式
+}
+
+message StringReplaceN {
+  Expr expr = 1;
+  string pattern = 2;
+  string value = 3;
+  bool literal = 4;
+  int64 n = 5;
+}
+
+message StringPattern {
+  Expr expr = 1;
+  string pattern = 2;
+}
+
+message StringAffix {
+  Expr expr = 1;
+  string value = 2;
 }
 
 // 字符串修剪

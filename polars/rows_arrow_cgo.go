@@ -13,6 +13,8 @@ import (
 	pb "github.com/isesword/polars-go-bridge/proto"
 )
 
+var recordBatchAllocator = mallocator.NewMallocator()
+
 // NewArrowRecordBatchFromRowsWithSchema converts row-oriented Go data into an
 // Arrow RecordBatch using an explicit primitive schema.
 func NewArrowRecordBatchFromRowsWithSchema(
@@ -64,8 +66,7 @@ func NewArrowRecordBatchFromRowsWithArrowSchema(
 		return nil, fmt.Errorf("schema is nil")
 	}
 
-	alloc := mallocator.NewMallocator()
-	builder := array.NewRecordBuilder(alloc, schema)
+	builder := array.NewRecordBuilder(recordBatchAllocator, schema)
 	defer builder.Release()
 
 	fields := schema.Fields()
@@ -214,9 +215,12 @@ func appendValueToArrowBuilder(builder array.Builder, value any, dataType arrow.
 		}
 		b.Append(v)
 	case *array.ListBuilder:
-		values, err := toInterfaceSlice(value)
+		values, pooled, err := toInterfaceSlice(value)
 		if err != nil {
 			return fmt.Errorf("%s: expected list-compatible value, got %T: %w", path, value, err)
+		}
+		if pooled {
+			defer putAnySlice(values)
 		}
 		listType, ok := dataType.(*arrow.ListType)
 		if !ok {
@@ -229,9 +233,12 @@ func appendValueToArrowBuilder(builder array.Builder, value any, dataType arrow.
 			}
 		}
 	case *array.LargeListBuilder:
-		values, err := toInterfaceSlice(value)
+		values, pooled, err := toInterfaceSlice(value)
 		if err != nil {
 			return fmt.Errorf("%s: expected large-list-compatible value, got %T: %w", path, value, err)
+		}
+		if pooled {
+			defer putAnySlice(values)
 		}
 		listType, ok := dataType.(*arrow.LargeListType)
 		if !ok {
@@ -296,21 +303,21 @@ func appendNullToArrowBuilder(builder array.Builder, dataType arrow.DataType, pa
 	}
 }
 
-func toInterfaceSlice(value any) ([]any, error) {
+func toInterfaceSlice(value any) ([]any, bool, error) {
 	if items, ok := value.([]any); ok {
-		return items, nil
+		return items, false, nil
 	}
 
 	rv := reflect.ValueOf(value)
 	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
-		return nil, fmt.Errorf("value is not a slice")
+		return nil, false, fmt.Errorf("value is not a slice")
 	}
 
-	items := make([]any, rv.Len())
+	items := getAnySlice(rv.Len())
 	for i := 0; i < rv.Len(); i++ {
 		items[i] = rv.Index(i).Interface()
 	}
-	return items, nil
+	return items, true, nil
 }
 
 func toStringAnyMap(value any) (map[string]any, error) {

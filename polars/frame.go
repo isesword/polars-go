@@ -1,10 +1,12 @@
 package polars
 
 import (
+	"encoding/json"
 	"fmt"
 	"runtime"
 
 	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/isesword/polars-go-bridge/bridge"
 	pb "github.com/isesword/polars-go-bridge/proto"
 )
 
@@ -306,6 +308,14 @@ func (f *DataFrame) ToArrow() (arrow.RecordBatch, error) {
 	return f.df.ToArrow()
 }
 
+// Describe returns a summary dataframe.
+func (f *DataFrame) Describe() (*DataFrame, error) {
+	if f == nil || f.df == nil {
+		return nil, fmt.Errorf("dataframe is nil")
+	}
+	return f.df.Describe()
+}
+
 // MapRows applies a User-defined Go function (UDG) to each row and returns a
 // new managed DataFrame.
 //
@@ -394,6 +404,14 @@ func (f *DataFrame) Print() error {
 	return f.df.Print()
 }
 
+// Explain returns the logical or optimized plan description.
+func (f *DataFrame) Explain(optimized ...bool) (string, error) {
+	if f == nil || f.df == nil {
+		return "", fmt.Errorf("dataframe is nil")
+	}
+	return f.df.Explain(optimized...)
+}
+
 // Lazy converts the DataFrame into a LazyFrame for further operations.
 func (f *DataFrame) Lazy() *LazyFrame {
 	if f == nil || f.df == nil {
@@ -408,6 +426,22 @@ func (f *DataFrame) Filter(predicate Expr) *LazyFrame {
 		return nil
 	}
 	return f.df.Filter(predicate)
+}
+
+// Drop removes columns and returns a LazyFrame.
+func (f *DataFrame) Drop(columns ...string) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Drop(columns...)
+}
+
+// Rename renames columns and returns a LazyFrame.
+func (f *DataFrame) Rename(mapping map[string]string, strict ...bool) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Rename(mapping, strict...)
 }
 
 // Select selects columns and returns a LazyFrame.
@@ -432,6 +466,86 @@ func (f *DataFrame) Limit(n uint64) *LazyFrame {
 		return nil
 	}
 	return f.df.Limit(n)
+}
+
+// Slice slices rows and returns a LazyFrame.
+func (f *DataFrame) Slice(offset int64, length uint64) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Slice(offset, length)
+}
+
+// Head returns the first n rows.
+func (f *DataFrame) Head(n uint64) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Head(n)
+}
+
+// Tail returns the last n rows.
+func (f *DataFrame) Tail(n uint64) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Tail(n)
+}
+
+// FFill forward-fills null values across all columns.
+func (f *DataFrame) FFill(limit ...uint64) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.FFill(limit...)
+}
+
+// BFill backward-fills null values across all columns.
+func (f *DataFrame) BFill(limit ...uint64) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.BFill(limit...)
+}
+
+// FillNull fills null values across all columns.
+func (f *DataFrame) FillNull(value interface{}) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.FillNull(value)
+}
+
+// DropNulls drops rows containing nulls in the provided subset.
+func (f *DataFrame) DropNulls(subset ...string) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.DropNulls(subset...)
+}
+
+// Explode explodes list-like columns.
+func (f *DataFrame) Explode(columns ...string) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Explode(columns...)
+}
+
+// Unpivot reshapes wide data to long format.
+func (f *DataFrame) Unpivot(opts UnpivotOptions) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Unpivot(opts)
+}
+
+// Melt is an alias for Unpivot for pandas users.
+func (f *DataFrame) Melt(opts UnpivotOptions) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Melt(opts)
 }
 
 // GroupBy groups rows by one or more column names.
@@ -483,6 +597,33 @@ func (f *DataFrame) Concat(others ...*LazyFrame) *LazyFrame {
 		return nil
 	}
 	return f.df.Concat(others...)
+}
+
+// Pivot performs an eager pivot operation aligned with Polars' eager-only pivot semantics.
+func (f *DataFrame) Pivot(opts PivotOptions) (*DataFrame, error) {
+	if f == nil || f.df == nil {
+		return nil, fmt.Errorf("dataframe is nil")
+	}
+	df, err := f.df.Pivot(opts)
+	if err != nil {
+		return nil, err
+	}
+	return newDataFrameWrapper(df), nil
+}
+
+func pivotEagerFrame(brg *bridge.Bridge, handle uint64, opts PivotOptions) (*EagerFrame, error) {
+	if len(opts.On) == 0 {
+		return nil, fmt.Errorf("pivot options require at least one column in On")
+	}
+	payload, err := json.Marshal(opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode pivot options: %w", err)
+	}
+	dfHandle, err := brg.PivotDataFrame(handle, payload)
+	if err != nil {
+		return nil, err
+	}
+	return newDataFrame(dfHandle, brg), nil
 }
 
 // QueryMaps imports rows into a managed DataFrame, executes the provided query

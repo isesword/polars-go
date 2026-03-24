@@ -96,6 +96,11 @@ func Col(name string) Expr {
 	}
 }
 
+// ColRegex creates a regex-based column selector, aligned with Polars regex projection semantics.
+func ColRegex(pattern string) Expr {
+	return Col(pattern)
+}
+
 // Cols 创建多列引用表达式（表达式展开）
 func Cols(names ...string) []Expr {
 	exprs := make([]Expr, len(names))
@@ -111,6 +116,20 @@ func All() Expr {
 		inner: &pb.Expr{
 			Kind: &pb.Expr_Wildcard{
 				Wildcard: &pb.Wildcard{},
+			},
+		},
+	}
+}
+
+// Exclude excludes named columns from a wildcard/selector-style expression.
+func (e Expr) Exclude(columns ...string) Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_Exclude{
+				Exclude: &pb.Exclude{
+					Expr:    e.inner,
+					Columns: columns,
+				},
 			},
 		},
 	}
@@ -660,6 +679,66 @@ func (e Expr) Diff(periods int64, nullBehavior DiffNullBehavior) Expr {
 			},
 		},
 	}
+}
+
+// FFill forward-fills null values with the last non-null value.
+func (e Expr) FFill(limit ...uint64) Expr {
+	var limitPtr *uint64
+	if len(limit) > 0 {
+		l := limit[0]
+		limitPtr = &l
+	}
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_ForwardFill{
+				ForwardFill: &pb.ForwardFill{
+					Expr:  e.inner,
+					Limit: limitPtr,
+				},
+			},
+		},
+	}
+}
+
+// BFill backward-fills null values with the next non-null value.
+func (e Expr) BFill(limit ...uint64) Expr {
+	var limitPtr *uint64
+	if len(limit) > 0 {
+		l := limit[0]
+		limitPtr = &l
+	}
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_BackwardFill{
+				BackwardFill: &pb.BackwardFill{
+					Expr:  e.inner,
+					Limit: limitPtr,
+				},
+			},
+		},
+	}
+}
+
+// FillNull fills null values in the expression with the provided value or expression.
+func (e Expr) FillNull(value interface{}) Expr {
+	fillExpr := exprFromValue(value)
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_FillNull{
+				FillNull: &pb.FillNull{
+					Expr:      e.inner,
+					FillValue: fillExpr.inner,
+				},
+			},
+		},
+	}
+}
+
+func exprFromValue(value interface{}) Expr {
+	if expr, ok := value.(Expr); ok {
+		return expr
+	}
+	return Lit(value)
 }
 
 // toProto 转换为 Protobuf 表达式
