@@ -35,11 +35,7 @@ pub fn build_string_expr(kind: &proto::expr::Kind) -> Option<Result<Expr, Bridge
     }
 }
 
-fn build_unary<F>(
-    func: &proto::StringFunction,
-    name: &str,
-    op: F,
-) -> Result<Expr, BridgeError>
+fn build_unary<F>(func: &proto::StringFunction, name: &str, op: F) -> Result<Expr, BridgeError>
 where
     F: FnOnce(Expr) -> Expr,
 {
@@ -132,10 +128,7 @@ fn build_pad_end(pad: &proto::StringPad) -> Result<Expr, BridgeError> {
     Ok(expr.str().pad_end(lit(pad.length), fill_char))
 }
 
-fn build_inner_expr(
-    expr: &Option<Box<proto::Expr>>,
-    name: &str,
-) -> Result<Expr, BridgeError> {
+fn build_inner_expr(expr: &Option<Box<proto::Expr>>, name: &str) -> Result<Expr, BridgeError> {
     let expr = expr
         .as_ref()
         .ok_or_else(|| BridgeError::PlanSemantic(format!("{name} has no expr")))?;
@@ -144,9 +137,9 @@ fn build_inner_expr(
 
 fn parse_fill_char(value: &str, name: &str) -> Result<char, BridgeError> {
     let mut chars = value.chars();
-    let fill_char = chars.next().ok_or_else(|| {
-        BridgeError::InvalidArgument(format!("{name} fill_char cannot be empty"))
-    })?;
+    let fill_char = chars
+        .next()
+        .ok_or_else(|| BridgeError::InvalidArgument(format!("{name} fill_char cannot be empty")))?;
 
     if chars.next().is_some() {
         return Err(BridgeError::InvalidArgument(format!(

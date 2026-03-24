@@ -7,11 +7,12 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-polars = { version = "0.52", features = ["lazy", "json", "timezones", "csv", "parquet", "ipc", "strings", "regex", "string_pad"] }
+polars = { version = "0.52", features = ["lazy", "json", "timezones", "csv", "parquet", "ipc", "strings", "regex", "string_pad", "semi_anti_join", "cross_join", "rank", "cum_agg", "dtype-struct", "diff", "abs", "temporal", "dtype-date", "dtype-datetime", "dtype-time", "month_start", "month_end", "sql"] }
 polars-arrow = { package = "polars-arrow", version = "0.52" }
 prost = "0.13"
 arrow = { version = "53", features = ["ffi"] }
 libc = "0.2"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [build-dependencies]

@@ -73,9 +73,7 @@ pub fn import_dataframe_from_arrow(
     let struct_array = array
         .as_any()
         .downcast_ref::<StructArray>()
-        .ok_or_else(|| {
-            BridgeError::ArrowImport("Arrow array is not a StructArray".into())
-        })?;
+        .ok_or_else(|| BridgeError::ArrowImport("Arrow array is not a StructArray".into()))?;
 
     if struct_array.validity().is_some() {
         return Err(BridgeError::ArrowImport(

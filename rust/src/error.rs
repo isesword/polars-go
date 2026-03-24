@@ -50,7 +50,9 @@ impl std::fmt::Display for BridgeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             BridgeError::InvalidArgument(s) => write!(f, "Invalid argument: {}", s),
-            BridgeError::AbiMismatch(expected, got) => write!(f, "ABI mismatch: expected {}, got {}", expected, got),
+            BridgeError::AbiMismatch(expected, got) => {
+                write!(f, "ABI mismatch: expected {}, got {}", expected, got)
+            }
             BridgeError::PlanVersionUnsupported(v) => write!(f, "Plan version {} unsupported", v),
             BridgeError::PlanDecode(s) => write!(f, "Plan decode error: {}", s),
             BridgeError::PlanSemantic(s) => write!(f, "Plan semantic error: {}", s),
@@ -68,7 +70,9 @@ pub fn bridge_error_to_code(err: &BridgeError) -> (ErrorCode, String) {
     match err {
         BridgeError::InvalidArgument(s) => (ErrorCode::InvalidArgument, s.clone()),
         BridgeError::AbiMismatch(_, _) => (ErrorCode::AbiMismatch, err.to_string()),
-        BridgeError::PlanVersionUnsupported(_) => (ErrorCode::PlanVersionUnsupported, err.to_string()),
+        BridgeError::PlanVersionUnsupported(_) => {
+            (ErrorCode::PlanVersionUnsupported, err.to_string())
+        }
         BridgeError::PlanDecode(s) => (ErrorCode::PlanDecode, s.clone()),
         BridgeError::PlanSemantic(s) => (ErrorCode::PlanSemantic, s.clone()),
         BridgeError::ArrowImport(s) => (ErrorCode::ArrowImport, s.clone()),

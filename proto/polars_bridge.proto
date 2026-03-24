@@ -21,25 +21,49 @@ message Node {
     Filter filter = 14;
     WithColumns with_columns = 15;
     Limit limit = 16;
+    GroupBy group_by = 17;
+    Join join = 18;
+    Sort sort = 19;
+    Unique unique = 20;
+    Concat concat = 21;
+    SqlQuery sql_query = 22;
   }
-  
-  reserved 50 to 99;   // join/window reserved
+
+  reserved 50 to 99;   // window reserved
   reserved 100 to 149; // udf reserved
 }
 
 // Memory Scan（从输入 Arrow 读取）
 message MemoryScan {
   repeated string column_names = 1;
+  uint32 source_id = 2;
 }
 
 // CSV Scan（从 CSV 文件路径懒加载）
 message CsvScan {
   string path = 1;  // 文件路径
+  optional bool has_header = 2;
+  optional uint32 separator = 3;
+  optional uint64 skip_rows = 4;
+  optional uint64 infer_schema_length = 5;
+  optional string null_value = 6;
+  optional bool try_parse_dates = 7;
+  optional uint32 quote_char = 8;
+  optional string comment_prefix = 9;
+  map<string, DataType> schema = 10;
+  optional CsvEncoding encoding = 11;
+  optional bool ignore_errors = 12;
+}
+
+enum CsvEncoding {
+  CSV_ENCODING_UTF8 = 0;
+  CSV_ENCODING_LOSSY_UTF8 = 1;
 }
 
 // Parquet Scan（从 Parquet 文件路径懒加载）
 message ParquetScan {
   string path = 1;  // 文件路径
+  optional bool rechunk = 2;
 }
 
 // Project（选择列）
@@ -66,6 +90,67 @@ message Limit {
   uint64 n = 2;
 }
 
+// GroupBy + Aggregation
+message GroupBy {
+  Node input = 1;
+  repeated Expr keys = 2;
+  repeated Expr aggs = 3;
+}
+
+enum JoinType {
+  JOIN_INNER = 0;
+  JOIN_LEFT = 1;
+  JOIN_RIGHT = 2;
+  JOIN_FULL = 3;
+  JOIN_SEMI = 4;
+  JOIN_ANTI = 5;
+  JOIN_CROSS = 6;
+}
+
+message Join {
+  Node left = 1;
+  Node right = 2;
+  repeated Expr left_on = 3;
+  repeated Expr right_on = 4;
+  JoinType how = 5;
+  string suffix = 6;
+}
+
+message Sort {
+  Node input = 1;
+  repeated Expr by = 2;
+  repeated bool descending = 3;
+}
+
+enum UniqueKeepStrategy {
+  UNIQUE_KEEP_FIRST = 0;
+  UNIQUE_KEEP_LAST = 1;
+  UNIQUE_KEEP_ANY = 2;
+  UNIQUE_KEEP_NONE = 3;
+}
+
+message Unique {
+  Node input = 1;
+  repeated string subset = 2;
+  UniqueKeepStrategy keep = 3;
+  bool maintain_order = 4;
+}
+
+message Concat {
+  repeated Node inputs = 1;
+  bool rechunk = 2;
+  bool to_supertypes = 3;
+  bool parallel = 4;
+  bool diagonal = 5;
+  bool maintain_order = 6;
+}
+
+message SqlQuery {
+  string query = 1;
+  repeated string table_names = 2;
+  repeated Node inputs = 3;
+}
+
 // 表达式
 message Expr {
   oneof kind {
@@ -78,6 +163,42 @@ message Expr {
     Wildcard wildcard = 7;  // 通配符（选择所有列）
     Exclude exclude = 8;  // 排除列
     Cast cast = 9;  // 类型转换
+    AggExpr sum = 10;
+    AggExpr mean = 11;
+    AggExpr min = 12;
+    AggExpr max = 13;
+    AggExpr count = 14;
+    AggExpr first = 15;
+    AggExpr last = 16;
+    AggExpr len = 17;
+    AggExpr n_unique = 18;
+    AggExpr median = 19;
+    AggExpr std = 20;
+    AggExpr var = 21;
+    Quantile quantile = 22;
+    WhenThen when_then = 23;
+    MapBatchesExpr map_batches = 24;
+    Over over = 100;
+    Rank rank = 101;
+    CumSum cum_sum = 102;
+    CumCount cum_count = 103;
+    CumMin cum_min = 104;
+    CumMax cum_max = 105;
+    CumProd cum_prod = 106;
+    Shift shift = 107;
+    Diff diff = 108;
+    TemporalUnary dt_year = 109;
+    TemporalUnary dt_month = 110;
+    TemporalUnary dt_day = 111;
+    TemporalUnary dt_weekday = 112;
+    TemporalParse str_to_date = 113;
+    TemporalParse str_to_datetime = 114;
+    TemporalUnary dt_hour = 115;
+    TemporalUnary dt_minute = 116;
+    TemporalUnary dt_second = 117;
+    TemporalUnary dt_month_start = 118;
+    TemporalUnary dt_month_end = 119;
+    TemporalParse str_to_time = 120;
     
     // 字符串函数 (50-99)
     StringFunction str_len_bytes = 50;
@@ -99,7 +220,7 @@ message Expr {
   }
   
   reserved 66 to 99;   // 预留更多字符串函数
-  reserved 100 to 149; // window functions reserved
+  reserved 121 to 149; // more temporal/window functions reserved
 }
 
 // 列引用
@@ -125,6 +246,12 @@ message BinaryExpr {
   Expr left = 1;
   BinaryOperator op = 2;
   Expr right = 3;
+}
+
+message MapBatchesExpr {
+  repeated Expr exprs = 1;
+  uint64 udg_id = 2;
+  DataType output_type = 3;
 }
 
 enum BinaryOperator {
@@ -177,6 +304,104 @@ message Cast {
   Expr expr = 1;  // 要转换的表达式
   DataType data_type = 2;  // 目标数据类型
   bool strict = 3;  // 严格模式（默认 true）
+}
+
+message AggExpr {
+  Expr expr = 1;
+}
+
+enum QuantileMethod {
+  QUANTILE_NEAREST = 0;
+  QUANTILE_LOWER = 1;
+  QUANTILE_HIGHER = 2;
+  QUANTILE_MIDPOINT = 3;
+  QUANTILE_LINEAR = 4;
+  QUANTILE_EQUIPROBABLE = 5;
+}
+
+message Quantile {
+  Expr expr = 1;
+  double quantile = 2;
+  QuantileMethod method = 3;
+}
+
+message WhenThen {
+  Expr predicate = 1;
+  Expr truthy = 2;
+  Expr falsy = 3;
+}
+
+message Over {
+  Expr expr = 1;
+  repeated Expr partition_by = 2;
+  repeated Expr order_by = 3;
+  bool descending = 4;
+  bool nulls_last = 5;
+}
+
+enum RankMethod {
+  RANK_DENSE = 0;
+  RANK_AVERAGE = 1;
+  RANK_MIN = 2;
+  RANK_MAX = 3;
+  RANK_ORDINAL = 4;
+}
+
+message Rank {
+  Expr expr = 1;
+  RankMethod method = 2;
+  bool descending = 3;
+  optional uint64 seed = 4;
+}
+
+message CumSum {
+  Expr expr = 1;
+  bool reverse = 2;
+}
+
+message CumCount {
+  Expr expr = 1;
+  bool reverse = 2;
+}
+
+message CumMin {
+  Expr expr = 1;
+  bool reverse = 2;
+}
+
+message CumMax {
+  Expr expr = 1;
+  bool reverse = 2;
+}
+
+message CumProd {
+  Expr expr = 1;
+  bool reverse = 2;
+}
+
+message Shift {
+  Expr expr = 1;
+  int64 periods = 2;
+}
+
+enum DiffNullBehavior {
+  DIFF_NULL_IGNORE = 0;
+  DIFF_NULL_DROP = 1;
+}
+
+message Diff {
+  Expr expr = 1;
+  int64 periods = 2;
+  DiffNullBehavior null_behavior = 3;
+}
+
+message TemporalUnary {
+  Expr expr = 1;
+}
+
+message TemporalParse {
+  Expr expr = 1;
+  string format = 2;
 }
 
 // 数据类型

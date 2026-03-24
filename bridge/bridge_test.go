@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -24,6 +25,55 @@ func TestLoadBridge(t *testing.T) {
 	}
 
 	t.Logf("✅ ABI Version: %d", abiVer)
+}
+
+func TestLoadBridgeDefaultCached(t *testing.T) {
+	libPath := os.Getenv("POLARS_BRIDGE_LIB")
+	if libPath == "" {
+		t.Skip("POLARS_BRIDGE_LIB not set, skipping test")
+	}
+
+	t.Setenv("POLARS_BRIDGE_LIB", libPath)
+
+	brg1, err := LoadBridge("")
+	if err != nil {
+		t.Fatalf("Failed to load default bridge first time: %v", err)
+	}
+
+	brg2, err := LoadBridge("")
+	if err != nil {
+		t.Fatalf("Failed to load default bridge second time: %v", err)
+	}
+
+	if brg1 != brg2 {
+		t.Fatal("Expected default bridge loader to reuse the same instance")
+	}
+}
+
+func TestLoadBridgeExplicitPathCached(t *testing.T) {
+	libPath := os.Getenv("POLARS_BRIDGE_LIB")
+	if libPath == "" {
+		t.Skip("POLARS_BRIDGE_LIB not set, skipping test")
+	}
+
+	absPath, err := filepath.Abs(libPath)
+	if err != nil {
+		t.Fatalf("Failed to resolve library path: %v", err)
+	}
+
+	brg1, err := LoadBridge(libPath)
+	if err != nil {
+		t.Fatalf("Failed to load bridge by original path: %v", err)
+	}
+
+	brg2, err := LoadBridge(absPath)
+	if err != nil {
+		t.Fatalf("Failed to load bridge by absolute path: %v", err)
+	}
+
+	if brg1 != brg2 {
+		t.Fatal("Expected explicit path loader to reuse the same instance for the same dylib")
+	}
 }
 
 func TestEngineVersion(t *testing.T) {

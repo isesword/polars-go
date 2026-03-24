@@ -34,7 +34,7 @@ func main() {
 	fmt.Println("\n=== Testing CSV Scan (Mode A: ScanCSV) ===")
 
 	lf := polars.ScanCSV("testdata/sample.csv")
-	if err := lf.Print(brg); err != nil {
+	if err := lf.Print(); err != nil {
 		log.Fatalf("Failed to execute CSV scan: %v", err)
 	}
 
