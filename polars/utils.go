@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -73,6 +74,62 @@ func parseArrowRecordBatch(recordBatch arrow.RecordBatch) ([]map[string]interfac
 	}
 
 	return rows, nil
+}
+
+func toStringAnyMap(value any) (map[string]any, error) {
+	if typed, ok := value.(map[string]any); ok {
+		return typed, nil
+	}
+	rv := reflect.ValueOf(value)
+	if !rv.IsValid() {
+		return nil, fmt.Errorf("value is nil")
+	}
+	if rv.Kind() == reflect.Struct {
+		out := make(map[string]any, rv.NumField())
+		rt := rv.Type()
+		for i := 0; i < rv.NumField(); i++ {
+			field := rt.Field(i)
+			if !field.IsExported() {
+				continue
+			}
+			out[field.Name] = rv.Field(i).Interface()
+		}
+		return out, nil
+	}
+	if rv.Kind() == reflect.Map && rv.Type().Key().Kind() == reflect.String {
+		out := make(map[string]any, rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			out[iter.Key().String()] = iter.Value().Interface()
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("value is not a map[string]any or struct")
+}
+
+func toBytes(value any) ([]byte, error) {
+	switch v := value.(type) {
+	case []byte:
+		return append([]byte(nil), v...), nil
+	case string:
+		return []byte(v), nil
+	}
+
+	rv := reflect.ValueOf(value)
+	if !rv.IsValid() {
+		return nil, fmt.Errorf("value is nil")
+	}
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return nil, fmt.Errorf("value is not a byte slice")
+	}
+	if rv.Type().Elem().Kind() != reflect.Uint8 {
+		return nil, fmt.Errorf("value is not a byte slice")
+	}
+	buf := make([]byte, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		buf[i] = byte(rv.Index(i).Uint())
+	}
+	return buf, nil
 }
 
 func newArrowColumnDecoder(col arrow.Array) (arrowColumnDecoder, error) {

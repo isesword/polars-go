@@ -23,7 +23,7 @@ func goExprMapBatchesCallback(
 	inputArray *bridge.ArrowArray,
 	outputSchema *bridge.ArrowSchema,
 	outputArray *bridge.ArrowArray,
-) int32 {
+) uintptr {
 	fn, ok := lookupExprMapBatches(udgID)
 	if !ok {
 		return 1
