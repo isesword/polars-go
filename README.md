@@ -211,6 +211,70 @@ _ = lf.SinkNDJSON(&sinkNDJSONBuf, polars.SinkNDJSONOptions{
 - `SinkJSON(...)` / `SinkNDJSON(...)` 当前会先 collect 结果，再写出 JSON；接口先对齐，后续如果需要可以再下沉成真正的 plan-to-sink
 - Python Polars 里 `write_ndjson` / `sink_ndjson` 还包含更偏文件路径语义的参数；当前 Go 版本面向 `io.Writer`，所以只保留与 writer 直接相关的压缩选项
 
+### Excel 读取
+
+当前提供一个先走 Go 侧实现的 Excel 读取入口：
+
+- `polars.ReadExcel(path string, opts ...polars.ExcelReadOptions)`
+- `polars.ReadExcelSheets(path string, opts ...polars.ExcelReadOptions)`
+
+第一版支持范围：
+
+- `.xlsx`
+- 单 sheet 读取
+- 多 sheet 读取并返回 `map[string]*DataFrame`
+- `SheetName` / `SheetID`
+- `SheetNames` / `SheetIDs`
+- 有表头 / 无表头
+- 空表报错或放行
+
+示例：
+
+```go
+df, err := polars.ReadExcel("users.xlsx", polars.ExcelReadOptions{
+    SheetName: "Sheet1",
+})
+if err != nil {
+    panic(err)
+}
+defer df.Close()
+
+rows, _ := df.ToMaps()
+fmt.Println(rows)
+```
+
+无表头时会自动生成列名：
+
+```go
+hasHeader := false
+
+df, err := polars.ReadExcel("users.xlsx", polars.ExcelReadOptions{
+    SheetID:   2,
+    HasHeader: &hasHeader,
+})
+```
+
+读取多个 sheet：
+
+```go
+frames, err := polars.ReadExcelSheets("users.xlsx")
+if err != nil {
+    panic(err)
+}
+defer func() {
+    for _, df := range frames {
+        df.Close()
+    }
+}()
+```
+
+说明：
+
+- 当前实现基于 `excelize`，然后复用现有 `NewDataFrame(...)` 导入链
+- 类型推断按列进行，目标是比逐格猜类型更稳定
+- 像 `"001"` 这种带前导零的文本会保留成字符串
+- 当前还不支持 `.xls` / `.xlsb`
+
 ### UDG（User-defined Go functions）
 
 当前已提供三类 Go 侧 UDG 入口：

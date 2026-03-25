@@ -22,10 +22,15 @@ pub fn export_dataframe_to_arrow(
         ));
     }
 
-    let record_batch = df.clone().rechunk_to_record_batch(CompatLevel::newest());
+    let mut df = df.clone();
+    df.rechunk_mut();
+    let record_batch = df
+        .iter_chunks(CompatLevel::newest(), false)
+        .next()
+        .ok_or_else(|| BridgeError::ArrowExport("Failed to materialize Arrow record batch".into()))?;
     let height = record_batch.height();
     let (schema, arrays) = record_batch.into_schema_and_arrays();
-    let fields: Vec<Field> = schema.iter_values().cloned().collect();
+    let fields: Vec<Field> = schema.iter().map(|(_, field)| field.clone()).collect();
     let dtype = ArrowDataType::Struct(fields.clone());
 
     let struct_array = StructArray::try_new(dtype, height, arrays, None)

@@ -21,6 +21,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/isesword/polars-go-bridge/bridge"
 	pb "github.com/isesword/polars-go-bridge/proto"
+	"github.com/xuri/excelize/v2"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -4691,6 +4692,133 @@ func TestLazyFrameJSONExport(t *testing.T) {
 		}
 		if !strings.Contains(string(plain), "\"Bob\"") {
 			t.Fatalf("unexpected lazy gzip ndjson payload: %q", string(plain))
+		}
+	})
+}
+
+func TestReadExcel(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sample.xlsx")
+	file := excelize.NewFile()
+	defer file.Close()
+
+	if err := file.SetSheetRow("Sheet1", "A1", &[]any{"id", "name", "active", "score"}); err != nil {
+		t.Fatalf("SetSheetRow Sheet1 header failed: %v", err)
+	}
+	if err := file.SetSheetRow("Sheet1", "A2", &[]any{1, "Alice", true, 9.5}); err != nil {
+		t.Fatalf("SetSheetRow Sheet1 row1 failed: %v", err)
+	}
+	if err := file.SetSheetRow("Sheet1", "A3", &[]any{2, "Bob", false, 7.25}); err != nil {
+		t.Fatalf("SetSheetRow Sheet1 row2 failed: %v", err)
+	}
+
+	sheet2 := "Raw"
+	if _, err := file.NewSheet(sheet2); err != nil {
+		t.Fatalf("NewSheet failed: %v", err)
+	}
+	if err := file.SetSheetRow(sheet2, "A1", &[]any{"001", "Carol"}); err != nil {
+		t.Fatalf("SetSheetRow Raw row1 failed: %v", err)
+	}
+	if err := file.SetSheetRow(sheet2, "A2", &[]any{"002", "Drew"}); err != nil {
+		t.Fatalf("SetSheetRow Raw row2 failed: %v", err)
+	}
+
+	if err := file.SaveAs(path); err != nil {
+		t.Fatalf("SaveAs failed: %v", err)
+	}
+
+	t.Run("DefaultSheet", func(t *testing.T) {
+		df, err := ReadExcel(path)
+		if err != nil {
+			t.Fatalf("ReadExcel failed: %v", err)
+		}
+		defer df.Close()
+
+		rows, err := df.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("expected 2 rows, got %d", len(rows))
+		}
+		if rows[0]["name"] != "Alice" || rows[1]["active"] != false {
+			t.Fatalf("unexpected excel rows: %#v", rows)
+		}
+	})
+
+	t.Run("SheetNameNoHeader", func(t *testing.T) {
+		hasHeader := false
+		df, err := ReadExcel(path, ExcelReadOptions{
+			SheetName: sheet2,
+			HasHeader: &hasHeader,
+		})
+		if err != nil {
+			t.Fatalf("ReadExcel sheet Raw failed: %v", err)
+		}
+		defer df.Close()
+
+		rows, err := df.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if got := rows[0]["column_1"]; got != "001" {
+			t.Fatalf("expected leading-zero string in column_1, got %#v", got)
+		}
+		if got := rows[1]["column_2"]; got != "Drew" {
+			t.Fatalf("unexpected second column value: %#v", got)
+		}
+	})
+
+	t.Run("InvalidSheetID", func(t *testing.T) {
+		if _, err := ReadExcel(path, ExcelReadOptions{SheetID: 99}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("expected ErrInvalidInput for invalid sheet id, got %v", err)
+		}
+	})
+
+	t.Run("ReadExcelSheetsAll", func(t *testing.T) {
+		frames, err := ReadExcelSheets(path)
+		if err != nil {
+			t.Fatalf("ReadExcelSheets failed: %v", err)
+		}
+		defer func() {
+			for _, df := range frames {
+				df.Close()
+			}
+		}()
+		if len(frames) != 2 {
+			t.Fatalf("expected 2 sheets, got %d", len(frames))
+		}
+		rows, err := frames["Sheet1"].ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps Sheet1 failed: %v", err)
+		}
+		if len(rows) != 2 || rows[1]["name"] != "Bob" {
+			t.Fatalf("unexpected Sheet1 rows: %#v", rows)
+		}
+	})
+
+	t.Run("ReadExcelSheetsSubset", func(t *testing.T) {
+		hasHeader := false
+		frames, err := ReadExcelSheets(path, ExcelReadOptions{
+			SheetNames: []string{sheet2},
+			HasHeader:  &hasHeader,
+		})
+		if err != nil {
+			t.Fatalf("ReadExcelSheets subset failed: %v", err)
+		}
+		defer func() {
+			for _, df := range frames {
+				df.Close()
+			}
+		}()
+		if len(frames) != 1 {
+			t.Fatalf("expected 1 sheet, got %d", len(frames))
+		}
+		rows, err := frames[sheet2].ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps Raw failed: %v", err)
+		}
+		if rows[0]["column_1"] != "001" {
+			t.Fatalf("unexpected Raw rows: %#v", rows)
 		}
 	})
 }

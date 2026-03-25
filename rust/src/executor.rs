@@ -7,7 +7,6 @@ use polars::lazy::dsl::concat as concat_lf;
 use polars::lazy::dsl::{all, by_name};
 use polars::prelude::IntoLazy;
 use polars::prelude::NullValues;
-use polars::prelude::PlPath;
 use polars::prelude::*;
 use polars::series::ops::NullBehavior;
 use polars::sql::SQLContext;
@@ -72,7 +71,7 @@ fn build_lazy_frame(
     match kind {
         Kind::CsvScan(scan) => {
             // 从 CSV 文件路径懒加载
-            let mut reader = LazyCsvReader::new(PlPath::new(scan.path.as_str()));
+            let mut reader = LazyCsvReader::new(PlRefPath::new(scan.path.as_str()));
             if let Some(has_header) = scan.has_header {
                 reader = reader.with_has_header(has_header);
             }
@@ -150,7 +149,7 @@ fn build_lazy_frame(
             if let Some(rechunk) = scan.rechunk {
                 args.rechunk = rechunk;
             }
-            LazyFrame::scan_parquet(PlPath::new(scan.path.as_str()), args).map_err(|e| {
+            LazyFrame::scan_parquet(PlRefPath::new(scan.path.as_str()), args).map_err(|e| {
                 BridgeError::Execution(format!("ParquetScan failed for '{}': {}", scan.path, e))
             })
         }
@@ -195,7 +194,7 @@ fn build_lazy_frame(
                 .as_ref()
                 .ok_or_else(|| BridgeError::PlanSemantic("Drop has no input".into()))?;
             let lf = build_lazy_frame(input_node, input_dfs)?;
-            Ok(lf.drop(by_name(drop.columns.iter().cloned(), true)))
+            Ok(lf.drop(by_name(drop.columns.iter().cloned(), true, false)))
         }
         Kind::Rename(rename) => {
             let input_node = rename
@@ -385,6 +384,7 @@ fn build_lazy_frame(
                 parallel: concat.parallel,
                 to_supertypes: concat.to_supertypes,
                 diagonal: concat.diagonal,
+                strict: false,
                 from_partitioned_ds: false,
                 maintain_order: concat.maintain_order,
             };
@@ -397,7 +397,13 @@ fn build_lazy_frame(
                 .as_ref()
                 .ok_or_else(|| BridgeError::PlanSemantic("Explode has no input".into()))?;
             let lf = build_lazy_frame(input_node, input_dfs)?;
-            Ok(lf.explode(by_name(explode.columns.iter().cloned(), true)))
+            Ok(lf.explode(
+                by_name(explode.columns.iter().cloned(), true, false),
+                ExplodeOptions {
+                    empty_as_null: false,
+                    keep_nulls: true,
+                },
+            ))
         }
         Kind::DropNulls(drop_nulls) => {
             let input_node = drop_nulls
@@ -408,7 +414,7 @@ fn build_lazy_frame(
             let subset = if drop_nulls.subset.is_empty() {
                 None
             } else {
-                Some(by_name(drop_nulls.subset.iter().cloned(), true))
+                Some(by_name(drop_nulls.subset.iter().cloned(), true, false))
             };
             Ok(lf.drop_nulls(subset))
         }
@@ -421,7 +427,7 @@ fn build_lazy_frame(
             let subset = if drop_nans.subset.is_empty() {
                 None
             } else {
-                Some(by_name(drop_nans.subset.iter().cloned(), true))
+                Some(by_name(drop_nans.subset.iter().cloned(), true, false))
             };
             Ok(lf.drop_nans(subset))
         }
@@ -476,8 +482,12 @@ fn build_lazy_frame(
                 .ok_or_else(|| BridgeError::PlanSemantic("Unpivot has no input".into()))?;
             let lf = build_lazy_frame(input_node, input_dfs)?;
             let args = UnpivotArgsDSL {
-                on: by_name(unpivot.on.iter().cloned(), true),
-                index: by_name(unpivot.index.iter().cloned(), true),
+                on: if unpivot.on.is_empty() {
+                    None
+                } else {
+                    Some(by_name(unpivot.on.iter().cloned(), true, false))
+                },
+                index: by_name(unpivot.index.iter().cloned(), true, false),
                 variable_name: if unpivot.variable_name.is_empty() {
                     None
                 } else {
@@ -744,7 +754,7 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
                         .map(|column| column.name().clone())
                         .unwrap_or_else(|| PlSmallStr::from_static("map_batches"));
                     let input_columns = columns.iter_mut().map(std::mem::take).collect::<Vec<_>>();
-                    let input_df = DataFrame::new(input_columns).map_err(|err| {
+                    let input_df = DataFrame::new_infer_height(input_columns).map_err(|err| {
                         PolarsError::ComputeError(
                             format!("failed to build MapBatches input dataframe: {}", err).into(),
                         )
@@ -765,7 +775,7 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
                         ));
                     }
 
-                    let mut columns = output_df.take_columns();
+                    let mut columns = output_df.into_columns();
                     let mut output = columns.pop().ok_or_else(|| {
                         PolarsError::ComputeError("Go Expr.MapBatches returned no columns".into())
                     })?;

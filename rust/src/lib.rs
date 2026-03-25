@@ -1,7 +1,6 @@
 use polars::datatypes::{DataType, TimeUnit};
 use polars::io::json::{JsonFormat, JsonWriter};
-use polars::lazy::frame::pivot::{pivot, pivot_stable};
-use polars::prelude::col;
+use polars::prelude::{by_name, element};
 use polars::prelude::{AnyValue, DataFrame, IntoLazy, SerWriter, Series};
 use polars::sql::SQLContext;
 use prost::Message;
@@ -121,7 +120,7 @@ fn export_dataframe_json(df: &DataFrame, format: c_int) -> Result<String, Bridge
 
     let mut df = df.clone();
     for idx in 0..df.width() {
-        let column = &df.get_columns()[idx];
+        let column = &df.columns()[idx];
         let needs_binary_cast = matches!(column.dtype(), DataType::Binary);
         let column_name = column.name().to_string();
         if needs_binary_cast {
@@ -136,7 +135,7 @@ fn export_dataframe_json(df: &DataFrame, format: c_int) -> Result<String, Bridge
                         e
                     ))
                 })?;
-            df.replace_column(idx, casted).map_err(|e| {
+            df.replace_column(idx, casted.into()).map_err(|e| {
                 BridgeError::Execution(format!(
                     "Failed to replace normalized JSON column {}: {}",
                     column_name,
@@ -653,7 +652,7 @@ pub extern "C" fn bridge_df_from_columns(
 
         // 创建 DataFrame
         let columns: Vec<_> = series_vec.into_iter().map(|s| s.into()).collect();
-        let df = DataFrame::new(columns)
+        let df = DataFrame::new_infer_height(columns)
             .map_err(|e| BridgeError::Execution(format!("Failed to create DataFrame: {}", e)))?;
         enforce_memory_limit(&df, "dataframe import from columns")?;
 
@@ -706,14 +705,14 @@ struct PivotRequest {
 fn build_pivot_agg_expr(name: &str) -> Result<Option<polars::prelude::Expr>, BridgeError> {
     let expr = match name {
         "" => return Ok(None),
-        "first" => col("").first(),
-        "last" => col("").last(),
-        "sum" => col("").sum(),
-        "min" => col("").min(),
-        "max" => col("").max(),
-        "mean" => col("").mean(),
-        "median" => col("").median(),
-        "count" | "len" => col("").count(),
+        "first" => element().first(),
+        "last" => element().last(),
+        "sum" => element().sum(),
+        "min" => element().min(),
+        "max" => element().max(),
+        "mean" => element().mean(),
+        "median" => element().median(),
+        "count" | "len" => element().count(),
         other => {
             return Err(BridgeError::Unsupported(format!(
                 "unsupported pivot aggregate {}",
@@ -741,6 +740,7 @@ pub extern "C" fn bridge_df_pivot(
         let opts: PivotRequest = serde_json::from_slice(options_slice).map_err(|e| {
             BridgeError::InvalidArgument(format!("Invalid pivot options JSON: {}", e))
         })?;
+        let _ = opts.sort_columns;
 
         if opts.on.is_empty() {
             return Err(BridgeError::InvalidArgument(
@@ -764,28 +764,38 @@ pub extern "C" fn bridge_df_pivot(
             Some(opts.separator.as_str())
         };
 
-        let result = if opts.maintain_order {
-            pivot_stable(
-                df,
-                opts.on.iter().map(|s| s.as_str()),
-                index.as_ref().map(|items| items.iter().copied()),
-                values.as_ref().map(|items| items.iter().copied()),
-                opts.sort_columns,
-                agg_expr,
-                separator,
+        let on_columns = df
+            .select(opts.on.iter().map(|s| s.as_str()))
+            .and_then(|selected| {
+                let subset = opts.on.clone();
+                selected.unique_stable(
+                    Some(subset.as_slice()),
+                    polars::prelude::UniqueKeepStrategy::Any,
+                    None,
+                )
+            })
+            .map_err(|e| BridgeError::Execution(format!("Failed to derive pivot columns: {}", e)))?;
+
+        let result = df
+            .clone()
+            .lazy()
+            .pivot(
+                by_name(opts.on.iter().cloned(), true, false),
+                std::sync::Arc::new(on_columns),
+                match &index {
+                    Some(items) => by_name(items.iter().copied(), true, false),
+                    None => by_name(std::iter::empty::<&str>(), true, false),
+                },
+                match &values {
+                    Some(items) => by_name(items.iter().copied(), true, false),
+                    None => by_name(std::iter::empty::<&str>(), true, false),
+                },
+                agg_expr.unwrap_or_else(|| element().first()),
+                opts.maintain_order,
+                separator.unwrap_or("").into(),
             )
-        } else {
-            pivot(
-                df,
-                opts.on.iter().map(|s| s.as_str()),
-                index.as_ref().map(|items| items.iter().copied()),
-                values.as_ref().map(|items| items.iter().copied()),
-                opts.sort_columns,
-                agg_expr,
-                separator,
-            )
-        }
-        .map_err(|e| BridgeError::Execution(format!("Pivot failed: {}", e)))?;
+            .collect()
+            .map_err(|e| BridgeError::Execution(format!("Pivot failed: {}", e)))?;
 
         let handle = Box::into_raw(Box::new(result)) as u64;
         unsafe { *out_df_handle = handle };
