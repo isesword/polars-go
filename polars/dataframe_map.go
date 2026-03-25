@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/isesword/polars-go-bridge/bridge"
@@ -343,6 +344,55 @@ func normalizeRowValue(value any) (any, error) {
 		return normalizeRowValue(v.Elem().Interface())
 	}
 
+	switch v.Kind() {
+	case reflect.Slice, reflect.Array:
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return cloneBytes(v), nil
+		}
+		items := getAnySlice(v.Len())
+		for i := 0; i < v.Len(); i++ {
+			item, err := normalizeRowValue(v.Index(i).Interface())
+			if err != nil {
+				putAnySlice(items)
+				return nil, fmt.Errorf("index %d: %w", i, err)
+			}
+			items[i] = item
+		}
+		return items, nil
+	case reflect.Map:
+		if v.Type().Key().Kind() != reflect.String {
+			return value, nil
+		}
+		out := make(map[string]any, v.Len())
+		iter := v.MapRange()
+		for iter.Next() {
+			normalized, err := normalizeRowValue(iter.Value().Interface())
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", iter.Key().String(), err)
+			}
+			out[iter.Key().String()] = normalized
+		}
+		return out, nil
+	case reflect.Struct:
+		if v.Type() == reflect.TypeOf(time.Time{}) {
+			return value, nil
+		}
+		out := make(map[string]any, v.NumField())
+		rt := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := rt.Field(i)
+			if !field.IsExported() {
+				continue
+			}
+			normalized, err := normalizeRowValue(v.Field(i).Interface())
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", field.Name, err)
+			}
+			out[field.Name] = normalized
+		}
+		return out, nil
+	}
+
 	return value, nil
 }
 
@@ -561,4 +611,12 @@ func toFloat64(value any) (float64, error) {
 	default:
 		return 0, fmt.Errorf("cannot convert %T to float64", value)
 	}
+}
+
+func cloneBytes(v reflect.Value) []byte {
+	buf := make([]byte, v.Len())
+	for i := 0; i < v.Len(); i++ {
+		buf[i] = byte(v.Index(i).Uint())
+	}
+	return buf
 }

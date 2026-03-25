@@ -412,6 +412,63 @@ fn build_lazy_frame(
             };
             Ok(lf.drop_nulls(subset))
         }
+        Kind::DropNans(drop_nans) => {
+            let input_node = drop_nans
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("DropNans has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            let subset = if drop_nans.subset.is_empty() {
+                None
+            } else {
+                Some(by_name(drop_nans.subset.iter().cloned(), true))
+            };
+            Ok(lf.drop_nans(subset))
+        }
+        Kind::FillNan(fill_nan) => {
+            let input_node = fill_nan
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("FillNan has no input".into()))?;
+            let fill_value = fill_nan
+                .fill_value
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("FillNan has no fill_value".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            let fill_expr = build_expr(fill_value)?;
+            Ok(lf.fill_nan(fill_expr))
+        }
+        Kind::Reverse(reverse) => {
+            let input_node = reverse
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Reverse has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            Ok(lf.reverse())
+        }
+        Kind::Sample(sample) => {
+            let input_node = sample
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Sample has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            let expr = if sample.is_fraction {
+                col(PlSmallStr::from_static("*")).sample_frac(
+                    lit(sample.value),
+                    sample.with_replacement,
+                    sample.shuffle,
+                    sample.seed,
+                )
+            } else {
+                col(PlSmallStr::from_static("*")).sample_n(
+                    lit(sample.value as u64),
+                    sample.with_replacement,
+                    sample.shuffle,
+                    sample.seed,
+                )
+            };
+            Ok(lf.select(vec![expr]))
+        }
         Kind::Unpivot(unpivot) => {
             let input_node = unpivot
                 .input
@@ -542,6 +599,14 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
             let e = build_expr(expr)?;
             Ok(e.is_null())
         }
+        Kind::IsNotNull(is_not_null) => {
+            let expr = is_not_null
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("IsNotNull has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.is_not_null())
+        }
         Kind::Not(not) => {
             let expr = not
                 .expr
@@ -594,6 +659,13 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
         Kind::First(agg) => build_agg_expr(agg, |e| e.first(), "First"),
         Kind::Last(agg) => build_agg_expr(agg, |e| e.last(), "Last"),
         Kind::Len(agg) => build_agg_expr(agg, |e| e.len(), "Len"),
+        Kind::NullCount(agg) => {
+            let expr = agg
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("NullCount has no expr".into()))?;
+            Ok(build_expr(expr)?.null_count())
+        }
         Kind::NUnique(agg) => build_agg_expr(agg, |e| e.n_unique(), "NUnique"),
         Kind::Median(agg) => build_agg_expr(agg, |e| e.median(), "Median"),
         Kind::Std(agg) => build_agg_expr(agg, |e| e.std(1), "Std"),
@@ -898,6 +970,131 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
                 fill.limit.map(|v| v as IdxSize),
             )))
         }
+        Kind::FillNan(fill) => {
+            let expr = fill
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("FillNan has no expr".into()))?;
+            let fill_value = fill
+                .fill_value
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("FillNan has no fill_value".into()))?;
+            let e = build_expr(expr)?;
+            let fv = build_expr(fill_value)?;
+            Ok(e.fill_nan(fv))
+        }
+        Kind::IsNan(is_nan) => {
+            let expr = is_nan
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("IsNan has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.is_nan())
+        }
+        Kind::IsFinite(is_finite) => {
+            let expr = is_finite
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("IsFinite has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.is_finite())
+        }
+        Kind::Abs(abs) => {
+            let expr = abs
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Abs has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.abs())
+        }
+        Kind::Round(round) => {
+            let expr = round
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Round has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.round(round.decimals, RoundMode::default()))
+        }
+        Kind::Sqrt(sqrt) => {
+            let expr = sqrt
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Sqrt has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.sqrt())
+        }
+        Kind::Log(log) => {
+            let expr = log
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Log has no expr".into()))?;
+            let base = log
+                .base
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Log has no base".into()))?;
+            let e = build_expr(expr)?;
+            let base_expr = build_expr(base)?;
+            Ok(e.log(base_expr))
+        }
+        Kind::Clip(clip) => {
+            let expr = clip
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Clip has no expr".into()))?;
+            let min = clip
+                .min
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Clip has no min".into()))?;
+            let max = clip
+                .max
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Clip has no max".into()))?;
+            let e = build_expr(expr)?;
+            let min_expr = build_expr(min)?;
+            let max_expr = build_expr(max)?;
+            Ok(e.clip(min_expr, max_expr))
+        }
+        Kind::ValueCounts(value_counts) => {
+            let expr = value_counts
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("ValueCounts has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.value_counts(
+                value_counts.sort,
+                value_counts.parallel,
+                value_counts.name.as_str(),
+                value_counts.normalize,
+            ))
+        }
+        Kind::IsDuplicated(is_duplicated) => {
+            let expr = is_duplicated
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("IsDuplicated has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.is_duplicated())
+        }
+        Kind::RollingMin(rolling) => {
+            build_rolling_expr(rolling, |e, opts| e.rolling_min(opts), "RollingMin")
+        }
+        Kind::RollingMax(rolling) => {
+            build_rolling_expr(rolling, |e, opts| e.rolling_max(opts), "RollingMax")
+        }
+        Kind::RollingMean(rolling) => {
+            build_rolling_expr(rolling, |e, opts| e.rolling_mean(opts), "RollingMean")
+        }
+        Kind::RollingSum(rolling) => {
+            build_rolling_expr(rolling, |e, opts| e.rolling_sum(opts), "RollingSum")
+        }
+        Kind::Reverse(reverse) => {
+            let expr = reverse
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Reverse has no expr".into()))?;
+            let e = build_expr(expr)?;
+            Ok(e.reverse())
+        }
         _ => Err(BridgeError::Unsupported(
             "Expression type is not yet supported".into(),
         )),
@@ -913,6 +1110,37 @@ where
         .as_ref()
         .ok_or_else(|| BridgeError::PlanSemantic(format!("{} has no expr", label)))?;
     Ok(f(build_expr(expr)?))
+}
+
+fn build_rolling_expr<F>(rolling: &proto::Rolling, f: F, label: &str) -> Result<Expr, BridgeError>
+where
+    F: FnOnce(Expr, RollingOptionsFixedWindow) -> Expr,
+{
+    let expr = rolling
+        .expr
+        .as_ref()
+        .ok_or_else(|| BridgeError::PlanSemantic(format!("{} has no expr", label)))?;
+    let window_size = rolling.window_size as usize;
+    let min_periods = rolling.min_periods as usize;
+    if window_size == 0 {
+        return Err(BridgeError::InvalidArgument(format!(
+            "{} window_size must be > 0",
+            label
+        )));
+    }
+    if min_periods == 0 || min_periods > window_size {
+        return Err(BridgeError::InvalidArgument(format!(
+            "{} min_periods must be between 1 and window_size",
+            label
+        )));
+    }
+    let opts = RollingOptionsFixedWindow {
+        window_size,
+        min_periods,
+        center: rolling.center,
+        ..Default::default()
+    };
+    Ok(f(build_expr(expr)?, opts))
 }
 
 fn proto_data_type_to_polars(data_type: i32) -> Result<DataType, BridgeError> {

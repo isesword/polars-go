@@ -33,6 +33,10 @@ message Node {
     Explode explode = 26;
     DropNulls drop_nulls = 27;
     Unpivot unpivot = 28;
+    Reverse reverse = 29;
+    DropNans drop_nans = 30;
+    FillNanFrame fill_nan = 31;
+    Sample sample = 32;
   }
 
   reserved 50 to 99;   // window reserved
@@ -194,6 +198,29 @@ message Unpivot {
   string value_name = 5;
 }
 
+message Reverse {
+  Node input = 1;
+}
+
+message DropNans {
+  Node input = 1;
+  repeated string subset = 2;
+}
+
+message FillNanFrame {
+  Node input = 1;
+  Expr fill_value = 2;
+}
+
+message Sample {
+  Node input = 1;
+  bool is_fraction = 2;
+  double value = 3;
+  bool with_replacement = 4;
+  bool shuffle = 5;
+  optional uint64 seed = 6;
+}
+
 // 表达式
 message Expr {
   oneof kind {
@@ -202,6 +229,7 @@ message Expr {
     BinaryExpr binary = 3;
     Alias alias = 4;
     IsNull is_null = 5;
+    IsNotNull is_not_null = 124;
     Not not = 6;  // 逻辑取反
     Wildcard wildcard = 7;  // 通配符（选择所有列）
     Exclude exclude = 8;  // 排除列
@@ -245,6 +273,22 @@ message Expr {
     ForwardFill forward_fill = 121;
     FillNull fill_null = 122;
     BackwardFill backward_fill = 123;
+    IsNan is_nan = 125;
+    IsFinite is_finite = 126;
+    Abs abs = 127;
+    Round round = 128;
+    Sqrt sqrt = 129;
+    Log log = 130;
+    Clip clip = 131;
+    NullCount null_count = 132;
+    ValueCounts value_counts = 133;
+    ReverseExpr reverse = 134;
+    FillNan fill_nan = 135;
+    IsDuplicated is_duplicated = 136;
+    Rolling rolling_min = 137;
+    Rolling rolling_max = 138;
+    Rolling rolling_mean = 139;
+    Rolling rolling_sum = 140;
     
     // 字符串函数 (50-99)
     StringFunction str_len_bytes = 50;
@@ -271,7 +315,7 @@ message Expr {
   }
   
   reserved 71 to 99;   // 预留更多字符串函数
-  reserved 124 to 149; // more temporal/window functions reserved
+  reserved 141 to 149; // more temporal/window functions reserved
 }
 
 // 列引用
@@ -331,6 +375,18 @@ message Alias {
 
 // 空值检查
 message IsNull {
+  Expr expr = 1;
+}
+
+message IsNotNull {
+  Expr expr = 1;
+}
+
+message IsNan {
+  Expr expr = 1;
+}
+
+message IsFinite {
   Expr expr = 1;
 }
 
@@ -459,6 +515,62 @@ message FillNull {
 message BackwardFill {
   Expr expr = 1;
   optional uint64 limit = 2;
+}
+
+message Abs {
+  Expr expr = 1;
+}
+
+message Round {
+  Expr expr = 1;
+  uint32 decimals = 2;
+}
+
+message Sqrt {
+  Expr expr = 1;
+}
+
+message Log {
+  Expr expr = 1;
+  Expr base = 2;
+}
+
+message Clip {
+  Expr expr = 1;
+  Expr min = 2;
+  Expr max = 3;
+}
+
+message NullCount {
+  Expr expr = 1;
+}
+
+message ValueCounts {
+  Expr expr = 1;
+  bool sort = 2;
+  bool parallel = 3;
+  string name = 4;
+  bool normalize = 5;
+}
+
+message ReverseExpr {
+  Expr expr = 1;
+}
+
+message FillNan {
+  Expr expr = 1;
+  Expr fill_value = 2;
+}
+
+message IsDuplicated {
+  Expr expr = 1;
+}
+
+message Rolling {
+  Expr expr = 1;
+  uint64 window_size = 2;
+  uint64 min_periods = 3;
+  bool center = 4;
 }
 
 message TemporalUnary {

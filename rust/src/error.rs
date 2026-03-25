@@ -1,9 +1,7 @@
 #[repr(i32)]
 pub enum ErrorCode {
-    Ok = 0,
     Unknown = 1,
     InvalidArgument = 2,
-    AbiMismatch = 3,
     PlanVersionUnsupported = 4,
     PlanDecode = 5,
     PlanSemantic = 6,
@@ -17,10 +15,8 @@ pub enum ErrorCode {
 impl std::fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ErrorCode::Ok => write!(f, "OK"),
             ErrorCode::Unknown => write!(f, "ERR_UNKNOWN"),
             ErrorCode::InvalidArgument => write!(f, "ERR_INVALID_ARGUMENT"),
-            ErrorCode::AbiMismatch => write!(f, "ERR_ABI_MISMATCH"),
             ErrorCode::PlanVersionUnsupported => write!(f, "ERR_PLAN_VERSION_UNSUPPORTED"),
             ErrorCode::PlanDecode => write!(f, "ERR_PLAN_DECODE"),
             ErrorCode::PlanSemantic => write!(f, "ERR_PLAN_SEMANTIC"),
@@ -36,7 +32,6 @@ impl std::fmt::Display for ErrorCode {
 #[derive(Debug)]
 pub enum BridgeError {
     InvalidArgument(String),
-    AbiMismatch(u32, u32),
     PlanVersionUnsupported(u32),
     PlanDecode(String),
     PlanSemantic(String),
@@ -51,9 +46,6 @@ impl std::fmt::Display for BridgeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             BridgeError::InvalidArgument(s) => write!(f, "Invalid argument: {}", s),
-            BridgeError::AbiMismatch(expected, got) => {
-                write!(f, "ABI mismatch: expected {}, got {}", expected, got)
-            }
             BridgeError::PlanVersionUnsupported(v) => write!(f, "Plan version {} unsupported", v),
             BridgeError::PlanDecode(s) => write!(f, "Plan decode error: {}", s),
             BridgeError::PlanSemantic(s) => write!(f, "Plan semantic error: {}", s),
@@ -71,7 +63,6 @@ impl std::error::Error for BridgeError {}
 pub fn bridge_error_to_code(err: &BridgeError) -> (ErrorCode, String) {
     match err {
         BridgeError::InvalidArgument(s) => (ErrorCode::InvalidArgument, s.clone()),
-        BridgeError::AbiMismatch(_, _) => (ErrorCode::AbiMismatch, err.to_string()),
         BridgeError::PlanVersionUnsupported(_) => {
             (ErrorCode::PlanVersionUnsupported, err.to_string())
         }

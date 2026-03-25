@@ -77,6 +77,10 @@ func parseArrowRecordBatch(recordBatch arrow.RecordBatch) ([]map[string]interfac
 
 func newArrowColumnDecoder(col arrow.Array) (arrowColumnDecoder, error) {
 	switch c := col.(type) {
+	case *array.Null:
+		return func(i int) (interface{}, error) {
+			return nil, nil
+		}, nil
 	case *array.Int64:
 		return func(i int) (interface{}, error) {
 			if c.IsNull(i) {
@@ -161,6 +165,27 @@ func newArrowColumnDecoder(col arrow.Array) (arrowColumnDecoder, error) {
 			}
 			return strings.Clone(c.Value(i)), nil
 		}, nil
+	case *array.Binary:
+		return func(i int) (interface{}, error) {
+			if c.IsNull(i) {
+				return nil, nil
+			}
+			return append([]byte(nil), c.Value(i)...), nil
+		}, nil
+	case *array.LargeBinary:
+		return func(i int) (interface{}, error) {
+			if c.IsNull(i) {
+				return nil, nil
+			}
+			return append([]byte(nil), c.Value(i)...), nil
+		}, nil
+	case *array.FixedSizeBinary:
+		return func(i int) (interface{}, error) {
+			if c.IsNull(i) {
+				return nil, nil
+			}
+			return append([]byte(nil), c.Value(i)...), nil
+		}, nil
 	case *array.LargeString:
 		return func(i int) (interface{}, error) {
 			if c.IsNull(i) {
@@ -233,6 +258,8 @@ func arrowValueAt(col arrow.Array, i int) (interface{}, error) {
 	}
 
 	switch c := col.(type) {
+	case *array.Null:
+		return nil, nil
 	case *array.Int64:
 		return c.Value(i), nil
 	case *array.Int32:
@@ -257,6 +284,12 @@ func arrowValueAt(col arrow.Array, i int) (interface{}, error) {
 		return c.Value(i), nil
 	case *array.String:
 		return strings.Clone(c.Value(i)), nil
+	case *array.Binary:
+		return append([]byte(nil), c.Value(i)...), nil
+	case *array.LargeBinary:
+		return append([]byte(nil), c.Value(i)...), nil
+	case *array.FixedSizeBinary:
+		return append([]byte(nil), c.Value(i)...), nil
 	case *array.LargeString:
 		return strings.Clone(c.Value(i)), nil
 	case *array.Date32:

@@ -82,7 +82,7 @@ func NewArrowRecordBatchFromRowsWithArrowSchema(
 		}
 	}
 
-	return builder.NewRecord(), nil
+	return builder.NewRecordBatch(), nil
 }
 
 func arrowDataTypeFromPrimitive(dataType pb.DataType) (arrow.DataType, error) {
@@ -196,6 +196,21 @@ func appendValueToArrowBuilder(builder array.Builder, value any, dataType arrow.
 		b.Append(v)
 	case *array.StringBuilder:
 		b.Append(fmt.Sprint(value))
+	case *array.BinaryBuilder:
+		v, err := toBytes(value)
+		if err != nil {
+			return fmt.Errorf("%s: expected binary-compatible value, got %T: %w", path, value, err)
+		}
+		b.Append(v)
+	case *array.FixedSizeBinaryBuilder:
+		v, err := toBytes(value)
+		if err != nil {
+			return fmt.Errorf("%s: expected fixed-size-binary-compatible value, got %T: %w", path, value, err)
+		}
+		if len(v) != b.Type().(*arrow.FixedSizeBinaryType).ByteWidth {
+			return fmt.Errorf("%s: expected %d bytes, got %d", path, b.Type().(*arrow.FixedSizeBinaryType).ByteWidth, len(v))
+		}
+		b.Append(v)
 	case *array.Date32Builder:
 		v, err := toArrowDate32(value)
 		if err != nil {
@@ -277,7 +292,8 @@ func appendNullToArrowBuilder(builder array.Builder, dataType arrow.DataType, pa
 	case *array.Int64Builder, *array.Int32Builder, *array.Int16Builder, *array.Int8Builder,
 		*array.Uint64Builder, *array.Uint32Builder, *array.Uint16Builder, *array.Uint8Builder,
 		*array.Float64Builder, *array.Float32Builder, *array.BooleanBuilder,
-		*array.StringBuilder, *array.Date32Builder, *array.TimestampBuilder, *array.Time64Builder:
+		*array.StringBuilder, *array.BinaryBuilder, *array.FixedSizeBinaryBuilder,
+		*array.Date32Builder, *array.TimestampBuilder, *array.Time64Builder:
 		builder.AppendNull()
 		return nil
 	case *array.ListBuilder:
@@ -327,5 +343,54 @@ func toStringAnyMap(value any) (map[string]any, error) {
 	if typed, ok := value.(map[string]interface{}); ok {
 		return typed, nil
 	}
-	return nil, fmt.Errorf("value is not a map[string]any")
+	rv := reflect.ValueOf(value)
+	if !rv.IsValid() {
+		return nil, fmt.Errorf("value is nil")
+	}
+	if rv.Kind() == reflect.Struct {
+		out := make(map[string]any, rv.NumField())
+		rt := rv.Type()
+		for i := 0; i < rv.NumField(); i++ {
+			field := rt.Field(i)
+			if !field.IsExported() {
+				continue
+			}
+			out[field.Name] = rv.Field(i).Interface()
+		}
+		return out, nil
+	}
+	if rv.Kind() == reflect.Map && rv.Type().Key().Kind() == reflect.String {
+		out := make(map[string]any, rv.Len())
+		iter := rv.MapRange()
+		for iter.Next() {
+			out[iter.Key().String()] = iter.Value().Interface()
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("value is not a map[string]any or struct")
+}
+
+func toBytes(value any) ([]byte, error) {
+	switch v := value.(type) {
+	case []byte:
+		return append([]byte(nil), v...), nil
+	case string:
+		return []byte(v), nil
+	}
+
+	rv := reflect.ValueOf(value)
+	if !rv.IsValid() {
+		return nil, fmt.Errorf("value is nil")
+	}
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return nil, fmt.Errorf("value is not a byte slice")
+	}
+	if rv.Type().Elem().Kind() != reflect.Uint8 {
+		return nil, fmt.Errorf("value is not a byte slice")
+	}
+	buf := make([]byte, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		buf[i] = byte(rv.Index(i).Uint())
+	}
+	return buf, nil
 }

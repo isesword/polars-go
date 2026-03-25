@@ -50,6 +50,7 @@ Go (获取结果)
 对接 GoFrame / MySQL 时，推荐直接用：
 
 - `polars.NewDataFrame(rows, polars.WithSchema(schema))`
+- `polars.NewDataFrame(structRows)`
 
 这样高层会走对象导入流程，并由 Rust 负责推断；如果你已经有 Arrow，再显式使用 `NewDataFrameFromArrow(...)`。
 如果你更偏好显式命名，也可以用 `NewDataFrameFromMaps(...)` 或 `NewDataFrameFromColumns(...)`。
@@ -68,8 +69,76 @@ Go (获取结果)
 | `ToArrow()` | `to_arrow()` |
 | `Collect()` | `collect()` |
 | `ToMaps()` | `to_dicts()` |
+| `polars.ToStructs[T](df)` | `to_dicts()` 后绑定到 typed objects |
 
 如果你是从 Python Polars 迁移过来，可以优先按这张表找对应入口。
+
+### Go Struct 导入 / 导出
+
+除了 `[]map[string]any` / `map[string]interface{}`，现在也支持直接使用 Go struct slice：
+
+- 导入：
+  - `polars.NewDataFrame([]MyStruct{...})`
+  - `polars.NewDataFrameFromStructs([]MyStruct{...})`
+- 导出：
+  - `polars.ToStructs[MyStruct](df)`
+  - `polars.ToStructPointers[MyStruct](df)`
+
+示例：
+
+```go
+type Profile struct {
+    City string `polars:"city"`
+    Zip  int64  `polars:"zip"`
+}
+
+type User struct {
+    ID       int64    `polars:"id"`
+    Name     string   `polars:"name"`
+    Age      *int     `polars:"age"`
+    Tags     []string `polars:"tags"`
+    Payload  []byte   `polars:"payload"`
+    Profile  Profile  `polars:"profile"`
+    Nickname *string  `polars:"nickname"`
+    IgnoreMe string   `polars:"-"`
+}
+
+users := []User{
+    {ID: 1, Name: "Alice", Tags: []string{"go", "polars"}},
+    {ID: 2, Name: "Bob"},
+}
+
+df, err := polars.NewDataFrame(users)
+if err != nil {
+    log.Fatal(err)
+}
+defer df.Close()
+
+typed, err := polars.ToStructs[User](df)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(typed[0].Name)
+```
+
+tag 规则：
+
+- `polars:"name"`：指定列名
+- `polars:"-"`：忽略字段
+- 未加 tag 时默认使用 Go 字段名
+
+当前行为：
+
+- 支持 `struct` / `*struct` slice 导入
+- 指针字段会映射为 nullable
+- 支持嵌套 struct、`[]string`、`[]byte`、常见数值类型、`time.Time`
+- `ToStructs` / `ToStructPointers` 当前优先走 Arrow 直转；常见标量列、嵌套 struct 和常见 list 列会命中快路径
+
+当前限制：
+
+- `ToStructs[T]` / `ToStructPointers[T]` 的 `T` 必须是 struct，不能是 `*struct`
+- 重复的 `polars` 列名会返回 `ErrInvalidInput`
+- 如果列值无法转换到目标字段类型，也会返回 `ErrInvalidInput`
 
 ### Arrow C Data Interface
 
@@ -87,6 +156,60 @@ Go (获取结果)
 - `Arrow C Data Interface` 更像“把 Arrow 内存结构直接借给另一侧使用”
 - `ToMaps()` 最后仍会组装成 Go 的 `[]map[string]interface{}`，但中间不再经过额外的二进制序列化/反序列化
 - `ToArrow()` 则直接返回 Arrow `RecordBatch`，更接近 Python Polars 的 `to_arrow()`
+
+### JSON 导出
+
+当前 JSON 导出已经对齐到更接近 Polars 的命名：
+
+- eager:
+  - `(*DataFrame).WriteJSON(w io.Writer)`
+  - `(*DataFrame).WriteNDJSON(w io.Writer, opts ...polars.WriteNDJSONOptions)`
+- lazy:
+  - `(*LazyFrame).SinkJSON(w io.Writer)`
+  - `(*LazyFrame).SinkNDJSON(w io.Writer, opts ...polars.SinkNDJSONOptions)`
+
+实现说明：
+
+- JSON 序列化由 Rust / Polars `JsonWriter` 完成，不再由 Go 侧逐行编码
+- eager 路径更接近 Python Polars 的 `write_json()` / `write_ndjson()`
+- lazy 路径使用 `sink_*` 命名，对齐 Python Polars 的 `sink_ndjson()` 心智
+- `NDJSON` 当前提供对 `io.Writer` 真正有意义的附加选项：
+  - `Compression: none | gzip`
+  - `CompressionLevel`
+
+示例：
+
+```go
+df, _ := polars.NewDataFrame([]map[string]any{
+    {"id": 1, "name": "Alice"},
+    {"id": 2, "name": "Bob"},
+})
+defer df.Close()
+
+var jsonBuf bytes.Buffer
+_ = df.WriteJSON(&jsonBuf)
+
+var ndjsonBuf bytes.Buffer
+_ = df.WriteNDJSON(&ndjsonBuf, polars.WriteNDJSONOptions{
+    Compression: polars.NDJSONCompressionGzip,
+})
+
+lf := df.Filter(polars.Col("id").Gt(polars.Lit(1)))
+
+var sinkBuf bytes.Buffer
+_ = lf.SinkJSON(&sinkBuf)
+
+var sinkNDJSONBuf bytes.Buffer
+_ = lf.SinkNDJSON(&sinkNDJSONBuf, polars.SinkNDJSONOptions{
+    Compression: polars.NDJSONCompressionNone,
+})
+```
+
+注意：
+
+- 当前顶层 binary 列会先在 Rust 侧归一化后再写 JSON，避免 Polars 0.52 对 binary JSON writer 的未实现分支
+- `SinkJSON(...)` / `SinkNDJSON(...)` 当前会先 collect 结果，再写出 JSON；接口先对齐，后续如果需要可以再下沉成真正的 plan-to-sink
+- Python Polars 里 `write_ndjson` / `sink_ndjson` 还包含更偏文件路径语义的参数；当前 Go 版本面向 `io.Writer`，所以只保留与 writer 直接相关的压缩选项
 
 ### UDG（User-defined Go functions）
 
@@ -348,7 +471,9 @@ go test ./polars -run '^$' -bench 'BenchmarkImportRows/Rows2000|BenchmarkQueryCo
 | `BenchmarkImportRows/Rows2000/ArrowSchema` | 4,936,000 | 69,480 | 4,368 |
 | `BenchmarkQueryCollect/Rows4000/InMemoryArrowBacked` | 17,183,750 | 1,405,000 | 20,013 |
 | `BenchmarkQueryCollect/Rows4000/CSVScan` | 20,517,500 | 1,075,976 | 18,028 |
-| `BenchmarkToMaps/Rows4000` | 636,458 | 1,686,968 | 31,841 |
+| `BenchmarkToMaps/Rows4000` | 676,434 | 1,689,452 | 31,846 |
+| `BenchmarkToStructs/Rows4000` | 382,076 | 781,858 | 12,102 |
+| `BenchmarkToStructPointers/Rows4000` | 453,279 | 1,070,625 | 16,103 |
 | `BenchmarkExprVsMapBatches/Rows4000/NativeSingle` | 580,681 | 1,381,933 | 8,079 |
 | `BenchmarkExprVsMapBatches/Rows4000/MapBatchesSingle` | 543,986 | 1,467,624 | 8,171 |
 | `BenchmarkExprVsMapBatches/Rows4000/NativeMulti` | 648,181 | 1,413,965 | 12,079 |
@@ -359,8 +484,31 @@ go test ./polars -run '^$' -bench 'BenchmarkImportRows/Rows2000|BenchmarkQueryCo
 - `ArrowSchema` 导入明显快于 `JSONWithSchema`，而且分配更少
 - 4k 行样本下，内存 Arrow-backed 查询比 CSV 扫描更快
 - `ToMaps()` 目前仍然有比较明显的分配成本，后续值得继续优化
+- `ToStructs()` 现在优先走 Arrow 直转并带有常见标量列的直赋值快路径；在当前基线下，已经同时优于 `ToMaps()` 的延迟、内存和分配次数
+- `ToStructPointers()` 会比 `ToStructs()` 多一层对象分配，但在当前基线下仍明显优于 `ToMaps()`
 - `Expr.MapBatches(...)` 单输入在当前实现下已经和原生表达式非常接近
 - 多输入 `polars.MapBatches(...)` 会有额外的 Arrow batch 回调成本，但仍保持在同一量级
+
+`ToMaps()` / `ToStructs()` / `ToStructPointers()` 对照（Apple M4 Pro, `go test ./polars -run '^$' -bench 'Benchmark(ToMaps|ToStructs|ToStructPointers)' -benchmem`）：
+
+| Benchmark | ns/op | B/op | allocs/op |
+|---|---:|---:|---:|
+| `BenchmarkToMaps/Rows1000` | 174,895 | 426,788 | 7,843 |
+| `BenchmarkToStructs/Rows1000` | 100,829 | 201,819 | 3,102 |
+| `BenchmarkToStructPointers/Rows1000` | 113,734 | 274,012 | 4,103 |
+| `BenchmarkToMaps/Rows4000` | 747,331 | 1,689,469 | 31,847 |
+| `BenchmarkToStructs/Rows4000` | 382,076 | 781,858 | 12,102 |
+| `BenchmarkToStructPointers/Rows4000` | 453,279 | 1,070,625 | 16,103 |
+| `BenchmarkToMaps/Rows16000` | 2,991,847 | 6,734,175 | 127,849 |
+| `BenchmarkToStructs/Rows16000` | 1,501,154 | 3,085,616 | 48,102 |
+| `BenchmarkToStructPointers/Rows16000` | 2,075,547 | 4,240,708 | 64,103 |
+
+Struct 导出选型建议：
+
+- 需要 typed 结果并且希望吞吐/内存都更好时，优先用 `polars.ToStructs[T](df)`
+- 需要保留指针语义或想直接得到 `[]*T` 时，用 `polars.ToStructPointers[T](df)`
+- 需要最灵活、无 schema 假设的 Go 原生结果时，用 `ToMaps()`
+- 如果输入本身是复杂嵌套 rows，想让导入和导出都更稳定命中列式路径，优先配合 `WithArrowSchema(...)`
 
 ## 🚀 快速开始
 
@@ -416,6 +564,43 @@ func main() {
     defer eagerDF.Free()
     
     eagerDF.Print()
+}
+```
+
+### Struct 用法
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/isesword/polars-go-bridge/polars"
+)
+
+type Employee struct {
+    ID   int64  `polars:"id"`
+    Name string `polars:"name"`
+    Team string `polars:"team"`
+}
+
+func main() {
+    df, err := polars.NewDataFrame([]Employee{
+        {ID: 1, Name: "Alice", Team: "Engineering"},
+        {ID: 2, Name: "Bob", Team: "Marketing"},
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer df.Close()
+
+    out, err := polars.ToStructs[Employee](df)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println(out[1].Name) // Bob
 }
 ```
 
@@ -537,8 +722,12 @@ trimmed := df.Drop("bonus").Rename(map[string]string{
 head := df.Head(5)
 tail := df.Tail(5)
 filled := df.FillNull(int64(0))
+filledNan := df.FillNan(float64(0))
 backfilled := df.BFill()
 nonNull := df.DropNulls("age", "salary")
+nonNan := df.DropNans("score")
+reversed := df.Reverse()
+sampled := df.SampleN(10, polars.SampleOptions{})
 exploded := df.Explode("tags")
 unpivoted := df.Unpivot(polars.UnpivotOptions{
     On:           []string{"math", "english"},
@@ -614,8 +803,12 @@ _ = trimmed
 _ = head
 _ = tail
 _ = filled
+_ = filledNan
 _ = backfilled
 _ = nonNull
+_ = nonNan
+_ = reversed
+_ = sampled
 _ = exploded
 _ = unpivoted
 _ = labeled
@@ -653,6 +846,24 @@ orderedWindow := lf.Select(
 
 _ = windowed
 _ = orderedWindow
+
+numericHelpers := lf.Select(
+    polars.Col("value").IsNotNull().Alias("value_not_null"),
+    polars.Col("score").IsNan().Alias("score_is_nan"),
+    polars.Col("score").IsFinite().Alias("score_is_finite"),
+    polars.Col("value").Abs().Alias("abs_value"),
+    polars.Col("value").Round(0).Alias("round_value"),
+    polars.Col("value").Clip(-2.0, 5.0).Alias("clip_value"),
+    polars.Col("value").Sqrt().Alias("sqrt_value"),
+    polars.Col("value").Log(10.0).Alias("log10_value"),
+    polars.Col("value").NullCount().Alias("value_null_count"),
+    polars.Col("department").ValueCounts(polars.ValueCountsOptions{
+        Sort: true,
+        Name: "n",
+    }).Alias("department_counts"),
+)
+
+_ = numericHelpers
 
 analytic := lf.Select(
     polars.Col("name"),
@@ -1492,13 +1703,14 @@ EagerFrame（新的结果）
 - [x] CSV / Parquet 扫描参数：HasHeader / Separator / SkipRows / InferSchemaLength / NullValue / TryParseDates / QuoteChar / CommentPrefix / Schema / Encoding / IgnoreErrors / Rechunk
 - [x] Filter / Select / WithColumns / Limit 操作
 - [x] Drop / Rename / Slice / Head / Tail 操作
-- [x] FillNull / BFill / DropNulls / Explode / Unpivot(Melt) 操作
+- [x] FillNull / FillNan / FFill / BFill / DropNulls / DropNans / Reverse / Sample / Explode / Unpivot(Melt) 操作
 - [x] 完整的表达式系统：
   - 算术操作：Add, Sub, Mul, Div, **Mod, Pow**
   - 比较操作：Eq, Ne, Gt, Ge, Lt, Le
   - 逻辑操作：And, Or, **Not, Xor**
   - 类型转换：Cast, StrictCast
-  - 其他：Alias, IsNull, Cols, All, Exclude, FillNull, FFill, BFill
+  - 其他：Alias, IsNull, IsNotNull, IsNan, IsFinite, Cols, All, Exclude, FillNull, FillNan, FFill, BFill, Reverse
+  - 数值辅助：Abs, Round, Clip, Sqrt, Log, NullCount, ValueCounts
 - [x] 字符串表达式：
   - StrLenBytes, StrLenChars
   - StrContains, StrStartsWith, StrEndsWith

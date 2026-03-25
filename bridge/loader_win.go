@@ -29,6 +29,7 @@ type Bridge struct {
 	capabilities                     *syscall.Proc
 	lastError                        *syscall.Proc
 	lastErrorFree                    *syscall.Proc
+	stringFree                       *syscall.Proc
 	planCompile                      *syscall.Proc
 	planFree                         *syscall.Proc
 	planExplain                      *syscall.Proc
@@ -36,6 +37,7 @@ type Bridge struct {
 	planExecuteArrow                 *syscall.Proc
 	planCollectDF                    *syscall.Proc
 	dfToArrow                        *syscall.Proc
+	dfToJSON                         *syscall.Proc
 	dfPrint                          *syscall.Proc
 	dfFree                           *syscall.Proc
 	dfFromColumns                    *syscall.Proc
@@ -95,6 +97,9 @@ func loadBridge(libPath string) (*Bridge, error) {
 	if b.lastErrorFree, err = lib.FindProc("bridge_last_error_free"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_last_error_free: %w", err)
 	}
+	if b.stringFree, err = lib.FindProc("bridge_string_free"); err != nil {
+		return nil, fmt.Errorf("failed to find bridge_string_free: %w", err)
+	}
 	if b.planCompile, err = lib.FindProc("bridge_plan_compile"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_plan_compile: %w", err)
 	}
@@ -115,6 +120,9 @@ func loadBridge(libPath string) (*Bridge, error) {
 	}
 	if b.dfToArrow, err = lib.FindProc("bridge_df_to_arrow"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_df_to_arrow: %w", err)
+	}
+	if b.dfToJSON, err = lib.FindProc("bridge_df_to_json"); err != nil {
+		return nil, fmt.Errorf("failed to find bridge_df_to_json: %w", err)
 	}
 	if b.dfPrint, err = lib.FindProc("bridge_df_print"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_df_print: %w", err)
@@ -314,8 +322,25 @@ func (b *Bridge) ExplainPlan(handle uint64, inputDFHandles []uint64, optimized b
 	if ret != 0 {
 		return "", b.getLastError()
 	}
-	defer b.lastErrorFree.Call(ptr, length)
+	defer b.stringFree.Call(ptr, length)
 	return ptrToString(ptr, int(length)), nil
+}
+
+// DataFrameToJSON exports a Rust-side dataframe handle as JSON text.
+func (b *Bridge) DataFrameToJSON(handle uint64, format int32) ([]byte, error) {
+	var ptr uintptr
+	var length uintptr
+	ret, _, _ := b.dfToJSON.Call(
+		uintptr(handle),
+		uintptr(format),
+		uintptr(unsafe.Pointer(&ptr)),
+		uintptr(unsafe.Pointer(&length)),
+	)
+	if ret != 0 {
+		return nil, b.getLastError()
+	}
+	defer b.stringFree.Call(ptr, length)
+	return ptrToBytes(ptr, int(length)), nil
 }
 
 // ExecuteArrow 执行计划并通过 Arrow C Data Interface 返回结果（零拷贝）。
@@ -635,4 +660,15 @@ func ptrToString(ptr uintptr, length int) string {
 		bytes[i] = *(*byte)(unsafe.Pointer(ptr + uintptr(i)))
 	}
 	return string(bytes)
+}
+
+func ptrToBytes(ptr uintptr, length int) []byte {
+	if ptr == 0 || length == 0 {
+		return nil
+	}
+	bytes := make([]byte, length)
+	for i := 0; i < length; i++ {
+		bytes[i] = *(*byte)(unsafe.Pointer(ptr + uintptr(i)))
+	}
+	return bytes
 }

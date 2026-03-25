@@ -37,7 +37,7 @@ func NewSQLContext(initialTables ...map[string]any) *SQLContext {
 // - *EagerFrame
 // - *LazyFrame
 func (ctx *SQLContext) Register(name string, table any) *SQLContext {
-	if ctx == nil {
+	if err := invalidSQLContextError(ctx); err != nil {
 		return ctx
 	}
 	if ctx.err != nil {
@@ -57,7 +57,7 @@ func (ctx *SQLContext) Register(name string, table any) *SQLContext {
 
 // RegisterMany adds multiple tables to the SQLContext.
 func (ctx *SQLContext) RegisterMany(tables map[string]any) *SQLContext {
-	if ctx == nil {
+	if err := invalidSQLContextError(ctx); err != nil {
 		return ctx
 	}
 	if ctx.err != nil {
@@ -74,7 +74,7 @@ func (ctx *SQLContext) RegisterMany(tables map[string]any) *SQLContext {
 
 // Unregister removes a table from the SQLContext.
 func (ctx *SQLContext) Unregister(name string) *SQLContext {
-	if ctx == nil {
+	if err := invalidSQLContextError(ctx); err != nil {
 		return ctx
 	}
 	delete(ctx.tables, name)
@@ -83,7 +83,7 @@ func (ctx *SQLContext) Unregister(name string) *SQLContext {
 
 // Tables returns the currently registered table names in sorted order.
 func (ctx *SQLContext) Tables() []string {
-	if ctx == nil {
+	if err := invalidSQLContextError(ctx); err != nil {
 		return nil
 	}
 	names := make([]string, 0, len(ctx.tables))
@@ -95,18 +95,18 @@ func (ctx *SQLContext) Tables() []string {
 }
 
 func (ctx *SQLContext) buildLazyQuery(query string) (*LazyFrame, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("sql context is nil")
+	if err := invalidSQLContextError(ctx); err != nil {
+		return nil, wrapOp("SQLContext.buildLazyQuery", err)
 	}
 	if ctx.err != nil {
-		return nil, ctx.err
+		return nil, wrapOp("SQLContext.buildLazyQuery", ctx.err)
 	}
 	if query == "" {
-		return nil, fmt.Errorf("query is empty")
+		return nil, fmt.Errorf("SQLContext.buildLazyQuery: query is empty")
 	}
 	names := ctx.Tables()
 	if len(names) == 0 {
-		return nil, fmt.Errorf("sql context has no registered tables")
+		return nil, fmt.Errorf("SQLContext.buildLazyQuery: sql context has no registered tables")
 	}
 	inputs := make([]*pb.Node, 0, len(names))
 	var (
@@ -116,16 +116,16 @@ func (ctx *SQLContext) buildLazyQuery(query string) (*LazyFrame, error) {
 	for _, name := range names {
 		lf, err := resolveSQLTableLazy(ctx.tables[name])
 		if err != nil {
-			return nil, fmt.Errorf("sql table %q: %w", name, err)
+			return nil, fmt.Errorf("SQLContext.buildLazyQuery: sql table %q: %w", name, err)
 		}
 		var sourceIDs map[*EagerFrame]uint32
 		memorySources, sourceIDs, err = mergeMemorySources(memorySources, lf.memorySources)
 		if err != nil {
-			return nil, fmt.Errorf("sql table %q: %w", name, err)
+			return nil, fmt.Errorf("SQLContext.buildLazyQuery: sql table %q: %w", name, err)
 		}
 		root, err := remapNodeSources(lf.root, lf.memorySources, sourceIDs)
 		if err != nil {
-			return nil, fmt.Errorf("sql table %q: %w", name, err)
+			return nil, fmt.Errorf("SQLContext.buildLazyQuery: sql table %q: %w", name, err)
 		}
 		inputs = append(inputs, root)
 		if lf.nodeID > maxNodeID {

@@ -30,6 +30,7 @@ type Bridge struct {
 	capabilities                     func(*uintptr, *uintptr) int32
 	lastError                        func(*uintptr, *uintptr) int32
 	lastErrorFree                    func(uintptr, uintptr)
+	stringFree                       func(uintptr, uintptr)
 	planCompile                      func(*byte, uintptr, *uint64) int32
 	planFree                         func(uint64)
 	planExplain                      func(uint64, *uint64, uintptr, int32, *uintptr, *uintptr) int32
@@ -37,6 +38,7 @@ type Bridge struct {
 	planExecuteArrow                 func(uint64, *ArrowSchema, *ArrowArray, *ArrowSchema, *ArrowArray) int32
 	planCollectDF                    func(uint64, *uint64, uintptr, *uint64) int32
 	dfToArrow                        func(uint64, *ArrowSchema, *ArrowArray) int32
+	dfToJSON                         func(uint64, int32, *uintptr, *uintptr) int32
 	dfPrint                          func(uint64) int32
 	dfFree                           func(uint64)
 	dfFromColumns                    func(*byte, uintptr, *uint64) int32
@@ -86,6 +88,7 @@ func loadBridge(libPath string) (*Bridge, error) {
 	purego.RegisterLibFunc(&b.capabilities, lib, "bridge_capabilities")
 	purego.RegisterLibFunc(&b.lastError, lib, "bridge_last_error")
 	purego.RegisterLibFunc(&b.lastErrorFree, lib, "bridge_last_error_free")
+	purego.RegisterLibFunc(&b.stringFree, lib, "bridge_string_free")
 	purego.RegisterLibFunc(&b.planCompile, lib, "bridge_plan_compile")
 	purego.RegisterLibFunc(&b.planFree, lib, "bridge_plan_free")
 	purego.RegisterLibFunc(&b.planExplain, lib, "bridge_plan_explain")
@@ -93,6 +96,7 @@ func loadBridge(libPath string) (*Bridge, error) {
 	purego.RegisterLibFunc(&b.planExecuteArrow, lib, "bridge_plan_execute_arrow")
 	purego.RegisterLibFunc(&b.planCollectDF, lib, "bridge_plan_collect_df")
 	purego.RegisterLibFunc(&b.dfToArrow, lib, "bridge_df_to_arrow")
+	purego.RegisterLibFunc(&b.dfToJSON, lib, "bridge_df_to_json")
 	purego.RegisterLibFunc(&b.dfPrint, lib, "bridge_df_print")
 	purego.RegisterLibFunc(&b.dfFree, lib, "bridge_df_free")
 	purego.RegisterLibFunc(&b.dfFromColumns, lib, "bridge_df_from_columns")
@@ -259,8 +263,20 @@ func (b *Bridge) ExplainPlan(handle uint64, inputDFHandles []uint64, optimized b
 	if ret != 0 {
 		return "", b.getLastError()
 	}
-	defer b.lastErrorFree(ptr, length)
+	defer b.stringFree(ptr, length)
 	return ptrToString(ptr, int(length)), nil
+}
+
+// DataFrameToJSON exports a Rust-side dataframe handle as JSON text.
+func (b *Bridge) DataFrameToJSON(handle uint64, format int32) ([]byte, error) {
+	var ptr uintptr
+	var length uintptr
+	ret := b.dfToJSON(handle, format, &ptr, &length)
+	if ret != 0 {
+		return nil, b.getLastError()
+	}
+	defer b.stringFree(ptr, length)
+	return ptrToBytes(ptr, int(length)), nil
 }
 
 // ExecuteArrow 执行计划并通过 Arrow C Data Interface 返回结果（零拷贝）。
@@ -537,4 +553,14 @@ func ptrToString(ptr uintptr, length int) string {
 	}
 	bytes := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), length)
 	return string(bytes)
+}
+
+func ptrToBytes(ptr uintptr, length int) []byte {
+	if ptr == 0 || length == 0 {
+		return nil
+	}
+	src := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), length)
+	out := make([]byte, length)
+	copy(out, src)
+	return out
 }

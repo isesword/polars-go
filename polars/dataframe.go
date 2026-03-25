@@ -2,6 +2,7 @@ package polars
 
 import (
 	"fmt"
+	"io"
 
 	pb "github.com/isesword/polars-go-bridge/proto"
 	"google.golang.org/protobuf/proto"
@@ -85,6 +86,12 @@ type UnpivotOptions struct {
 	Index        []string
 	VariableName string
 	ValueName    string
+}
+
+type SampleOptions struct {
+	WithReplacement bool
+	Shuffle         bool
+	Seed            *uint64
 }
 
 type CSVScanOptions struct {
@@ -527,6 +534,120 @@ func (lf *LazyFrame) DropNulls(subset ...string) *LazyFrame {
 	return lf.withRoot(newNode)
 }
 
+// DropNans drops rows that contain NaN values in the provided subset.
+func (lf *LazyFrame) DropNans(subset ...string) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_DropNans{
+			DropNans: &pb.DropNans{
+				Input:  lf.root,
+				Subset: subset,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// FillNan fills NaN values across all columns with the provided value.
+func (lf *LazyFrame) FillNan(value interface{}) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	fillExpr := exprFromValue(value)
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_FillNan{
+			FillNan: &pb.FillNanFrame{
+				Input:     lf.root,
+				FillValue: fillExpr.toProto(),
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// Reverse reverses row order.
+func (lf *LazyFrame) Reverse() *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Reverse{
+			Reverse: &pb.Reverse{Input: lf.root},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// SampleN samples n rows.
+func (lf *LazyFrame) SampleN(n uint64, opts ...SampleOptions) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	cfg := SampleOptions{Shuffle: true}
+	if len(opts) > 0 {
+		cfg = opts[0]
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Sample{
+			Sample: &pb.Sample{
+				Input:           lf.root,
+				IsFraction:      false,
+				Value:           float64(n),
+				WithReplacement: cfg.WithReplacement,
+				Shuffle:         cfg.Shuffle,
+				Seed:            cfg.Seed,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
+// SampleFrac samples a fraction of rows.
+func (lf *LazyFrame) SampleFrac(frac float64, opts ...SampleOptions) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	cfg := SampleOptions{Shuffle: true}
+	if len(opts) > 0 {
+		cfg = opts[0]
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Sample{
+			Sample: &pb.Sample{
+				Input:           lf.root,
+				IsFraction:      true,
+				Value:           frac,
+				WithReplacement: cfg.WithReplacement,
+				Shuffle:         cfg.Shuffle,
+				Seed:            cfg.Seed,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
 // Explode explodes list-like columns.
 func (lf *LazyFrame) Explode(columns ...string) *LazyFrame {
 	if lf == nil {
@@ -721,30 +842,30 @@ func (lf *LazyFrame) Unique(opts UniqueOptions) *LazyFrame {
 
 // Collect 执行查询并返回 DataFrame（使用完请调用 Free）
 func (lf *LazyFrame) Collect() (*EagerFrame, error) {
-	if lf == nil {
-		return nil, fmt.Errorf("lazyframe is nil")
+	if err := invalidLazyFrameError(lf); err != nil {
+		return nil, wrapOp("LazyFrame.Collect", err)
 	}
 	if lf.err != nil {
-		return nil, lf.err
+		return nil, wrapOp("LazyFrame.Collect", lf.err)
 	}
 	brg, err := resolveBridge(nil)
 	if err != nil {
 		return nil, err
 	}
 	if err := ensureExprMapBatchesBridge(brg); err != nil {
-		return nil, err
+		return nil, wrapOp("LazyFrame.Collect", err)
 	}
 	for i, src := range lf.memorySources {
 		if src == nil || src.handle == 0 || src.brg == nil {
-			return nil, fmt.Errorf("memory source %d is nil", i)
+			return nil, fmt.Errorf("LazyFrame.Collect: memory source %d is nil", i)
 		}
 		if src.brg != brg {
-			return nil, fmt.Errorf("bridge mismatch for memory source %d", i)
+			return nil, fmt.Errorf("LazyFrame.Collect: bridge mismatch for memory source %d", i)
 		}
 	}
 	handle, err := lf.compilePlan(brg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile plan: %w", err)
+		return nil, fmt.Errorf("LazyFrame.Collect: failed to compile plan: %w", err)
 	}
 	defer brg.FreePlan(handle)
 
@@ -755,19 +876,57 @@ func (lf *LazyFrame) Collect() (*EagerFrame, error) {
 	}
 	dfHandle, err := brg.CollectPlanDF(handle, inputHandles)
 	if err != nil {
-		return nil, fmt.Errorf("failed to collect dataframe: %w", err)
+		return nil, fmt.Errorf("LazyFrame.Collect: failed to collect dataframe: %w", err)
 	}
 
 	return newDataFrame(dfHandle, brg), nil
 }
 
-// Print 执行查询并直接打印结果（使用 Polars 原生的 Display）
-func (lf *LazyFrame) Print() error {
-	if lf == nil {
-		return fmt.Errorf("lazyframe is nil")
+// SinkJSON collects the lazy query and writes the resulting JSON to w.
+func (lf *LazyFrame) SinkJSON(w io.Writer) error {
+	if err := invalidLazyFrameError(lf); err != nil {
+		return wrapOp("LazyFrame.SinkJSON", err)
 	}
 	if lf.err != nil {
-		return lf.err
+		return wrapOp("LazyFrame.SinkJSON", lf.err)
+	}
+	df, err := lf.Collect()
+	if err != nil {
+		return wrapOp("LazyFrame.SinkJSON", err)
+	}
+	defer df.Free()
+	if err := df.WriteJSON(w); err != nil {
+		return wrapOp("LazyFrame.SinkJSON", err)
+	}
+	return nil
+}
+
+// SinkNDJSON collects the lazy query and writes the resulting NDJSON to w.
+func (lf *LazyFrame) SinkNDJSON(w io.Writer, opts ...SinkNDJSONOptions) error {
+	if err := invalidLazyFrameError(lf); err != nil {
+		return wrapOp("LazyFrame.SinkNDJSON", err)
+	}
+	if lf.err != nil {
+		return wrapOp("LazyFrame.SinkNDJSON", lf.err)
+	}
+	df, err := lf.Collect()
+	if err != nil {
+		return wrapOp("LazyFrame.SinkNDJSON", err)
+	}
+	defer df.Free()
+	if err := df.WriteNDJSON(w, opts...); err != nil {
+		return wrapOp("LazyFrame.SinkNDJSON", err)
+	}
+	return nil
+}
+
+// Print 执行查询并直接打印结果（使用 Polars 原生的 Display）
+func (lf *LazyFrame) Print() error {
+	if err := invalidLazyFrameError(lf); err != nil {
+		return wrapOp("LazyFrame.Print", err)
+	}
+	if lf.err != nil {
+		return wrapOp("LazyFrame.Print", lf.err)
 	}
 	brg, err := resolveBridge(nil)
 	if err != nil {
@@ -784,14 +943,14 @@ func (lf *LazyFrame) Print() error {
 
 	handle, err := lf.compilePlan(brg)
 	if err != nil {
-		return fmt.Errorf("failed to compile plan: %w", err)
+		return fmt.Errorf("LazyFrame.Print: failed to compile plan: %w", err)
 	}
 	defer brg.FreePlan(handle)
 
 	// 3. 执行并打印（调用 Polars 原生的 Display）
 	err = brg.ExecuteAndPrint(handle)
 	if err != nil {
-		return fmt.Errorf("failed to execute and print: %w", err)
+		return fmt.Errorf("LazyFrame.Print: failed to execute and print: %w", err)
 	}
 
 	return nil
@@ -799,11 +958,11 @@ func (lf *LazyFrame) Print() error {
 
 // Explain returns the logical or optimized plan description.
 func (lf *LazyFrame) Explain(optimized ...bool) (string, error) {
-	if lf == nil {
-		return "", fmt.Errorf("lazyframe is nil")
+	if err := invalidLazyFrameError(lf); err != nil {
+		return "", wrapOp("LazyFrame.Explain", err)
 	}
 	if lf.err != nil {
-		return "", lf.err
+		return "", wrapOp("LazyFrame.Explain", lf.err)
 	}
 	brg, err := resolveBridge(nil)
 	if err != nil {
@@ -811,7 +970,7 @@ func (lf *LazyFrame) Explain(optimized ...bool) (string, error) {
 	}
 	handle, err := lf.compilePlan(brg)
 	if err != nil {
-		return "", fmt.Errorf("failed to compile plan: %w", err)
+		return "", fmt.Errorf("LazyFrame.Explain: failed to compile plan: %w", err)
 	}
 	defer brg.FreePlan(handle)
 
@@ -822,11 +981,21 @@ func (lf *LazyFrame) Explain(optimized ...bool) (string, error) {
 	inputHandles := make([]uint64, len(lf.memorySources))
 	for i, src := range lf.memorySources {
 		if src == nil || src.handle == 0 {
-			return "", fmt.Errorf("memory source %d is nil", i)
+			return "", fmt.Errorf("LazyFrame.Explain: memory source %d is nil", i)
 		}
 		inputHandles[i] = src.handle
 	}
 	return brg.ExplainPlan(handle, inputHandles, useOptimized)
+}
+
+// LogicalPlan returns the unoptimized logical plan for debugging.
+func (lf *LazyFrame) LogicalPlan() (string, error) {
+	return lf.Explain(false)
+}
+
+// OptimizedPlan returns the optimized logical plan for debugging.
+func (lf *LazyFrame) OptimizedPlan() (string, error) {
+	return lf.Explain(true)
 }
 
 func (lf *LazyFrame) compilePlan(brg interface {

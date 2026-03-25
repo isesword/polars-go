@@ -1,7 +1,13 @@
 package polars
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1322,11 +1328,165 @@ func TestAdvancedConvenienceOperations(t *testing.T) {
 		defer described.Close()
 
 		describeRows, err := described.df.ToMaps()
+		fmt.Println(describeRows)
 		if err != nil {
 			t.Fatalf("Describe ToMaps failed: %v", err)
 		}
 		if len(describeRows) == 0 || describeRows[0]["statistic"] != "count" {
 			t.Fatalf("unexpected describe rows: %#v", describeRows)
+		}
+	})
+
+	t.Run("NullNanNumericAndSamplingHelpers", func(t *testing.T) {
+		seed := uint64(7)
+		tmpDir := t.TempDir()
+		path := filepath.Join(tmpDir, "nan_helpers.csv")
+		if err := os.WriteFile(path, []byte("name,value,score\nAlice,1.25,NaN\nBob,,2.5\nCara,-3.5,NaN\nDrew,10.0,4.25\n"), 0o644); err != nil {
+			t.Fatalf("WriteFile failed: %v", err)
+		}
+		nullValue := ""
+		df := ScanCSVWithOptions(path, CSVScanOptions{
+			NullValue: &nullValue,
+			Schema: map[string]pb.DataType{
+				"name":  pb.DataType_UTF8,
+				"value": pb.DataType_FLOAT64,
+				"score": pb.DataType_FLOAT64,
+			},
+		})
+
+		rows, err := collectToMaps(t, df.Select(
+			Col("name"),
+			Col("value").IsNotNull().Alias("value_not_null"),
+			Col("score").IsNan().Alias("score_is_nan"),
+			Col("score").IsFinite().Alias("score_is_finite"),
+			Col("value").Abs().Alias("abs_value"),
+			Col("value").Round(0).Alias("round_value"),
+			Col("value").Clip(-2.0, 5.0).Alias("clip_value"),
+			Col("value").Sqrt().Alias("sqrt_value"),
+			Col("value").Log(10.0).Alias("log10_value"),
+		))
+		if err != nil {
+			t.Fatalf("helper select failed: %v", err)
+		}
+		if rows[0]["value_not_null"] != true || rows[1]["value_not_null"] != false {
+			t.Fatalf("unexpected is_not_null rows: %#v", rows)
+		}
+		if rows[0]["score_is_nan"] != true || rows[1]["score_is_nan"] != false {
+			t.Fatalf("unexpected is_nan rows: %#v", rows)
+		}
+		if rows[1]["score_is_finite"] != true || rows[0]["score_is_finite"] != false {
+			t.Fatalf("unexpected is_finite rows: %#v", rows)
+		}
+		if v, ok := asFloat64(rows[2]["abs_value"]); !ok || v != 3.5 {
+			t.Fatalf("unexpected abs value: %#v", rows[2]["abs_value"])
+		}
+		if v, ok := asFloat64(rows[3]["round_value"]); !ok || v != 10.0 {
+			t.Fatalf("unexpected round value: %#v", rows[3]["round_value"])
+		}
+		if v, ok := asFloat64(rows[2]["clip_value"]); !ok || v != -2.0 {
+			t.Fatalf("unexpected clip value: %#v", rows[2]["clip_value"])
+		}
+		if rows[2]["sqrt_value"] != nil {
+			if v, ok := asFloat64(rows[2]["sqrt_value"]); !ok || !math.IsNaN(v) {
+				t.Fatalf("expected sqrt of negative to be null/NaN-like, got %#v", rows[2]["sqrt_value"])
+			}
+		}
+		if v, ok := asFloat64(rows[3]["log10_value"]); !ok || math.Abs(v-1.0) > 1e-9 {
+			t.Fatalf("unexpected log10 value: %#v", rows[3]["log10_value"])
+		}
+
+		filledRows, err := collectToMaps(t, df.FillNan(0.0).Reverse())
+		if err != nil {
+			t.Fatalf("FillNan/Reverse failed: %v", err)
+		}
+		if filledRows[0]["name"] != "Drew" || filledRows[3]["name"] != "Alice" {
+			t.Fatalf("unexpected reverse rows: %#v", filledRows)
+		}
+		if v, ok := asFloat64(filledRows[3]["score"]); !ok || v != 0.0 {
+			t.Fatalf("unexpected fill_nan result: %#v", filledRows[3]["score"])
+		}
+
+		dropRows, err := collectToMaps(t, df.DropNans("score"))
+		if err != nil {
+			t.Fatalf("DropNans failed: %v", err)
+		}
+		if len(dropRows) != 2 {
+			t.Fatalf("expected 2 rows after DropNans, got %#v", dropRows)
+		}
+
+		sampledRows, err := collectToMaps(t, df.SampleN(2, SampleOptions{Seed: &seed}))
+		if err != nil {
+			t.Fatalf("SampleN failed: %v", err)
+		}
+		if len(sampledRows) != 2 {
+			t.Fatalf("unexpected SampleN rows: %#v", sampledRows)
+		}
+
+		fracRows, err := collectToMaps(t, df.SampleFrac(0.5, SampleOptions{Seed: &seed}))
+		if err != nil {
+			t.Fatalf("SampleFrac failed: %v", err)
+		}
+		if len(fracRows) == 0 || len(fracRows) > 3 {
+			t.Fatalf("unexpected SampleFrac rows: %#v", fracRows)
+		}
+
+		valueCountRows, err := collectToMaps(t, df.Select(
+			Col("name").ValueCounts(ValueCountsOptions{
+				Sort: true,
+				Name: "n",
+			}).Alias("name_counts"),
+		))
+		if err != nil {
+			t.Fatalf("ValueCounts failed: %v", err)
+		}
+		countStruct, ok := valueCountRows[0]["name_counts"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected struct-like value_counts result, got %#v", valueCountRows[0]["name_counts"])
+		}
+		if _, ok := countStruct["name"]; !ok {
+			t.Fatalf("value_counts missing value field: %#v", countStruct)
+		}
+		if _, ok := countStruct["n"]; !ok {
+			t.Fatalf("value_counts missing count field: %#v", countStruct)
+		}
+	})
+
+	t.Run("DuplicatedAndRollingHelpers", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"value": int64(1), "group": "a"},
+			{"value": int64(1), "group": "a"},
+			{"value": int64(2), "group": "b"},
+			{"value": int64(4), "group": "b"},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		rows, err := collectToMaps(t, df.Select(
+			Col("group").IsDuplicated().Alias("group_dup"),
+			Col("value").RollingMin(RollingOptions{WindowSize: 2, MinPeriods: 1}).Alias("roll_min"),
+			Col("value").RollingMax(RollingOptions{WindowSize: 2, MinPeriods: 1}).Alias("roll_max"),
+			Col("value").RollingMean(RollingOptions{WindowSize: 2, MinPeriods: 1}).Alias("roll_mean"),
+			Col("value").RollingSum(RollingOptions{WindowSize: 2, MinPeriods: 1}).Alias("roll_sum"),
+		))
+		if err != nil {
+			t.Fatalf("duplicated/rolling collect failed: %v", err)
+		}
+		if rows[0]["group_dup"] != true || rows[2]["group_dup"] != true {
+			t.Fatalf("unexpected duplicated mask: %#v", rows)
+		}
+		if v, ok := asFloat64(rows[3]["roll_sum"]); !ok || v != 6 {
+			t.Fatalf("unexpected rolling sum: %#v", rows[3]["roll_sum"])
+		}
+		if v, ok := asFloat64(rows[3]["roll_mean"]); !ok || v != 3 {
+			t.Fatalf("unexpected rolling mean: %#v", rows[3]["roll_mean"])
+		}
+		if v, ok := asFloat64(rows[2]["roll_min"]); !ok || v != 1 {
+			t.Fatalf("unexpected rolling min: %#v", rows[2]["roll_min"])
+		}
+		if v, ok := asFloat64(rows[3]["roll_max"]); !ok || v != 4 {
+			t.Fatalf("unexpected rolling max: %#v", rows[3]["roll_max"])
 		}
 	})
 }
@@ -2562,6 +2722,83 @@ func TestArrowNestedRoundTrip(t *testing.T) {
 	}
 }
 
+func TestArrowBinaryRoundTrip(t *testing.T) {
+	if !zeroCopySupported() {
+		t.Skip("arrow import/export requires cgo")
+	}
+
+	schema := arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "payload", Type: arrow.BinaryTypes.Binary, Nullable: true},
+		{Name: "blob", Type: arrow.BinaryTypes.LargeBinary, Nullable: true},
+		{Name: "token", Type: &arrow.FixedSizeBinaryType{ByteWidth: 4}, Nullable: true},
+	}, nil)
+
+	rows := []map[string]any{
+		{
+			"id":      int64(1),
+			"payload": []byte("abc"),
+			"blob":    "longer-binary",
+			"token":   [4]byte{1, 2, 3, 4},
+		},
+		{
+			"id":      int64(2),
+			"payload": nil,
+			"blob":    []byte{9, 8, 7},
+			"token":   []byte{5, 6, 7, 8},
+		},
+	}
+
+	df, err := NewDataFrame(rows, WithArrowSchema(schema))
+	if err != nil {
+		t.Fatalf("NewDataFrame binary Arrow schema failed: %v", err)
+	}
+	defer df.Close()
+
+	out, err := df.ToMaps()
+	if err != nil {
+		t.Fatalf("ToMaps failed: %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(out))
+	}
+	assertBinaryValue(t, out[0]["payload"], []byte("abc"))
+	assertBinaryValue(t, out[0]["blob"], []byte("longer-binary"))
+	assertBinaryValue(t, out[0]["token"], []byte{1, 2, 3, 4})
+	if out[1]["payload"] != nil {
+		t.Fatalf("expected nil payload, got %#v", out[1]["payload"])
+	}
+}
+
+func TestParseArrowRecordBatchBinaryTypes(t *testing.T) {
+	schema := arrow.NewSchema([]arrow.Field{
+		{Name: "payload", Type: arrow.BinaryTypes.Binary, Nullable: true},
+		{Name: "blob", Type: arrow.BinaryTypes.LargeBinary, Nullable: true},
+		{Name: "token", Type: &arrow.FixedSizeBinaryType{ByteWidth: 4}, Nullable: true},
+	}, nil)
+
+	builder := array.NewRecordBuilder(memory.DefaultAllocator, schema)
+	defer builder.Release()
+
+	builder.Field(0).(*array.BinaryBuilder).Append([]byte("abc"))
+	builder.Field(1).(*array.BinaryBuilder).Append([]byte("longer-binary"))
+	builder.Field(2).(*array.FixedSizeBinaryBuilder).Append([]byte{1, 2, 3, 4})
+
+	record := builder.NewRecordBatch()
+	defer record.Release()
+
+	rows, err := parseArrowRecordBatch(record)
+	if err != nil {
+		t.Fatalf("parseArrowRecordBatch failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	assertBinaryValue(t, rows[0]["payload"], []byte("abc"))
+	assertBinaryValue(t, rows[0]["blob"], []byte("longer-binary"))
+	assertBinaryValue(t, rows[0]["token"], []byte{1, 2, 3, 4})
+}
+
 func TestNewDataFrameWithArrowSchema(t *testing.T) {
 	if !zeroCopySupported() {
 		t.Skip("arrow row conversion requires cgo")
@@ -2613,6 +2850,48 @@ func TestNewDataFrameWithArrowSchema(t *testing.T) {
 	}
 	if got := out[1]["profile"].(map[string]interface{}); got["city"] != nil {
 		t.Fatalf("expected second city to be nil, got %#v", got["city"])
+	}
+}
+
+func TestNewDataFrameWithArrowSchemaStructValue(t *testing.T) {
+	if !zeroCopySupported() {
+		t.Skip("arrow row conversion requires cgo")
+	}
+
+	type profile struct {
+		City  string
+		Score int64
+	}
+
+	schema := arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "profile", Type: arrow.StructOf(
+			arrow.Field{Name: "City", Type: arrow.BinaryTypes.String, Nullable: true},
+			arrow.Field{Name: "Score", Type: arrow.PrimitiveTypes.Int64, Nullable: true},
+		), Nullable: true},
+	}, nil)
+
+	df, err := NewDataFrame([]map[string]any{
+		{
+			"id":      int64(1),
+			"profile": profile{City: "Shanghai", Score: 9},
+		},
+	}, WithArrowSchema(schema))
+	if err != nil {
+		t.Fatalf("NewDataFrame struct-valued Arrow schema failed: %v", err)
+	}
+	defer df.Close()
+
+	out, err := df.ToMaps()
+	if err != nil {
+		t.Fatalf("ToMaps failed: %v", err)
+	}
+	profileMap, ok := out[0]["profile"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected struct column to round-trip as map[string]interface{}, got %T", out[0]["profile"])
+	}
+	if profileMap["City"] != "Shanghai" || profileMap["Score"] != int64(9) {
+		t.Fatalf("unexpected struct column output: %#v", profileMap)
 	}
 }
 
@@ -2812,6 +3091,180 @@ func TestDataFrameAPI(t *testing.T) {
 		}
 	})
 
+	t.Run("NewDataFrameFromStructs", func(t *testing.T) {
+		type employee struct {
+			ID       int64  `polars:"id"`
+			Name     string `polars:"name"`
+			Age      *int   `polars:"age"`
+			IgnoreMe string `polars:"-"`
+			Team     string
+			Nickname *string `polars:"nickname"`
+		}
+
+		age := 35
+		nickname := "Bobby"
+		frame, err := NewDataFrame([]employee{
+			{ID: 1, Name: "Alice", Team: "Engineering"},
+			{ID: 2, Name: "Bob", Age: &age, Team: "Marketing", Nickname: &nickname},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame struct slice failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("NewDataFrame struct slice ToMaps failed: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("expected 2 rows, got %d", len(rows))
+		}
+		if rows[0]["id"] != int64(1) || rows[0]["name"] != "Alice" {
+			t.Fatalf("unexpected first struct row: %#v", rows[0])
+		}
+		if rows[0]["age"] != nil {
+			t.Fatalf("expected nil pointer field to round-trip as nil, got %#v", rows[0]["age"])
+		}
+		if _, exists := rows[0]["IgnoreMe"]; exists {
+			t.Fatalf("ignored field should not be exported: %#v", rows[0])
+		}
+		if rows[1]["nickname"] != "Bobby" {
+			t.Fatalf("unexpected tagged nickname value: %#v", rows[1]["nickname"])
+		}
+		if rows[1]["Team"] != "Marketing" {
+			t.Fatalf("unexpected default field name value: %#v", rows[1]["Team"])
+		}
+	})
+
+	t.Run("NewDataFrameFromStructsGeneric", func(t *testing.T) {
+		type user struct {
+			ID   int64  `polars:"id"`
+			Name string `polars:"name"`
+		}
+		frame, err := NewDataFrameFromStructs([]user{
+			{ID: 1, Name: "Alice"},
+			{ID: 2, Name: "Bob"},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrameFromStructs failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("NewDataFrameFromStructs ToMaps failed: %v", err)
+		}
+		if len(rows) != 2 || rows[1]["name"] != "Bob" {
+			t.Fatalf("unexpected rows from NewDataFrameFromStructs: %#v", rows)
+		}
+	})
+
+	t.Run("ToStructs", func(t *testing.T) {
+		type profile struct {
+			City string `polars:"city"`
+			Zip  int64  `polars:"zip"`
+		}
+		type employee struct {
+			ID       int64    `polars:"id"`
+			Name     string   `polars:"name"`
+			Age      *int     `polars:"age"`
+			Tags     []string `polars:"tags"`
+			Payload  []byte   `polars:"payload"`
+			Profile  profile  `polars:"profile"`
+			Nickname *string  `polars:"nickname"`
+		}
+
+		schema := arrow.NewSchema([]arrow.Field{
+			{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+			{Name: "name", Type: arrow.BinaryTypes.String},
+			{Name: "age", Type: arrow.PrimitiveTypes.Int64, Nullable: true},
+			{Name: "tags", Type: arrow.ListOf(arrow.BinaryTypes.String), Nullable: true},
+			{Name: "payload", Type: arrow.BinaryTypes.Binary, Nullable: true},
+			{Name: "profile", Type: arrow.StructOf(
+				arrow.Field{Name: "city", Type: arrow.BinaryTypes.String, Nullable: true},
+				arrow.Field{Name: "zip", Type: arrow.PrimitiveTypes.Int64, Nullable: true},
+			), Nullable: true},
+			{Name: "nickname", Type: arrow.BinaryTypes.String, Nullable: true},
+		}, nil)
+
+		frame, err := NewDataFrame([]map[string]any{
+			{
+				"id":       int64(1),
+				"name":     "Alice",
+				"age":      nil,
+				"tags":     []any{"go", "polars"},
+				"payload":  []byte("abc"),
+				"profile":  map[string]any{"city": "Shanghai", "zip": int64(200000)},
+				"nickname": nil,
+			},
+			{
+				"id":       int64(2),
+				"name":     "Bob",
+				"age":      int64(35),
+				"tags":     []any{"arrow"},
+				"payload":  []byte("xyz"),
+				"profile":  map[string]any{"city": "Suzhou", "zip": int64(215000)},
+				"nickname": "Bobby",
+			},
+		}, WithArrowSchema(schema))
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer frame.Close()
+
+		out, err := ToStructs[employee](frame)
+		if err != nil {
+			t.Fatalf("ToStructs failed: %v", err)
+		}
+		if len(out) != 2 {
+			t.Fatalf("expected 2 structs, got %d", len(out))
+		}
+		if out[0].Age != nil {
+			t.Fatalf("expected nil Age, got %#v", out[0].Age)
+		}
+		if out[1].Age == nil || *out[1].Age != 35 {
+			t.Fatalf("unexpected Age pointer: %#v", out[1].Age)
+		}
+		if out[1].Nickname == nil || *out[1].Nickname != "Bobby" {
+			t.Fatalf("unexpected Nickname pointer: %#v", out[1].Nickname)
+		}
+		if len(out[0].Tags) != 2 || out[0].Tags[0] != "go" {
+			t.Fatalf("unexpected tags: %#v", out[0].Tags)
+		}
+		if !bytes.Equal(out[0].Payload, []byte("abc")) {
+			t.Fatalf("unexpected payload: %#v", out[0].Payload)
+		}
+		if out[1].Profile.City != "Suzhou" || out[1].Profile.Zip != 215000 {
+			t.Fatalf("unexpected nested profile: %#v", out[1].Profile)
+		}
+	})
+
+	t.Run("ToStructPointers", func(t *testing.T) {
+		type user struct {
+			ID   int64  `polars:"id"`
+			Name string `polars:"name"`
+		}
+		frame, err := NewDataFrame([]map[string]any{
+			{"id": int64(1), "name": "Alice"},
+			{"id": int64(2), "name": "Bob"},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer frame.Close()
+
+		out, err := ToStructPointers[user](frame)
+		if err != nil {
+			t.Fatalf("ToStructPointers failed: %v", err)
+		}
+		if len(out) != 2 || out[0] == nil || out[1] == nil {
+			t.Fatalf("unexpected pointer result: %#v", out)
+		}
+		if out[1].Name != "Bob" {
+			t.Fatalf("unexpected pointer export: %#v", out[1])
+		}
+	})
+
 	t.Run("NewDataFrameUsesDefaultBridgeWhenNil", func(t *testing.T) {
 		frame, err := NewDataFrame([]map[string]any{
 			{"id": 1, "name": "Alice"},
@@ -2927,8 +3380,14 @@ func TestDataFrameAPI(t *testing.T) {
 		frame.Close()
 		frame.Close()
 
+		if !frame.Closed() {
+			t.Fatal("expected Closed() to report true after Close")
+		}
+
 		if _, err := frame.ToMaps(); err == nil {
 			t.Fatal("Expected ToMaps() to fail after Close(), got nil")
+		} else if !errors.Is(err, ErrClosedDataFrame) {
+			t.Fatalf("expected ErrClosedDataFrame, got %v", err)
 		}
 	})
 
@@ -2969,7 +3428,7 @@ func TestDataFrameAPI(t *testing.T) {
 
 func TestLazyAndEagerModes(t *testing.T) {
 	t.Run("LazyModeFromScan", func(t *testing.T) {
-		lf := ScanCSV("/Users/esword/GolandProjects/src/polars-go-bridge/testdata/sample.csv").
+		lf := ScanCSV("../testdata/sample.csv").
 			Filter(Col("age").Gt(Lit(28))).
 			Select(Col("name"), Col("age")).
 			Limit(2)
@@ -3003,7 +3462,7 @@ func TestLazyAndEagerModes(t *testing.T) {
 	})
 
 	t.Run("LazyCollectToEager", func(t *testing.T) {
-		lf := ScanCSV("/Users/esword/GolandProjects/src/polars-go-bridge/testdata/sample.csv").
+		lf := ScanCSV("../testdata/sample.csv").
 			Filter(Col("department").Eq(Lit("Engineering"))).
 			Limit(2)
 
@@ -3065,7 +3524,7 @@ func TestDataFrameAcrossFunctions(t *testing.T) {
 }
 
 func TestLazyFrameDefaultBridge(t *testing.T) {
-	const sampleCSV = "/Users/esword/GolandProjects/src/polars-go-bridge/testdata/sample.csv"
+	const sampleCSV = "../testdata/sample.csv"
 
 	df, err := ScanCSV(sampleCSV).Limit(2).Collect()
 	if err != nil {
@@ -3083,6 +3542,22 @@ func TestLazyFrameDefaultBridge(t *testing.T) {
 
 	if err := ScanCSV(sampleCSV).Limit(1).Print(); err != nil {
 		t.Fatalf("Print(nil) failed: %v", err)
+	}
+
+	logicalPlan, err := ScanCSV(sampleCSV).Limit(1).LogicalPlan()
+	if err != nil {
+		t.Fatalf("LogicalPlan failed: %v", err)
+	}
+	if logicalPlan == "" {
+		t.Fatal("expected non-empty logical plan")
+	}
+
+	optimizedPlan, err := ScanCSV(sampleCSV).Limit(1).OptimizedPlan()
+	if err != nil {
+		t.Fatalf("OptimizedPlan failed: %v", err)
+	}
+	if optimizedPlan == "" {
+		t.Fatal("expected non-empty optimized plan")
 	}
 }
 
@@ -3881,11 +4356,19 @@ func TestDataFrameFreeBehavior(t *testing.T) {
 
 		df.Free()
 
+		if !df.Closed() {
+			t.Fatal("expected Closed() to report true after Free")
+		}
+
 		if _, err := df.ToMaps(); err == nil {
 			t.Fatal("Expected ToMaps() to fail after Free(), got nil")
+		} else if !errors.Is(err, ErrClosedDataFrame) {
+			t.Fatalf("expected ErrClosedDataFrame after Free, got %v", err)
 		}
 		if err := df.Print(); err == nil {
 			t.Fatal("Expected Print() to fail after Free(), got nil")
+		} else if !errors.Is(err, ErrClosedDataFrame) {
+			t.Fatalf("expected ErrClosedDataFrame from Print after Free, got %v", err)
 		}
 	})
 
@@ -3971,4 +4454,260 @@ func TestDataFrameFreeBehavior(t *testing.T) {
 			t.Fatal("Expected ToMaps() to fail after deferred Free ran, got nil")
 		}
 	})
+}
+
+func TestNilAndClosedErrors(t *testing.T) {
+	var managed *DataFrame
+	if _, err := managed.ToMaps(); !errors.Is(err, ErrNilDataFrame) {
+		t.Fatalf("expected ErrNilDataFrame from nil managed dataframe, got %v", err)
+	}
+
+	var lazy *LazyFrame
+	if _, err := lazy.Collect(); !errors.Is(err, ErrNilLazyFrame) {
+		t.Fatalf("expected ErrNilLazyFrame from nil lazyframe, got %v", err)
+	}
+
+	type dup struct {
+		First  string `polars:"name"`
+		Second string `polars:"name"`
+	}
+	if _, err := NewDataFrameFromStructs([]dup{{First: "a", Second: "b"}}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput from duplicate struct tags, got %v", err)
+	}
+
+	type user struct {
+		Name string `polars:"name"`
+	}
+	var nilUser *user
+	if _, err := NewDataFrame([]*user{nilUser}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput from nil struct pointer row, got %v", err)
+	}
+
+	frame, err := NewDataFrame([]map[string]any{{"name": "Alice"}})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer frame.Close()
+
+	if _, err := ToStructs[int](frame); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput from non-struct ToStructs target, got %v", err)
+	}
+
+	type strictUser struct {
+		Age int64 `polars:"age"`
+	}
+	badFrame, err := NewDataFrame([]map[string]any{{"age": "oops"}})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer badFrame.Close()
+
+	if _, err := ToStructs[strictUser](badFrame); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput from mismatched ToStructs field, got %v", err)
+	}
+}
+
+func TestDataFrameJSONExport(t *testing.T) {
+	if !zeroCopySupported() {
+		t.Skip("JSON export requires cgo")
+	}
+
+	schema := arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "name", Type: arrow.BinaryTypes.String},
+		{Name: "tags", Type: arrow.ListOf(arrow.BinaryTypes.String), Nullable: true},
+		{Name: "payload", Type: arrow.BinaryTypes.Binary, Nullable: true},
+		{Name: "profile", Type: arrow.StructOf(
+			arrow.Field{Name: "city", Type: arrow.BinaryTypes.String, Nullable: true},
+			arrow.Field{Name: "score", Type: arrow.PrimitiveTypes.Int64, Nullable: true},
+		), Nullable: true},
+	}, nil)
+
+	df, err := NewDataFrame([]map[string]any{
+		{
+			"id":      int64(1),
+			"name":    "Alice",
+			"tags":    []string{"go", "json"},
+			"payload": []byte("abc"),
+			"profile": map[string]any{"city": "Shanghai", "score": int64(9)},
+		},
+		{
+			"id":      int64(2),
+			"name":    "Bob",
+			"tags":    []string{"polars"},
+			"payload": []byte("xyz"),
+			"profile": map[string]any{"city": "Suzhou", "score": int64(7)},
+		},
+	}, WithArrowSchema(schema))
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer df.Close()
+
+	t.Run("WriteJSON", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := df.WriteJSON(&buf); err != nil {
+			t.Fatalf("WriteJSON failed: %v", err)
+		}
+		var rows []map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
+			t.Fatalf("unmarshal JSON failed: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("expected 2 rows, got %d", len(rows))
+		}
+		if rows[0]["name"] != "Alice" {
+			t.Fatalf("unexpected first row: %#v", rows[0])
+		}
+		if rows[0]["payload"] != "abc" {
+			t.Fatalf("unexpected payload: %#v", rows[0]["payload"])
+		}
+		profile, ok := rows[0]["profile"].(map[string]any)
+		if !ok || profile["city"] != "Shanghai" {
+			t.Fatalf("unexpected nested profile: %#v", rows[0]["profile"])
+		}
+	})
+
+	t.Run("WriteJSON", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := df.WriteJSON(&buf); err != nil {
+			t.Fatalf("WriteJSON failed: %v", err)
+		}
+		if !strings.HasPrefix(buf.String(), "[") {
+			t.Fatalf("expected JSON array string, got %q", buf.String())
+		}
+	})
+
+	t.Run("WriteJSONNDJSON", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := df.WriteNDJSON(&buf); err != nil {
+			t.Fatalf("WriteNDJSON failed: %v", err)
+		}
+		lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+		if len(lines) != 2 {
+			t.Fatalf("expected 2 ndjson lines, got %d", len(lines))
+		}
+		var row map[string]any
+		if err := json.Unmarshal([]byte(lines[1]), &row); err != nil {
+			t.Fatalf("unmarshal ndjson line failed: %v", err)
+		}
+		if row["name"] != "Bob" {
+			t.Fatalf("unexpected second ndjson row: %#v", row)
+		}
+	})
+
+	t.Run("WriteNDJSONGzip", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := df.WriteNDJSON(&buf, WriteNDJSONOptions{Compression: NDJSONCompressionGzip}); err != nil {
+			t.Fatalf("WriteNDJSON gzip failed: %v", err)
+		}
+		zr, err := gzip.NewReader(bytes.NewReader(buf.Bytes()))
+		if err != nil {
+			t.Fatalf("gzip reader failed: %v", err)
+		}
+		defer zr.Close()
+		plain, err := io.ReadAll(zr)
+		if err != nil {
+			t.Fatalf("read gzip payload failed: %v", err)
+		}
+		lines := strings.Split(strings.TrimSpace(string(plain)), "\n")
+		if len(lines) != 2 {
+			t.Fatalf("expected 2 gzip ndjson lines, got %d", len(lines))
+		}
+	})
+}
+
+func TestLazyFrameJSONExport(t *testing.T) {
+	if !zeroCopySupported() {
+		t.Skip("JSON export requires cgo")
+	}
+
+	df, err := NewDataFrame([]map[string]any{
+		{"id": int64(1), "name": "Alice"},
+		{"id": int64(2), "name": "Bob"},
+	})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer df.Close()
+
+	lf := df.Filter(Col("id").Gt(Lit(1)))
+
+	t.Run("SinkJSON", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := lf.SinkJSON(&buf); err != nil {
+			t.Fatalf("SinkJSON failed: %v", err)
+		}
+		var rows []map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
+			t.Fatalf("unmarshal JSON failed: %v", err)
+		}
+		if len(rows) != 1 || rows[0]["name"] != "Bob" {
+			t.Fatalf("unexpected lazy json rows: %#v", rows)
+		}
+	})
+
+	t.Run("SinkJSON", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := lf.SinkJSON(&buf); err != nil {
+			t.Fatalf("SinkJSON failed: %v", err)
+		}
+		if !strings.Contains(buf.String(), "\"Bob\"") {
+			t.Fatalf("unexpected lazy json string: %q", buf.String())
+		}
+	})
+
+	t.Run("WriteJSONNDJSON", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := lf.SinkNDJSON(&buf); err != nil {
+			t.Fatalf("SinkNDJSON failed: %v", err)
+		}
+		lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 ndjson line, got %d", len(lines))
+		}
+		var row map[string]any
+		if err := json.Unmarshal([]byte(lines[0]), &row); err != nil {
+			t.Fatalf("unmarshal ndjson line failed: %v", err)
+		}
+		if row["name"] != "Bob" {
+			t.Fatalf("unexpected lazy ndjson row: %#v", row)
+		}
+	})
+
+	t.Run("SinkNDJSONGzip", func(t *testing.T) {
+		var buf bytes.Buffer
+		if err := lf.SinkNDJSON(&buf, SinkNDJSONOptions{Compression: NDJSONCompressionGzip}); err != nil {
+			t.Fatalf("SinkNDJSON gzip failed: %v", err)
+		}
+		zr, err := gzip.NewReader(bytes.NewReader(buf.Bytes()))
+		if err != nil {
+			t.Fatalf("gzip reader failed: %v", err)
+		}
+		defer zr.Close()
+		plain, err := io.ReadAll(zr)
+		if err != nil {
+			t.Fatalf("read gzip payload failed: %v", err)
+		}
+		if !strings.Contains(string(plain), "\"Bob\"") {
+			t.Fatalf("unexpected lazy gzip ndjson payload: %q", string(plain))
+		}
+	})
+}
+
+func assertBinaryValue(t *testing.T, got any, want []byte) {
+	t.Helper()
+
+	switch v := got.(type) {
+	case []byte:
+		if !bytes.Equal(v, want) {
+			t.Fatalf("unexpected binary value: got %v want %v", v, want)
+		}
+	case string:
+		if !bytes.Equal([]byte(v), want) {
+			t.Fatalf("unexpected binary string value: got %q want %q", v, string(want))
+		}
+	default:
+		t.Fatalf("unexpected binary type %T (%#v)", got, got)
+	}
 }

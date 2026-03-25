@@ -1,12 +1,14 @@
 use polars::datatypes::{DataType, TimeUnit};
+use polars::io::json::{JsonFormat, JsonWriter};
 use polars::lazy::frame::pivot::{pivot, pivot_stable};
 use polars::prelude::col;
-use polars::prelude::{AnyValue, DataFrame, IntoLazy, Series};
+use polars::prelude::{AnyValue, DataFrame, IntoLazy, SerWriter, Series};
 use polars::sql::SQLContext;
 use prost::Message;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::CString;
+use std::io::Cursor;
 use std::os::raw::{c_char, c_int};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
@@ -87,6 +89,71 @@ fn clear_last_error() {
     LAST_ERROR.with(|e| {
         *e.borrow_mut() = None;
     });
+}
+
+fn write_output_string(value: String, out_ptr: *mut *const c_char, out_len: *mut usize) -> Result<(), BridgeError> {
+    if out_ptr.is_null() || out_len.is_null() {
+        return Err(BridgeError::InvalidArgument("Null output pointers".into()));
+    }
+
+    let cstr = CString::new(value)
+        .map_err(|e| BridgeError::Execution(format!("Failed to encode output: {}", e)))?;
+    let len = cstr.as_bytes().len();
+    let ptr = cstr.into_raw();
+    unsafe {
+        *out_ptr = ptr;
+        *out_len = len;
+    }
+    Ok(())
+}
+
+fn export_dataframe_json(df: &DataFrame, format: c_int) -> Result<String, BridgeError> {
+    let json_format = match format {
+        0 => JsonFormat::Json,
+        1 => JsonFormat::JsonLines,
+        other => {
+            return Err(BridgeError::InvalidArgument(format!(
+                "Unsupported JSON format code {}",
+                other
+            )))
+        }
+    };
+
+    let mut df = df.clone();
+    for idx in 0..df.width() {
+        let column = &df.get_columns()[idx];
+        let needs_binary_cast = matches!(column.dtype(), DataType::Binary);
+        let column_name = column.name().to_string();
+        if needs_binary_cast {
+            let cast_name = column_name.clone();
+            let casted = column
+                .as_materialized_series()
+                .cast(&DataType::String)
+                .map_err(|e| {
+                    BridgeError::Execution(format!(
+                        "Failed to cast binary column {} to string for JSON export: {}",
+                        cast_name,
+                        e
+                    ))
+                })?;
+            df.replace_column(idx, casted).map_err(|e| {
+                BridgeError::Execution(format!(
+                    "Failed to replace normalized JSON column {}: {}",
+                    column_name,
+                    e
+                ))
+            })?;
+        }
+    }
+
+    let mut buffer = Cursor::new(Vec::<u8>::new());
+    JsonWriter::new(&mut buffer)
+        .with_json_format(json_format)
+        .finish(&mut df)
+        .map_err(|e| BridgeError::Execution(format!("Failed to write dataframe as JSON: {}", e)))?;
+
+    String::from_utf8(buffer.into_inner())
+        .map_err(|e| BridgeError::Execution(format!("JSON output was not valid UTF-8: {}", e)))
 }
 
 // 错误处理宏
@@ -209,6 +276,11 @@ pub extern "C" fn bridge_last_error_free(ptr: *const c_char, _len: usize) {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn bridge_string_free(ptr: *const c_char, len: usize) {
+    bridge_last_error_free(ptr, len)
+}
+
 // 3. Plan 编译
 #[no_mangle]
 pub extern "C" fn bridge_plan_compile(
@@ -288,14 +360,7 @@ pub extern "C" fn bridge_plan_explain(
         let explanation = lf
             .explain(optimized)
             .map_err(|e| BridgeError::Execution(format!("Failed to explain plan: {}", e)))?;
-        let cstr = CString::new(explanation)
-            .map_err(|e| BridgeError::Execution(format!("Failed to encode explanation: {}", e)))?;
-        let len = cstr.as_bytes().len();
-        let ptr = cstr.into_raw();
-        unsafe {
-            *out_ptr = ptr;
-            *out_len = len;
-        }
+        write_output_string(explanation, out_ptr, out_len)?;
         Ok(0)
     })
 }
@@ -362,6 +427,25 @@ pub extern "C" fn bridge_df_to_arrow(
 
         let df = unsafe { &*(df_handle as *const DataFrame) };
         arrow_bridge::export_dataframe_to_arrow(df, output_schema, output_array)?;
+        Ok(0)
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn bridge_df_to_json(
+    df_handle: u64,
+    format: c_int,
+    out_ptr: *mut *const c_char,
+    out_len: *mut usize,
+) -> c_int {
+    ffi_guard!({
+        if df_handle == 0 {
+            return Err(BridgeError::InvalidArgument("Null dataframe handle".into()));
+        }
+
+        let df = unsafe { &*(df_handle as *const DataFrame) };
+        let json = export_dataframe_json(df, format)?;
+        write_output_string(json, out_ptr, out_len)?;
         Ok(0)
     })
 }

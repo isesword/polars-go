@@ -1,6 +1,10 @@
 package polars
 
 import (
+	"encoding/json"
+	"fmt"
+	"time"
+
 	"github.com/apache/arrow-go/v18/arrow"
 	pb "github.com/isesword/polars-go-bridge/proto"
 )
@@ -31,6 +35,19 @@ type Expr struct {
 
 type ExprMapBatchesOptions struct {
 	ReturnType pb.DataType
+}
+
+type ValueCountsOptions struct {
+	Sort      bool
+	Parallel  bool
+	Name      string
+	Normalize bool
+}
+
+type RollingOptions struct {
+	WindowSize uint64
+	MinPeriods uint64
+	Center     bool
 }
 
 type WhenBuilder struct {
@@ -144,9 +161,41 @@ func Lit(value interface{}) Expr {
 		lit = &pb.Literal{
 			Value: &pb.Literal_IntVal{IntVal: int64(v)},
 		}
+	case int8:
+		lit = &pb.Literal{
+			Value: &pb.Literal_IntVal{IntVal: int64(v)},
+		}
+	case int16:
+		lit = &pb.Literal{
+			Value: &pb.Literal_IntVal{IntVal: int64(v)},
+		}
+	case int32:
+		lit = &pb.Literal{
+			Value: &pb.Literal_IntVal{IntVal: int64(v)},
+		}
 	case int64:
 		lit = &pb.Literal{
 			Value: &pb.Literal_IntVal{IntVal: v},
+		}
+	case uint:
+		lit = &pb.Literal{
+			Value: &pb.Literal_IntVal{IntVal: int64(v)},
+		}
+	case uint8:
+		lit = &pb.Literal{
+			Value: &pb.Literal_IntVal{IntVal: int64(v)},
+		}
+	case uint16:
+		lit = &pb.Literal{
+			Value: &pb.Literal_IntVal{IntVal: int64(v)},
+		}
+	case uint32:
+		lit = &pb.Literal{
+			Value: &pb.Literal_IntVal{IntVal: int64(v)},
+		}
+	case uint64:
+		lit = &pb.Literal{
+			Value: &pb.Literal_IntVal{IntVal: int64(v)},
 		}
 	case float64:
 		lit = &pb.Literal{
@@ -164,14 +213,28 @@ func Lit(value interface{}) Expr {
 		lit = &pb.Literal{
 			Value: &pb.Literal_StringVal{StringVal: v},
 		}
+	case json.Number:
+		if intVal, err := v.Int64(); err == nil {
+			lit = &pb.Literal{
+				Value: &pb.Literal_IntVal{IntVal: intVal},
+			}
+			break
+		}
+		floatVal, _ := v.Float64()
+		lit = &pb.Literal{
+			Value: &pb.Literal_FloatVal{FloatVal: floatVal},
+		}
+	case time.Time:
+		lit = &pb.Literal{
+			Value: &pb.Literal_StringVal{StringVal: v.Format(time.RFC3339Nano)},
+		}
 	case nil:
 		lit = &pb.Literal{
 			Value: &pb.Literal_NullVal{NullVal: &pb.NullValue{}},
 		}
 	default:
-		// 默认转换为字符串
 		lit = &pb.Literal{
-			Value: &pb.Literal_StringVal{StringVal: ""},
+			Value: &pb.Literal_StringVal{StringVal: fmt.Sprint(v)},
 		}
 	}
 
@@ -369,6 +432,19 @@ func (e Expr) IsNull() Expr {
 	}
 }
 
+// IsNotNull checks whether values are not null.
+func (e Expr) IsNotNull() Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_IsNotNull{
+				IsNotNull: &pb.IsNotNull{
+					Expr: e.inner,
+				},
+			},
+		},
+	}
+}
+
 // Not 逻辑取反 (~)
 func (e Expr) Not() Expr {
 	return Expr{
@@ -472,6 +548,15 @@ func (e Expr) Len() Expr {
 	return Expr{
 		inner: &pb.Expr{
 			Kind: &pb.Expr_Len{Len: &pb.AggExpr{Expr: e.inner}},
+		},
+	}
+}
+
+// NullCount returns the number of null values.
+func (e Expr) NullCount() Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_NullCount{NullCount: &pb.NullCount{Expr: e.inner}},
 		},
 	}
 }
@@ -728,6 +813,235 @@ func (e Expr) FillNull(value interface{}) Expr {
 				FillNull: &pb.FillNull{
 					Expr:      e.inner,
 					FillValue: fillExpr.inner,
+				},
+			},
+		},
+	}
+}
+
+// FillNan fills NaN values with the provided value or expression.
+func (e Expr) FillNan(value interface{}) Expr {
+	fillExpr := exprFromValue(value)
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_FillNan{
+				FillNan: &pb.FillNan{
+					Expr:      e.inner,
+					FillValue: fillExpr.inner,
+				},
+			},
+		},
+	}
+}
+
+// IsNan checks whether values are NaN.
+func (e Expr) IsNan() Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_IsNan{
+				IsNan: &pb.IsNan{Expr: e.inner},
+			},
+		},
+	}
+}
+
+// IsFinite checks whether values are finite.
+func (e Expr) IsFinite() Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_IsFinite{
+				IsFinite: &pb.IsFinite{Expr: e.inner},
+			},
+		},
+	}
+}
+
+// IsDuplicated returns a boolean mask marking duplicated values.
+func (e Expr) IsDuplicated() Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_IsDuplicated{
+				IsDuplicated: &pb.IsDuplicated{Expr: e.inner},
+			},
+		},
+	}
+}
+
+// Reverse reverses the expression values.
+func (e Expr) Reverse() Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_Reverse{
+				Reverse: &pb.ReverseExpr{Expr: e.inner},
+			},
+		},
+	}
+}
+
+// Abs returns the absolute value of the expression.
+func (e Expr) Abs() Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_Abs{
+				Abs: &pb.Abs{Expr: e.inner},
+			},
+		},
+	}
+}
+
+// Round rounds floating point values to the given decimal precision.
+func (e Expr) Round(decimals uint32) Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_Round{
+				Round: &pb.Round{
+					Expr:     e.inner,
+					Decimals: decimals,
+				},
+			},
+		},
+	}
+}
+
+// Sqrt computes the square root of the expression.
+func (e Expr) Sqrt() Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_Sqrt{
+				Sqrt: &pb.Sqrt{Expr: e.inner},
+			},
+		},
+	}
+}
+
+// Log computes the logarithm using the provided base expression.
+func (e Expr) Log(base interface{}) Expr {
+	baseExpr := exprFromValue(base)
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_Log{
+				Log: &pb.Log{
+					Expr: e.inner,
+					Base: baseExpr.inner,
+				},
+			},
+		},
+	}
+}
+
+// Clip clips values to the provided inclusive min/max boundaries.
+func (e Expr) Clip(min interface{}, max interface{}) Expr {
+	minExpr := exprFromValue(min)
+	maxExpr := exprFromValue(max)
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_Clip{
+				Clip: &pb.Clip{
+					Expr: e.inner,
+					Min:  minExpr.inner,
+					Max:  maxExpr.inner,
+				},
+			},
+		},
+	}
+}
+
+// ValueCounts returns a struct expression containing values and counts.
+func (e Expr) ValueCounts(opts ...ValueCountsOptions) Expr {
+	cfg := ValueCountsOptions{Name: "count"}
+	if len(opts) > 0 {
+		cfg = opts[0]
+		if cfg.Name == "" {
+			cfg.Name = "count"
+		}
+	}
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_ValueCounts{
+				ValueCounts: &pb.ValueCounts{
+					Expr:      e.inner,
+					Sort:      cfg.Sort,
+					Parallel:  cfg.Parallel,
+					Name:      cfg.Name,
+					Normalize: cfg.Normalize,
+				},
+			},
+		},
+	}
+}
+
+func normalizeRollingOptions(opts RollingOptions) RollingOptions {
+	if opts.WindowSize == 0 {
+		opts.WindowSize = 1
+	}
+	if opts.MinPeriods == 0 {
+		opts.MinPeriods = 1
+	}
+	return opts
+}
+
+// RollingMin applies a fixed-size rolling minimum.
+func (e Expr) RollingMin(opts RollingOptions) Expr {
+	cfg := normalizeRollingOptions(opts)
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_RollingMin{
+				RollingMin: &pb.Rolling{
+					Expr:       e.inner,
+					WindowSize: cfg.WindowSize,
+					MinPeriods: cfg.MinPeriods,
+					Center:     cfg.Center,
+				},
+			},
+		},
+	}
+}
+
+// RollingMax applies a fixed-size rolling maximum.
+func (e Expr) RollingMax(opts RollingOptions) Expr {
+	cfg := normalizeRollingOptions(opts)
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_RollingMax{
+				RollingMax: &pb.Rolling{
+					Expr:       e.inner,
+					WindowSize: cfg.WindowSize,
+					MinPeriods: cfg.MinPeriods,
+					Center:     cfg.Center,
+				},
+			},
+		},
+	}
+}
+
+// RollingMean applies a fixed-size rolling mean.
+func (e Expr) RollingMean(opts RollingOptions) Expr {
+	cfg := normalizeRollingOptions(opts)
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_RollingMean{
+				RollingMean: &pb.Rolling{
+					Expr:       e.inner,
+					WindowSize: cfg.WindowSize,
+					MinPeriods: cfg.MinPeriods,
+					Center:     cfg.Center,
+				},
+			},
+		},
+	}
+}
+
+// RollingSum applies a fixed-size rolling sum.
+func (e Expr) RollingSum(opts RollingOptions) Expr {
+	cfg := normalizeRollingOptions(opts)
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_RollingSum{
+				RollingSum: &pb.Rolling{
+					Expr:       e.inner,
+					WindowSize: cfg.WindowSize,
+					MinPeriods: cfg.MinPeriods,
+					Center:     cfg.Center,
 				},
 			},
 		},

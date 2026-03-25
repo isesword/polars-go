@@ -198,6 +198,80 @@ func BenchmarkToMaps(b *testing.B) {
 	}
 }
 
+func BenchmarkToStructs(b *testing.B) {
+	requireBenchmarkBridge(b)
+	if !zeroCopySupported() {
+		b.Skip("struct export requires cgo")
+	}
+
+	type benchRow struct {
+		ID         int64   `polars:"id"`
+		Name       string  `polars:"name"`
+		Age        int64   `polars:"age"`
+		Salary     float64 `polars:"salary"`
+		Department string  `polars:"department"`
+	}
+
+	for _, size := range []int{1000, 4000, 16000} {
+		df, err := NewDataFrame(benchmarkRows(size), WithArrowSchema(benchmarkArrowSchema()))
+		if err != nil {
+			b.Fatalf("failed to create dataframe: %v", err)
+		}
+		defer df.Close()
+
+		b.Run(benchmarkSizeLabel(size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				rows, err := ToStructs[benchRow](df)
+				if err != nil {
+					b.Fatalf("ToStructs failed: %v", err)
+				}
+				if len(rows) == 0 {
+					b.Fatal("expected non-empty ToStructs result")
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkToStructPointers(b *testing.B) {
+	requireBenchmarkBridge(b)
+	if !zeroCopySupported() {
+		b.Skip("struct pointer export requires cgo")
+	}
+
+	type benchRow struct {
+		ID         int64   `polars:"id"`
+		Name       string  `polars:"name"`
+		Age        int64   `polars:"age"`
+		Salary     float64 `polars:"salary"`
+		Department string  `polars:"department"`
+	}
+
+	for _, size := range []int{1000, 4000, 16000} {
+		df, err := NewDataFrame(benchmarkRows(size), WithArrowSchema(benchmarkArrowSchema()))
+		if err != nil {
+			b.Fatalf("failed to create dataframe: %v", err)
+		}
+		defer df.Close()
+
+		b.Run(benchmarkSizeLabel(size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				rows, err := ToStructPointers[benchRow](df)
+				if err != nil {
+					b.Fatalf("ToStructPointers failed: %v", err)
+				}
+				if len(rows) == 0 || rows[0] == nil {
+					b.Fatal("expected non-empty ToStructPointers result")
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkExprMapBatches(b *testing.B) {
 	requireBenchmarkBridge(b)
 	if !zeroCopySupported() {

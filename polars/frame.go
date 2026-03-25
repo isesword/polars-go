@@ -85,6 +85,11 @@ func NewDataFrame(data any, opts ...ImportOption) (*DataFrame, error) {
 	case map[string]interface{}:
 		return NewDataFrameFromColumns(v, opts...)
 	default:
+		if rows, err := structSliceToMaps(data); err == nil {
+			return NewDataFrameFromMaps(rows, opts...)
+		} else if looksLikeStructSlice(data) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("unsupported dataframe input type %T", data)
 	}
 }
@@ -290,10 +295,15 @@ func (f *DataFrame) Close() {
 	f.df = nil
 }
 
+// Closed reports whether the managed dataframe has been closed.
+func (f *DataFrame) Closed() bool {
+	return f == nil || f.df == nil
+}
+
 // ToMaps materializes the DataFrame into Go maps.
 func (f *DataFrame) ToMaps() ([]map[string]interface{}, error) {
-	if f == nil || f.df == nil {
-		return nil, fmt.Errorf("dataframe is nil")
+	if err := invalidDataFrameError(f); err != nil {
+		return nil, wrapOp("DataFrame.ToMaps", err)
 	}
 	return f.df.ToMaps()
 }
@@ -302,16 +312,16 @@ func (f *DataFrame) ToMaps() ([]map[string]interface{}, error) {
 //
 // Callers own the returned RecordBatch and must call Release when finished.
 func (f *DataFrame) ToArrow() (arrow.RecordBatch, error) {
-	if f == nil || f.df == nil {
-		return nil, fmt.Errorf("dataframe is nil")
+	if err := invalidDataFrameError(f); err != nil {
+		return nil, wrapOp("DataFrame.ToArrow", err)
 	}
 	return f.df.ToArrow()
 }
 
 // Describe returns a summary dataframe.
 func (f *DataFrame) Describe() (*DataFrame, error) {
-	if f == nil || f.df == nil {
-		return nil, fmt.Errorf("dataframe is nil")
+	if err := invalidDataFrameError(f); err != nil {
+		return nil, wrapOp("DataFrame.Describe", err)
 	}
 	return f.df.Describe()
 }
@@ -326,11 +336,11 @@ func (f *DataFrame) MapRows(
 	fn func(row map[string]any) (map[string]any, error),
 	opts MapRowsOptions,
 ) (*DataFrame, error) {
-	if f == nil || f.df == nil {
-		return nil, fmt.Errorf("dataframe is nil")
+	if err := invalidDataFrameError(f); err != nil {
+		return nil, wrapOp("DataFrame.MapRows", err)
 	}
 	if fn == nil {
-		return nil, fmt.Errorf("MapRows function is nil")
+		return nil, fmt.Errorf("DataFrame.MapRows: function is nil")
 	}
 
 	rows, err := f.df.ToMaps()
@@ -367,11 +377,11 @@ func (f *DataFrame) MapBatches(
 	fn func(batch arrow.RecordBatch) (arrow.RecordBatch, error),
 	_ MapBatchesOptions,
 ) (*DataFrame, error) {
-	if f == nil || f.df == nil {
-		return nil, fmt.Errorf("dataframe is nil")
+	if err := invalidDataFrameError(f); err != nil {
+		return nil, wrapOp("DataFrame.MapBatches", err)
 	}
 	if fn == nil {
-		return nil, fmt.Errorf("MapBatches function is nil")
+		return nil, fmt.Errorf("DataFrame.MapBatches: function is nil")
 	}
 
 	inputBatch, err := f.df.ToArrow()
@@ -398,18 +408,28 @@ func (f *DataFrame) MapBatches(
 
 // Print outputs the DataFrame using Polars' Display implementation.
 func (f *DataFrame) Print() error {
-	if f == nil || f.df == nil {
-		return fmt.Errorf("dataframe is nil")
+	if err := invalidDataFrameError(f); err != nil {
+		return wrapOp("DataFrame.Print", err)
 	}
 	return f.df.Print()
 }
 
 // Explain returns the logical or optimized plan description.
 func (f *DataFrame) Explain(optimized ...bool) (string, error) {
-	if f == nil || f.df == nil {
-		return "", fmt.Errorf("dataframe is nil")
+	if err := invalidDataFrameError(f); err != nil {
+		return "", wrapOp("DataFrame.Explain", err)
 	}
 	return f.df.Explain(optimized...)
+}
+
+// LogicalPlan returns the unoptimized logical plan for debugging.
+func (f *DataFrame) LogicalPlan() (string, error) {
+	return f.Explain(false)
+}
+
+// OptimizedPlan returns the optimized logical plan for debugging.
+func (f *DataFrame) OptimizedPlan() (string, error) {
+	return f.Explain(true)
 }
 
 // Lazy converts the DataFrame into a LazyFrame for further operations.
@@ -516,6 +536,14 @@ func (f *DataFrame) FillNull(value interface{}) *LazyFrame {
 	return f.df.FillNull(value)
 }
 
+// FillNan fills NaN values across all columns.
+func (f *DataFrame) FillNan(value interface{}) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.FillNan(value)
+}
+
 // DropNulls drops rows containing nulls in the provided subset.
 func (f *DataFrame) DropNulls(subset ...string) *LazyFrame {
 	if f == nil || f.df == nil {
@@ -524,12 +552,44 @@ func (f *DataFrame) DropNulls(subset ...string) *LazyFrame {
 	return f.df.DropNulls(subset...)
 }
 
+// DropNans drops rows containing NaN values in the provided subset.
+func (f *DataFrame) DropNans(subset ...string) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.DropNans(subset...)
+}
+
 // Explode explodes list-like columns.
 func (f *DataFrame) Explode(columns ...string) *LazyFrame {
 	if f == nil || f.df == nil {
 		return nil
 	}
 	return f.df.Explode(columns...)
+}
+
+// Reverse reverses row order.
+func (f *DataFrame) Reverse() *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Reverse()
+}
+
+// SampleN samples n rows.
+func (f *DataFrame) SampleN(n uint64, opts ...SampleOptions) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.SampleN(n, opts...)
+}
+
+// SampleFrac samples a fraction of rows.
+func (f *DataFrame) SampleFrac(frac float64, opts ...SampleOptions) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.SampleFrac(frac, opts...)
 }
 
 // Unpivot reshapes wide data to long format.
@@ -601,8 +661,8 @@ func (f *DataFrame) Concat(others ...*LazyFrame) *LazyFrame {
 
 // Pivot performs an eager pivot operation aligned with Polars' eager-only pivot semantics.
 func (f *DataFrame) Pivot(opts PivotOptions) (*DataFrame, error) {
-	if f == nil || f.df == nil {
-		return nil, fmt.Errorf("dataframe is nil")
+	if err := invalidDataFrameError(f); err != nil {
+		return nil, wrapOp("DataFrame.Pivot", err)
 	}
 	df, err := f.df.Pivot(opts)
 	if err != nil {

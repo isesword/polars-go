@@ -51,14 +51,19 @@ func (df *EagerFrame) Free() {
 	df.brg.FreeDataFrame(handle)
 }
 
+// Closed reports whether the underlying Rust-side dataframe handle is no longer valid.
+func (df *EagerFrame) Closed() bool {
+	return df == nil || df.handle == 0 || df.brg == nil
+}
+
 // ToMaps exports the DataFrame through Arrow C Data Interface and parses it
 // into Go maps.
 func (df *EagerFrame) ToMaps() ([]map[string]interface{}, error) {
-	if df == nil || df.handle == 0 || df.brg == nil {
-		return nil, fmt.Errorf("dataframe is nil")
+	if err := invalidEagerFrameError(df); err != nil {
+		return nil, wrapOp("EagerFrame.ToMaps", err)
 	}
 	if !bridgeArrowExportSupported() {
-		return nil, fmt.Errorf("ToMaps requires cgo (set CGO_ENABLED=1)")
+		return nil, fmt.Errorf("EagerFrame.ToMaps: requires cgo (set CGO_ENABLED=1)")
 	}
 
 	recordBatch, err := exportDataFrameToArrowRecordBatch(df.brg, df.handle)
@@ -79,11 +84,11 @@ func (df *EagerFrame) ToMaps() ([]map[string]interface{}, error) {
 //
 // Callers own the returned RecordBatch and must call Release when finished.
 func (df *EagerFrame) ToArrow() (arrow.RecordBatch, error) {
-	if df == nil || df.handle == 0 || df.brg == nil {
-		return nil, fmt.Errorf("dataframe is nil")
+	if err := invalidEagerFrameError(df); err != nil {
+		return nil, wrapOp("EagerFrame.ToArrow", err)
 	}
 	if !bridgeArrowExportSupported() {
-		return nil, fmt.Errorf("ToArrow requires cgo (set CGO_ENABLED=1)")
+		return nil, fmt.Errorf("EagerFrame.ToArrow: requires cgo (set CGO_ENABLED=1)")
 	}
 
 	recordBatch, err := exportDataFrameToArrowRecordBatch(df.brg, df.handle)
@@ -103,10 +108,20 @@ func (df *EagerFrame) Explain(optimized ...bool) (string, error) {
 	return df.Lazy().Explain(optimized...)
 }
 
+// LogicalPlan returns the unoptimized logical plan for debugging.
+func (df *EagerFrame) LogicalPlan() (string, error) {
+	return df.Explain(false)
+}
+
+// OptimizedPlan returns the optimized logical plan for debugging.
+func (df *EagerFrame) OptimizedPlan() (string, error) {
+	return df.Explain(true)
+}
+
 // Print outputs the DataFrame using Polars' Display implementation.
 func (df *EagerFrame) Print() error {
-	if df == nil || df.handle == 0 || df.brg == nil {
-		return fmt.Errorf("dataframe is nil")
+	if err := invalidEagerFrameError(df); err != nil {
+		return wrapOp("EagerFrame.Print", err)
 	}
 	return df.brg.DataFramePrint(df.handle)
 }
@@ -191,14 +206,39 @@ func (df *EagerFrame) FillNull(value interface{}) *LazyFrame {
 	return df.Lazy().FillNull(value)
 }
 
+// FillNan fills NaN values across all columns.
+func (df *EagerFrame) FillNan(value interface{}) *LazyFrame {
+	return df.Lazy().FillNan(value)
+}
+
 // DropNulls drops rows containing nulls in the provided subset.
 func (df *EagerFrame) DropNulls(subset ...string) *LazyFrame {
 	return df.Lazy().DropNulls(subset...)
 }
 
+// DropNans drops rows containing NaN values in the provided subset.
+func (df *EagerFrame) DropNans(subset ...string) *LazyFrame {
+	return df.Lazy().DropNans(subset...)
+}
+
 // Explode explodes list-like columns.
 func (df *EagerFrame) Explode(columns ...string) *LazyFrame {
 	return df.Lazy().Explode(columns...)
+}
+
+// Reverse reverses row order.
+func (df *EagerFrame) Reverse() *LazyFrame {
+	return df.Lazy().Reverse()
+}
+
+// SampleN samples n rows.
+func (df *EagerFrame) SampleN(n uint64, opts ...SampleOptions) *LazyFrame {
+	return df.Lazy().SampleN(n, opts...)
+}
+
+// SampleFrac samples a fraction of rows.
+func (df *EagerFrame) SampleFrac(frac float64, opts ...SampleOptions) *LazyFrame {
+	return df.Lazy().SampleFrac(frac, opts...)
 }
 
 // Unpivot reshapes wide data to long format.
