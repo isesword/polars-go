@@ -528,6 +528,11 @@ go test ./polars -run '^$' -bench Benchmark -benchmem
 `ToMaps()` 的专项 benchmark / `pprof` 分析流程见：
 
 - [docs/tomaps-profiling.md](docs/tomaps-profiling.md)
+- [docs/python-polars-comparison.md](docs/python-polars-comparison.md)
+
+如果你想看本仓库与 Python Polars 在 `4k / 16k / 100k / 1M` 样本下的近似同口径对照，也可以直接看：
+
+- [docs/python-polars-comparison.md](docs/python-polars-comparison.md)
 
 按规模跑某一组：
 
