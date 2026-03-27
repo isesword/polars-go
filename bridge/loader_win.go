@@ -36,6 +36,7 @@ type Bridge struct {
 	planExecutePrint                 *syscall.Proc
 	planExecuteArrow                 *syscall.Proc
 	planCollectDF                    *syscall.Proc
+	planSinkNDJSON                   *syscall.Proc
 	dfToArrow                        *syscall.Proc
 	dfToJSON                         *syscall.Proc
 	dfPrint                          *syscall.Proc
@@ -117,6 +118,9 @@ func loadBridge(libPath string) (*Bridge, error) {
 	}
 	if b.planCollectDF, err = lib.FindProc("bridge_plan_collect_df"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_plan_collect_df: %w", err)
+	}
+	if b.planSinkNDJSON, err = lib.FindProc("bridge_plan_sink_ndjson"); err != nil {
+		return nil, fmt.Errorf("failed to find bridge_plan_sink_ndjson: %w", err)
 	}
 	if b.dfToArrow, err = lib.FindProc("bridge_df_to_arrow"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_df_to_arrow: %w", err)
@@ -410,6 +414,48 @@ func (b *Bridge) CollectPlanDF(planHandle uint64, inputDFHandles []uint64) (uint
 	return dfHandle, nil
 }
 
+// SinkPlanNDJSON executes a plan and streams the result to an NDJSON file.
+func (b *Bridge) SinkPlanNDJSON(
+	planHandle uint64,
+	path []byte,
+	inputDFHandles []uint64,
+	compressionCode int32,
+	compressionLevel int32,
+) error {
+	if planHandle == 0 {
+		return fmt.Errorf("Bridge.SinkPlanNDJSON: planHandle must not be zero")
+	}
+	if len(path) == 0 {
+		return fmt.Errorf("Bridge.SinkPlanNDJSON: path is empty")
+	}
+
+	var pathPtr *byte
+	if len(path) > 0 {
+		pathPtr = &path[0]
+	}
+	var inputPtr *uint64
+	if len(inputDFHandles) > 0 {
+		inputPtr = &inputDFHandles[0]
+	}
+
+	ret, _, _ := b.planSinkNDJSON.Call(
+		uintptr(planHandle),
+		uintptr(unsafe.Pointer(pathPtr)),
+		uintptr(len(path)),
+		uintptr(unsafe.Pointer(inputPtr)),
+		uintptr(len(inputDFHandles)),
+		uintptr(compressionCode),
+		uintptr(compressionLevel),
+	)
+	runtime.KeepAlive(path)
+	runtime.KeepAlive(inputDFHandles)
+
+	if ret != 0 {
+		return b.getLastError()
+	}
+	return nil
+}
+
 // ExportDataFrameToArrow exports a DataFrame through the Arrow C Data
 // Interface.
 //
@@ -455,7 +501,7 @@ func (b *Bridge) FreeDataFrame(handle uint64) {
 // NewDataFrameFromMap and NewDataFrameFromRows APIs in the polars package.
 func (b *Bridge) CreateDataFrameFromColumns(jsonData []byte) (uint64, error) {
 	if len(jsonData) == 0 {
-		return 0, fmt.Errorf("jsonData is empty")
+		return 0, fmt.Errorf("Bridge.CreateDataFrameFromColumns: jsonData is empty")
 	}
 
 	var dfHandle uint64
@@ -556,10 +602,10 @@ func (b *Bridge) SetMemoryLimitBytes(limitBytes int64) error {
 // returns the resulting dataframe handle.
 func (b *Bridge) SQLCollectDF(query []byte, tableNamesJSON []byte, inputDFHandles []uint64) (uint64, error) {
 	if len(query) == 0 {
-		return 0, fmt.Errorf("query is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDF: query is empty")
 	}
 	if len(tableNamesJSON) == 0 {
-		return 0, fmt.Errorf("tableNamesJSON is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDF: tableNamesJSON is empty")
 	}
 
 	var dfHandle uint64
@@ -595,16 +641,16 @@ func (b *Bridge) SQLCollectDFFromPlans(
 	inputDFOffsets []uintptr,
 ) (uint64, error) {
 	if len(query) == 0 {
-		return 0, fmt.Errorf("query is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDFFromPlans: query is empty")
 	}
 	if len(tableNamesJSON) == 0 {
-		return 0, fmt.Errorf("tableNamesJSON is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDFFromPlans: tableNamesJSON is empty")
 	}
 	if len(planHandles) == 0 {
-		return 0, fmt.Errorf("planHandles is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDFFromPlans: planHandles is empty")
 	}
 	if len(inputDFOffsets) != len(planHandles)+1 {
-		return 0, fmt.Errorf("inputDFOffsets length must equal len(planHandles)+1")
+		return 0, fmt.Errorf("Bridge.SQLCollectDFFromPlans: inputDFOffsets length must equal len(planHandles)+1")
 	}
 
 	var (

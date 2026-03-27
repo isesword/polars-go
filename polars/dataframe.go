@@ -3,6 +3,8 @@ package polars
 import (
 	"fmt"
 	"io"
+	"os"
+	"reflect"
 
 	pb "github.com/isesword/polars-go/proto"
 	"google.golang.org/protobuf/proto"
@@ -79,6 +81,16 @@ type PivotOptions struct {
 	SortColumns   bool     `json:"sort_columns"`
 	MaintainOrder bool     `json:"maintain_order"`
 	Separator     string   `json:"separator"`
+}
+
+type LazyPivotOptions struct {
+	On            []string
+	OnColumns     []any
+	Index         []string
+	Values        []string
+	Aggregate     string
+	MaintainOrder bool
+	Separator     string
 }
 
 type UnpivotOptions struct {
@@ -668,6 +680,26 @@ func (lf *LazyFrame) Explode(columns ...string) *LazyFrame {
 	return lf.withRoot(newNode)
 }
 
+// Unnest unnests struct columns into their fields.
+func (lf *LazyFrame) Unnest(columns ...string) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Unnest{
+			Unnest: &pb.Unnest{
+				Input:   lf.root,
+				Columns: columns,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
+}
+
 // Unpivot reshapes wide data to long format.
 func (lf *LazyFrame) Unpivot(opts UnpivotOptions) *LazyFrame {
 	if lf == nil {
@@ -694,6 +726,109 @@ func (lf *LazyFrame) Unpivot(opts UnpivotOptions) *LazyFrame {
 // Melt is an alias for Unpivot for pandas users.
 func (lf *LazyFrame) Melt(opts UnpivotOptions) *LazyFrame {
 	return lf.Unpivot(opts)
+}
+
+func buildLazyPivotOnColumnRow(on []string, raw any) (*pb.PivotOnColumnRow, error) {
+	if len(on) == 1 {
+		return &pb.PivotOnColumnRow{
+			Values: []*pb.Literal{literalFromValue(raw)},
+		}, nil
+	}
+
+	if raw == nil {
+		return nil, fmt.Errorf("on_columns row is nil; hint: provide a map keyed by On columns or a positional slice with %d values", len(on))
+	}
+
+	if values, ok := raw.([]any); ok {
+		if len(values) != len(on) {
+			return nil, fmt.Errorf("on_columns row length mismatch: expected %d values for On=%v, got %d", len(on), on, len(values))
+		}
+		row := &pb.PivotOnColumnRow{Values: make([]*pb.Literal, len(values))}
+		for i, value := range values {
+			row.Values[i] = literalFromValue(value)
+		}
+		return row, nil
+	}
+
+	if named, ok := raw.(map[string]any); ok {
+		row := &pb.PivotOnColumnRow{Values: make([]*pb.Literal, len(on))}
+		for i, name := range on {
+			value, exists := named[name]
+			if !exists {
+				return nil, fmt.Errorf("on_columns row is missing key %q; expected keys matching On=%v", name, on)
+			}
+			row.Values[i] = literalFromValue(value)
+		}
+		return row, nil
+	}
+
+	rv := reflect.ValueOf(raw)
+	if rv.IsValid() && (rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array) {
+		if rv.Len() != len(on) {
+			return nil, fmt.Errorf("on_columns row length mismatch: expected %d values for On=%v, got %d", len(on), on, rv.Len())
+		}
+		row := &pb.PivotOnColumnRow{Values: make([]*pb.Literal, rv.Len())}
+		for i := 0; i < rv.Len(); i++ {
+			row.Values[i] = literalFromValue(rv.Index(i).Interface())
+		}
+		return row, nil
+	}
+
+	return nil, fmt.Errorf(
+		"unsupported on_columns row type %T for multi-column pivot; hint: use map[string]any or []any with values matching On=%v",
+		raw,
+		on,
+	)
+}
+
+func buildLazyPivotOnColumns(on []string, rawRows []any) ([]*pb.PivotOnColumnRow, error) {
+	rows := make([]*pb.PivotOnColumnRow, len(rawRows))
+	for i, raw := range rawRows {
+		row, err := buildLazyPivotOnColumnRow(on, raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid on_columns[%d]: %w", i, err)
+		}
+		rows[i] = row
+	}
+	return rows, nil
+}
+
+// Pivot reshapes the lazy frame using explicit on_columns, aligned with Python
+// Polars LazyFrame.pivot semantics.
+func (lf *LazyFrame) Pivot(opts LazyPivotOptions) *LazyFrame {
+	if lf == nil {
+		return (&LazyFrame{}).withErr(fmt.Errorf("lazyframe is nil"))
+	}
+	if lf.err != nil {
+		return lf.withErr(lf.err)
+	}
+	if len(opts.On) == 0 {
+		return lf.withErr(fmt.Errorf("pivot options require at least one column in On; hint: set LazyPivotOptions.On to one or more column names"))
+	}
+	if len(opts.OnColumns) == 0 {
+		return lf.withErr(fmt.Errorf("lazy pivot requires explicit OnColumns; hint: pass LazyPivotOptions.OnColumns with the expected pivot column values"))
+	}
+	onColumns, err := buildLazyPivotOnColumns(opts.On, opts.OnColumns)
+	if err != nil {
+		return lf.withErr(fmt.Errorf("lazy pivot on_columns are invalid: %w", err))
+	}
+
+	newNode := &pb.Node{
+		Id: lf.nextNodeID(),
+		Kind: &pb.Node_Pivot{
+			Pivot: &pb.Pivot{
+				Input:         lf.root,
+				On:            opts.On,
+				OnColumns:     onColumns,
+				Index:         opts.Index,
+				Values:        opts.Values,
+				Aggregate:     opts.Aggregate,
+				MaintainOrder: opts.MaintainOrder,
+				Separator:     opts.Separator,
+			},
+		},
+	}
+	return lf.withRoot(newNode)
 }
 
 // GroupBy groups rows by one or more column names.
@@ -865,7 +1000,11 @@ func (lf *LazyFrame) Collect() (*EagerFrame, error) {
 	}
 	handle, err := lf.compilePlan(brg)
 	if err != nil {
-		return nil, fmt.Errorf("LazyFrame.Collect: failed to compile plan: %w", err)
+		return nil, fmt.Errorf(
+			"LazyFrame.Collect: failed to compile plan (memory_sources=%d): %w",
+			len(lf.memorySources),
+			err,
+		)
 	}
 	defer brg.FreePlan(handle)
 
@@ -876,7 +1015,11 @@ func (lf *LazyFrame) Collect() (*EagerFrame, error) {
 	}
 	dfHandle, err := brg.CollectPlanDF(handle, inputHandles)
 	if err != nil {
-		return nil, fmt.Errorf("LazyFrame.Collect: failed to collect dataframe: %w", err)
+		return nil, fmt.Errorf(
+			"LazyFrame.Collect: failed during dataframe collection (memory_sources=%d): %w",
+			len(lf.memorySources),
+			err,
+		)
 	}
 
 	return newDataFrame(dfHandle, brg), nil
@@ -901,7 +1044,10 @@ func (lf *LazyFrame) SinkJSON(w io.Writer) error {
 	return nil
 }
 
-// SinkNDJSON collects the lazy query and writes the resulting NDJSON to w.
+// SinkNDJSON writes the lazy query result as NDJSON to w.
+//
+// For generic writers this uses a temporary file-backed lazy sink internally,
+// so it no longer needs to collect the full result into a dataframe first.
 func (lf *LazyFrame) SinkNDJSON(w io.Writer, opts ...SinkNDJSONOptions) error {
 	if err := invalidLazyFrameError(lf); err != nil {
 		return wrapOp("LazyFrame.SinkNDJSON", err)
@@ -909,13 +1055,101 @@ func (lf *LazyFrame) SinkNDJSON(w io.Writer, opts ...SinkNDJSONOptions) error {
 	if lf.err != nil {
 		return wrapOp("LazyFrame.SinkNDJSON", lf.err)
 	}
-	df, err := lf.Collect()
+	cfg := normalizeWriteNDJSONOptions(opts)
+	if _, err := ndjsonCompressionCode(cfg.Compression); err != nil {
+		return wrapOp("LazyFrame.SinkNDJSON", err)
+	}
+	if err := validateNDJSONCompressionLevel(cfg); err != nil {
+		return wrapOp("LazyFrame.SinkNDJSON", err)
+	}
+
+	tmpFile, err := openNDJSONTempFile(cfg)
 	if err != nil {
 		return wrapOp("LazyFrame.SinkNDJSON", err)
 	}
-	defer df.Free()
-	if err := df.WriteNDJSON(w, opts...); err != nil {
+	tmpPath := tmpFile.Name()
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return wrapOp("LazyFrame.SinkNDJSON", fmt.Errorf("failed to prepare temporary NDJSON file: %w", err))
+	}
+	defer os.Remove(tmpPath)
+
+	if err := lf.SinkNDJSONFile(tmpPath, cfg); err != nil {
 		return wrapOp("LazyFrame.SinkNDJSON", err)
+	}
+
+	file, err := os.Open(tmpPath)
+	if err != nil {
+		return wrapOp("LazyFrame.SinkNDJSON", fmt.Errorf("failed to open temporary NDJSON file: %w", err))
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(w, file); err != nil {
+		return wrapOp("LazyFrame.SinkNDJSON", err)
+	}
+	return nil
+}
+
+// SinkNDJSONFile streams the lazy query result directly to an NDJSON file
+// without collecting it into a dataframe first.
+func (lf *LazyFrame) SinkNDJSONFile(path string, opts ...SinkNDJSONOptions) error {
+	if err := invalidLazyFrameError(lf); err != nil {
+		return wrapOp("LazyFrame.SinkNDJSONFile", err)
+	}
+	if lf.err != nil {
+		return wrapOp("LazyFrame.SinkNDJSONFile", lf.err)
+	}
+	if path == "" {
+		return wrapOp("LazyFrame.SinkNDJSONFile", fmt.Errorf("path is empty"))
+	}
+
+	cfg := normalizeWriteNDJSONOptions(opts)
+	compressionCode, err := ndjsonCompressionCode(cfg.Compression)
+	if err != nil {
+		return wrapOp("LazyFrame.SinkNDJSONFile", err)
+	}
+	if err := validateNDJSONCompressionLevel(cfg); err != nil {
+		return wrapOp("LazyFrame.SinkNDJSONFile", err)
+	}
+
+	brg, err := resolveBridge(nil)
+	if err != nil {
+		return wrapOp("LazyFrame.SinkNDJSONFile", err)
+	}
+	for i, src := range lf.memorySources {
+		if src == nil {
+			return wrapOp("LazyFrame.SinkNDJSONFile", fmt.Errorf("memory source %d is nil", i))
+		}
+		if src.brg != brg {
+			return wrapOp("LazyFrame.SinkNDJSONFile", fmt.Errorf("bridge mismatch for memory source %d", i))
+		}
+	}
+
+	handle, err := lf.compilePlan(brg)
+	if err != nil {
+		return wrapOp(
+			"LazyFrame.SinkNDJSONFile",
+			fmt.Errorf("failed to compile plan (memory_sources=%d): %w", len(lf.memorySources), err),
+		)
+	}
+	defer brg.FreePlan(handle)
+
+	inputHandles := make([]uint64, len(lf.memorySources))
+	for i, src := range lf.memorySources {
+		inputHandles[i] = src.handle
+	}
+
+	if err := brg.SinkPlanNDJSON(
+		handle,
+		[]byte(path),
+		inputHandles,
+		compressionCode,
+		int32(cfg.CompressionLevel),
+	); err != nil {
+		return wrapOp(
+			"LazyFrame.SinkNDJSONFile",
+			fmt.Errorf("failed during NDJSON sink (path=%q, memory_sources=%d): %w", path, len(lf.memorySources), err),
+		)
 	}
 	return nil
 }
@@ -943,14 +1177,22 @@ func (lf *LazyFrame) Print() error {
 
 	handle, err := lf.compilePlan(brg)
 	if err != nil {
-		return fmt.Errorf("LazyFrame.Print: failed to compile plan: %w", err)
+		return fmt.Errorf(
+			"LazyFrame.Print: failed to compile plan (memory_sources=%d): %w",
+			len(lf.memorySources),
+			err,
+		)
 	}
 	defer brg.FreePlan(handle)
 
 	// 3. 执行并打印（调用 Polars 原生的 Display）
 	err = brg.ExecuteAndPrint(handle)
 	if err != nil {
-		return fmt.Errorf("LazyFrame.Print: failed to execute and print: %w", err)
+		return fmt.Errorf(
+			"LazyFrame.Print: failed to execute and print (memory_sources=%d): %w",
+			len(lf.memorySources),
+			err,
+		)
 	}
 
 	return nil
@@ -968,16 +1210,21 @@ func (lf *LazyFrame) Explain(optimized ...bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	handle, err := lf.compilePlan(brg)
-	if err != nil {
-		return "", fmt.Errorf("LazyFrame.Explain: failed to compile plan: %w", err)
-	}
-	defer brg.FreePlan(handle)
-
 	useOptimized := true
 	if len(optimized) > 0 {
 		useOptimized = optimized[0]
 	}
+	handle, err := lf.compilePlan(brg)
+	if err != nil {
+		return "", fmt.Errorf(
+			"LazyFrame.Explain: failed to compile plan (optimized=%t, memory_sources=%d): %w",
+			useOptimized,
+			len(lf.memorySources),
+			err,
+		)
+	}
+	defer brg.FreePlan(handle)
+
 	inputHandles := make([]uint64, len(lf.memorySources))
 	for i, src := range lf.memorySources {
 		if src == nil || src.handle == 0 {
@@ -985,7 +1232,16 @@ func (lf *LazyFrame) Explain(optimized ...bool) (string, error) {
 		}
 		inputHandles[i] = src.handle
 	}
-	return brg.ExplainPlan(handle, inputHandles, useOptimized)
+	plan, err := brg.ExplainPlan(handle, inputHandles, useOptimized)
+	if err != nil {
+		return "", fmt.Errorf(
+			"LazyFrame.Explain: failed to explain plan (optimized=%t, memory_sources=%d): %w",
+			useOptimized,
+			len(lf.memorySources),
+			err,
+		)
+	}
+	return plan, nil
 }
 
 // LogicalPlan returns the unoptimized logical plan for debugging.

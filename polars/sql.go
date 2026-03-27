@@ -3,6 +3,7 @@ package polars
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	pb "github.com/isesword/polars-go/proto"
 )
@@ -44,7 +45,7 @@ func (ctx *SQLContext) Register(name string, table any) *SQLContext {
 		return ctx
 	}
 	if name == "" {
-		ctx.err = fmt.Errorf("table name is empty")
+		ctx.err = fmt.Errorf("SQLContext.Register: table name is empty")
 		return ctx
 	}
 	if table == nil {
@@ -102,11 +103,14 @@ func (ctx *SQLContext) buildLazyQuery(query string) (*LazyFrame, error) {
 		return nil, wrapOp("SQLContext.buildLazyQuery", ctx.err)
 	}
 	if query == "" {
-		return nil, fmt.Errorf("SQLContext.buildLazyQuery: query is empty")
+		return nil, fmt.Errorf("SQLContext.buildLazyQuery: query is empty; hint: provide a non-empty SQL statement")
 	}
 	names := ctx.Tables()
 	if len(names) == 0 {
-		return nil, fmt.Errorf("SQLContext.buildLazyQuery: sql context has no registered tables")
+		return nil, fmt.Errorf(
+			"SQLContext.buildLazyQuery: sql context has no registered tables for query %s",
+			summarizeQuery(query),
+		)
 	}
 	inputs := make([]*pb.Node, 0, len(names))
 	var (
@@ -116,16 +120,31 @@ func (ctx *SQLContext) buildLazyQuery(query string) (*LazyFrame, error) {
 	for _, name := range names {
 		lf, err := resolveSQLTableLazy(ctx.tables[name])
 		if err != nil {
-			return nil, fmt.Errorf("SQLContext.buildLazyQuery: sql table %q: %w", name, err)
+			return nil, fmt.Errorf(
+				"SQLContext.buildLazyQuery: table %q for query %s: %w",
+				name,
+				summarizeQuery(query),
+				err,
+			)
 		}
 		var sourceIDs map[*EagerFrame]uint32
 		memorySources, sourceIDs, err = mergeMemorySources(memorySources, lf.memorySources)
 		if err != nil {
-			return nil, fmt.Errorf("SQLContext.buildLazyQuery: sql table %q: %w", name, err)
+			return nil, fmt.Errorf(
+				"SQLContext.buildLazyQuery: table %q for query %s: %w",
+				name,
+				summarizeQuery(query),
+				err,
+			)
 		}
 		root, err := remapNodeSources(lf.root, lf.memorySources, sourceIDs)
 		if err != nil {
-			return nil, fmt.Errorf("SQLContext.buildLazyQuery: sql table %q: %w", name, err)
+			return nil, fmt.Errorf(
+				"SQLContext.buildLazyQuery: table %q for query %s: %w",
+				name,
+				summarizeQuery(query),
+				err,
+			)
 		}
 		inputs = append(inputs, root)
 		if lf.nodeID > maxNodeID {
@@ -166,7 +185,12 @@ func (ctx *SQLContext) Execute(query string) (*DataFrame, error) {
 	}
 	df, err := lf.Collect()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(
+			"SQLContext.Execute: query %s with tables [%s]: %w",
+			summarizeQuery(query),
+			strings.Join(ctx.Tables(), ", "),
+			err,
+		)
 	}
 	return newDataFrameWrapper(df), nil
 }
@@ -201,6 +225,9 @@ func resolveSQLTableLazy(table any) (*LazyFrame, error) {
 		}
 		return v, nil
 	default:
-		return nil, fmt.Errorf("unsupported SQL table type %T", table)
+		return nil, fmt.Errorf(
+			"unsupported SQL table type %T; supported types: *DataFrame, *EagerFrame, *LazyFrame",
+			table,
+		)
 	}
 }

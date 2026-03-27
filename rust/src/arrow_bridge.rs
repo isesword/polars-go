@@ -18,7 +18,7 @@ pub fn export_dataframe_to_arrow(
 ) -> Result<(), BridgeError> {
     if out_schema.is_null() || out_array.is_null() {
         return Err(BridgeError::InvalidArgument(
-            "Null output schema/array pointers".into(),
+            "Arrow export requires non-null output schema and output array pointers".into(),
         ));
     }
 
@@ -53,24 +53,24 @@ pub fn import_dataframe_from_arrow(
 ) -> Result<DataFrame, BridgeError> {
     if in_schema.is_null() || in_array.is_null() {
         return Err(BridgeError::InvalidArgument(
-            "Null input schema/array pointers".into(),
+            "Arrow import requires non-null input schema and input array pointers".into(),
         ));
     }
 
     let schema = unsafe { std::ptr::read(in_schema) };
     let field = unsafe { import_field_from_c(&schema) }
-        .map_err(|e| BridgeError::ArrowImport(e.to_string()))?;
+        .map_err(|e| BridgeError::ArrowImport(format!("failed to import Arrow schema: {}", e)))?;
 
     let dtype = field.dtype.clone();
     let array = unsafe { std::ptr::read(in_array) };
     let array = unsafe { import_array_from_c(array, dtype.clone()) }
-        .map_err(|e| BridgeError::ArrowImport(e.to_string()))?;
+        .map_err(|e| BridgeError::ArrowImport(format!("failed to import Arrow array: {}", e)))?;
 
     let fields = match dtype {
         ArrowDataType::Struct(fields) => fields,
         _ => {
             return Err(BridgeError::ArrowImport(
-                "Arrow record batch must be a Struct type".into(),
+                format!("Arrow record batch must be a Struct type, got {:?}", dtype),
             ))
         }
     };
@@ -78,18 +78,20 @@ pub fn import_dataframe_from_arrow(
     let struct_array = array
         .as_any()
         .downcast_ref::<StructArray>()
-        .ok_or_else(|| BridgeError::ArrowImport("Arrow array is not a StructArray".into()))?;
+        .ok_or_else(|| {
+            BridgeError::ArrowImport("Arrow array is not a StructArray after import".into())
+        })?;
 
     if struct_array.validity().is_some() {
         return Err(BridgeError::ArrowImport(
-            "StructArray contains top-level nulls".into(),
+            "Arrow StructArray contains top-level nulls; top-level rows must be present".into(),
         ));
     }
 
     let schema: ArrowSchema = fields.into_iter().collect();
     let arrays = struct_array.values().iter().cloned().collect::<Vec<_>>();
     let record_batch = RecordBatch::try_new(struct_array.len(), Arc::new(schema), arrays)
-        .map_err(|e| BridgeError::ArrowImport(e.to_string()))?;
+        .map_err(|e| BridgeError::ArrowImport(format!("failed to construct Arrow record batch: {}", e)))?;
 
     Ok(DataFrame::from(record_batch))
 }

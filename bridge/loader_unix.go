@@ -37,6 +37,7 @@ type Bridge struct {
 	planExecutePrint                 func(uint64) int32
 	planExecuteArrow                 func(uint64, *ArrowSchema, *ArrowArray, *ArrowSchema, *ArrowArray) int32
 	planCollectDF                    func(uint64, *uint64, uintptr, *uint64) int32
+	planSinkNDJSON                   func(uint64, *byte, uintptr, *uint64, uintptr, int32, int32) int32
 	dfToArrow                        func(uint64, *ArrowSchema, *ArrowArray) int32
 	dfToJSON                         func(uint64, int32, *uintptr, *uintptr) int32
 	dfPrint                          func(uint64) int32
@@ -95,6 +96,7 @@ func loadBridge(libPath string) (*Bridge, error) {
 	purego.RegisterLibFunc(&b.planExecutePrint, lib, "bridge_plan_execute_and_print")
 	purego.RegisterLibFunc(&b.planExecuteArrow, lib, "bridge_plan_execute_arrow")
 	purego.RegisterLibFunc(&b.planCollectDF, lib, "bridge_plan_collect_df")
+	purego.RegisterLibFunc(&b.planSinkNDJSON, lib, "bridge_plan_sink_ndjson")
 	purego.RegisterLibFunc(&b.dfToArrow, lib, "bridge_df_to_arrow")
 	purego.RegisterLibFunc(&b.dfToJSON, lib, "bridge_df_to_json")
 	purego.RegisterLibFunc(&b.dfPrint, lib, "bridge_df_print")
@@ -335,6 +337,47 @@ func (b *Bridge) CollectPlanDF(planHandle uint64, inputDFHandles []uint64) (uint
 	return dfHandle, nil
 }
 
+// SinkPlanNDJSON executes a plan and streams the result to an NDJSON file.
+func (b *Bridge) SinkPlanNDJSON(
+	planHandle uint64,
+	path []byte,
+	inputDFHandles []uint64,
+	compressionCode int32,
+	compressionLevel int32,
+) error {
+	if planHandle == 0 {
+		return fmt.Errorf("Bridge.SinkPlanNDJSON: planHandle must not be zero")
+	}
+	if len(path) == 0 {
+		return fmt.Errorf("Bridge.SinkPlanNDJSON: path is empty")
+	}
+
+	var pathPtr *byte
+	if len(path) > 0 {
+		pathPtr = &path[0]
+	}
+	var inputPtr *uint64
+	if len(inputDFHandles) > 0 {
+		inputPtr = &inputDFHandles[0]
+	}
+	ret := b.planSinkNDJSON(
+		planHandle,
+		pathPtr,
+		uintptr(len(path)),
+		inputPtr,
+		uintptr(len(inputDFHandles)),
+		compressionCode,
+		compressionLevel,
+	)
+	runtime.KeepAlive(path)
+	runtime.KeepAlive(inputDFHandles)
+
+	if ret != 0 {
+		return b.getLastError()
+	}
+	return nil
+}
+
 // CreateDataFrameFromColumns creates a DataFrame from JSON-encoded column data.
 //
 // This is the low-level compatibility JSON import path used by the
@@ -342,7 +385,7 @@ func (b *Bridge) CollectPlanDF(planHandle uint64, inputDFHandles []uint64) (uint
 // NewDataFrameFromMap and NewDataFrameFromRows APIs in the polars package.
 func (b *Bridge) CreateDataFrameFromColumns(jsonData []byte) (uint64, error) {
 	if len(jsonData) == 0 {
-		return 0, fmt.Errorf("jsonData is empty")
+		return 0, fmt.Errorf("Bridge.CreateDataFrameFromColumns: jsonData is empty")
 	}
 
 	var dfHandle uint64
@@ -430,10 +473,10 @@ func (b *Bridge) SetMemoryLimitBytes(limitBytes int64) error {
 // returns the resulting dataframe handle.
 func (b *Bridge) SQLCollectDF(query []byte, tableNamesJSON []byte, inputDFHandles []uint64) (uint64, error) {
 	if len(query) == 0 {
-		return 0, fmt.Errorf("query is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDF: query is empty")
 	}
 	if len(tableNamesJSON) == 0 {
-		return 0, fmt.Errorf("tableNamesJSON is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDF: tableNamesJSON is empty")
 	}
 
 	var dfHandle uint64
@@ -461,16 +504,16 @@ func (b *Bridge) SQLCollectDFFromPlans(
 	inputDFOffsets []uintptr,
 ) (uint64, error) {
 	if len(query) == 0 {
-		return 0, fmt.Errorf("query is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDFFromPlans: query is empty")
 	}
 	if len(tableNamesJSON) == 0 {
-		return 0, fmt.Errorf("tableNamesJSON is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDFFromPlans: tableNamesJSON is empty")
 	}
 	if len(planHandles) == 0 {
-		return 0, fmt.Errorf("planHandles is empty")
+		return 0, fmt.Errorf("Bridge.SQLCollectDFFromPlans: planHandles is empty")
 	}
 	if len(inputDFOffsets) != len(planHandles)+1 {
-		return 0, fmt.Errorf("inputDFOffsets length must equal len(planHandles)+1")
+		return 0, fmt.Errorf("Bridge.SQLCollectDFFromPlans: inputDFOffsets length must equal len(planHandles)+1")
 	}
 
 	var (

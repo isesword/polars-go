@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/isesword/polars-go/bridge"
-	"github.com/isesword/polars-go/polars"
+	pl "github.com/isesword/polars-go/polars"
 )
 
 func main() {
@@ -33,10 +33,32 @@ func main() {
 
 	fmt.Println("\n=== Testing CSV Scan (Mode A: ScanCSV) ===")
 
-	lf := polars.ScanCSV("testdata/sample.csv")
+	lf := pl.ScanCSV("testdata/sample.csv")
 	if err := lf.Print(); err != nil {
 		log.Fatalf("Failed to execute CSV scan: %v", err)
 	}
-
 	fmt.Println("\n✅ CSV scan finished!")
+
+	df, err := pl.NewDataFrame(map[string]interface{}{
+		"urls": []string{
+			"http://vote.com/ballon_dor?candidate=messi&ref=polars",
+			"http://vote.com/ballon_dor?candidat=jorginho&ref=polars",
+			"http://vote.com/ballon_dor?candidate=ronaldo&ref=polars",
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer df.Close()
+
+	out, err := df.Select(
+		pl.Col("urls").StrExtract(`candidate=(\w+)`, 1),
+	).Collect()
+	if err != nil {
+		panic(err)
+	}
+	defer out.Free()
+
+	_ = out.Print()
+
 }

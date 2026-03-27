@@ -177,7 +177,7 @@ func assignStructFieldValue(dest reflect.Value, raw any) error {
 	if dest.Type() == reflect.TypeOf(time.Time{}) {
 		t, err := toDateTime(raw)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot assign %s to %s: %w", describeValueType(raw), dest.Type(), err)
 		}
 		dest.Set(reflect.ValueOf(t))
 		return nil
@@ -194,7 +194,7 @@ func assignStructFieldValue(dest reflect.Value, raw any) error {
 	case reflect.Bool:
 		v, ok := raw.(bool)
 		if !ok {
-			return fmt.Errorf("cannot convert %T to bool", raw)
+			return fmt.Errorf("cannot convert %s to %s (value=%s); hint: provide a Go bool value", describeValueType(raw), dest.Type(), describeValue(raw))
 		}
 		dest.SetBool(v)
 		return nil
@@ -202,28 +202,28 @@ func assignStructFieldValue(dest reflect.Value, raw any) error {
 		if dest.Type().PkgPath() == "time" && dest.Type().Name() == "Duration" {
 			d, err := toDuration(raw)
 			if err != nil {
-				return err
+				return fmt.Errorf("cannot assign %s to %s: %w", describeValueType(raw), dest.Type(), err)
 			}
 			dest.SetInt(int64(d))
 			return nil
 		}
 		v, err := toInt64(raw)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot assign %s to %s: %w", describeValueType(raw), dest.Type(), err)
 		}
 		dest.SetInt(v)
 		return nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		v, err := toUint64(raw)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot assign %s to %s: %w", describeValueType(raw), dest.Type(), err)
 		}
 		dest.SetUint(v)
 		return nil
 	case reflect.Float32, reflect.Float64:
 		v, err := toFloat64(raw)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot assign %s to %s: %w", describeValueType(raw), dest.Type(), err)
 		}
 		dest.SetFloat(v)
 		return nil
@@ -231,7 +231,7 @@ func assignStructFieldValue(dest reflect.Value, raw any) error {
 		if dest.Type().Elem().Kind() == reflect.Uint8 {
 			v, err := toBytes(raw)
 			if err != nil {
-				return err
+				return fmt.Errorf("cannot assign %s to %s: %w", describeValueType(raw), dest.Type(), err)
 			}
 			dest.SetBytes(v)
 			return nil
@@ -330,7 +330,11 @@ func toDuration(value any) (time.Duration, error) {
 		}
 		return time.Duration(iv), nil
 	default:
-		return 0, fmt.Errorf("cannot convert %T to duration", value)
+		return 0, fmt.Errorf(
+			"cannot convert %s to duration (value=%s); hint: provide time.Duration, an integer nanosecond value, or a duration string such as 1500ms",
+			describeValueType(value),
+			describeValue(value),
+		)
 	}
 }
 

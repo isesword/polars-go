@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"os"
 )
 
 const (
@@ -37,6 +38,58 @@ func normalizeWriteNDJSONOptions(opts []WriteNDJSONOptions) WriteNDJSONOptions {
 	return out
 }
 
+func ndjsonCompressionCode(compression NDJSONCompression) (int32, error) {
+	switch compression {
+	case NDJSONCompressionNone:
+		return 0, nil
+	case NDJSONCompressionGzip:
+		return 1, nil
+	default:
+		return 0, fmt.Errorf(
+			"unsupported NDJSON compression %q; supported values: %q, %q",
+			compression,
+			NDJSONCompressionNone,
+			NDJSONCompressionGzip,
+		)
+	}
+}
+
+func validateNDJSONCompressionLevel(opts WriteNDJSONOptions) error {
+	if opts.Compression != NDJSONCompressionGzip {
+		return nil
+	}
+	level := opts.CompressionLevel
+	if level == 0 {
+		return nil
+	}
+	if _, err := gzip.NewWriterLevel(io.Discard, level); err != nil {
+		return fmt.Errorf(
+			"invalid gzip compression level %d: %w; hint: use gzip.DefaultCompression (0) or a value between %d and %d",
+			level,
+			err,
+			gzip.HuffmanOnly,
+			gzip.BestCompression,
+		)
+	}
+	return nil
+}
+
+func ndjsonTempFilePattern(opts WriteNDJSONOptions) string {
+	if opts.Compression == NDJSONCompressionGzip {
+		return "polars-*.jsonl.gz"
+	}
+	return "polars-*.jsonl"
+}
+
+func openNDJSONTempFile(opts WriteNDJSONOptions) (*os.File, error) {
+	pattern := ndjsonTempFilePattern(opts)
+	file, err := os.CreateTemp("", pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary NDJSON file: %w", err)
+	}
+	return file, nil
+}
+
 func wrapNDJSONWriter(w io.Writer, opts WriteNDJSONOptions) (io.Writer, func() error, error) {
 	switch opts.Compression {
 	case NDJSONCompressionNone:
@@ -48,11 +101,22 @@ func wrapNDJSONWriter(w io.Writer, opts WriteNDJSONOptions) (io.Writer, func() e
 		}
 		zw, err := gzip.NewWriterLevel(w, level)
 		if err != nil {
-			return nil, nil, fmt.Errorf("invalid gzip compression level %d: %w", level, err)
+			return nil, nil, fmt.Errorf(
+				"invalid gzip compression level %d: %w; hint: use gzip.DefaultCompression (0) or a value between %d and %d",
+				level,
+				err,
+				gzip.HuffmanOnly,
+				gzip.BestCompression,
+			)
 		}
 		return zw, zw.Close, nil
 	default:
-		return nil, nil, fmt.Errorf("unsupported NDJSON compression %q", opts.Compression)
+		return nil, nil, fmt.Errorf(
+			"unsupported NDJSON compression %q; supported values: %q, %q",
+			opts.Compression,
+			NDJSONCompressionNone,
+			NDJSONCompressionGzip,
+		)
 	}
 }
 

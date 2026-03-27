@@ -50,6 +50,11 @@ type RollingOptions struct {
 	Center     bool
 }
 
+type SortByOptions struct {
+	Descending []bool
+	NullsLast  []bool
+}
+
 type WhenBuilder struct {
 	predicate Expr
 }
@@ -76,11 +81,20 @@ type RankOptions struct {
 }
 
 type OverOptions struct {
-	PartitionBy []Expr
-	OrderBy     []Expr
-	Descending  bool
-	NullsLast   bool
+	PartitionBy     []Expr
+	OrderBy         []Expr
+	Descending      bool
+	NullsLast       bool
+	MappingStrategy WindowMapping
 }
+
+type WindowMapping = pb.WindowMapping
+
+const (
+	WindowMappingGroupToRows = pb.WindowMapping_WINDOW_MAPPING_GROUP_TO_ROWS
+	WindowMappingExplode     = pb.WindowMapping_WINDOW_MAPPING_EXPLODE
+	WindowMappingJoin        = pb.WindowMapping_WINDOW_MAPPING_JOIN
+)
 
 type DiffNullBehavior = pb.DiffNullBehavior
 
@@ -118,6 +132,21 @@ func ColRegex(pattern string) Expr {
 	return Col(pattern)
 }
 
+// AsStruct collects multiple expressions into a single struct expression.
+func AsStruct(exprs ...Expr) Expr {
+	protoExprs := make([]*pb.Expr, len(exprs))
+	for i, expr := range exprs {
+		protoExprs[i] = expr.inner
+	}
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_AsStruct{
+				AsStruct: &pb.AsStruct{Exprs: protoExprs},
+			},
+		},
+	}
+}
+
 // Cols 创建多列引用表达式（表达式展开）
 func Cols(names ...string) []Expr {
 	exprs := make([]Expr, len(names))
@@ -153,9 +182,8 @@ func (e Expr) Exclude(columns ...string) Expr {
 }
 
 // Lit 创建字面量表达式
-func Lit(value interface{}) Expr {
+func literalFromValue(value interface{}) *pb.Literal {
 	var lit *pb.Literal
-
 	switch v := value.(type) {
 	case int:
 		lit = &pb.Literal{
@@ -238,10 +266,14 @@ func Lit(value interface{}) Expr {
 		}
 	}
 
+	return lit
+}
+
+func Lit(value interface{}) Expr {
 	return Expr{
 		inner: &pb.Expr{
 			Kind: &pb.Expr_Lit{
-				Lit: lit,
+				Lit: literalFromValue(value),
 			},
 		},
 	}
@@ -636,11 +668,12 @@ func (e Expr) OverWithOptions(opts OverOptions) Expr {
 		inner: &pb.Expr{
 			Kind: &pb.Expr_Over{
 				Over: &pb.Over{
-					Expr:        e.inner,
-					PartitionBy: partitions,
-					OrderBy:     orderBy,
-					Descending:  opts.Descending,
-					NullsLast:   opts.NullsLast,
+					Expr:            e.inner,
+					PartitionBy:     partitions,
+					OrderBy:         orderBy,
+					Descending:      opts.Descending,
+					NullsLast:       opts.NullsLast,
+					MappingStrategy: opts.MappingStrategy,
 				},
 			},
 		},
@@ -873,6 +906,71 @@ func (e Expr) Reverse() Expr {
 		inner: &pb.Expr{
 			Kind: &pb.Expr_Reverse{
 				Reverse: &pb.ReverseExpr{Expr: e.inner},
+			},
+		},
+	}
+}
+
+// Filter filters a single expression in aggregation context.
+func (e Expr) Filter(predicate Expr) Expr {
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_FilterExpr{
+				FilterExpr: &pb.FilterExpr{
+					Expr:      e.inner,
+					Predicate: predicate.inner,
+				},
+			},
+		},
+	}
+}
+
+func normalizeSortFlags(flags []bool, n int) []bool {
+	if n <= 0 {
+		return nil
+	}
+	if len(flags) == 0 {
+		return make([]bool, n)
+	}
+	if len(flags) == 1 && n > 1 {
+		out := make([]bool, n)
+		for i := range out {
+			out[i] = flags[0]
+		}
+		return out
+	}
+	out := make([]bool, n)
+	copy(out, flags)
+	if len(flags) < n {
+		last := flags[len(flags)-1]
+		for i := len(flags); i < n; i++ {
+			out[i] = last
+		}
+	}
+	return out
+}
+
+// SortBy sorts this expression by one or more expressions, typically inside aggregation context.
+func (e Expr) SortBy(by []Expr, opts ...SortByOptions) Expr {
+	protoBy := make([]*pb.Expr, len(by))
+	for i, expr := range by {
+		protoBy[i] = expr.inner
+	}
+	var cfg SortByOptions
+	if len(opts) > 0 {
+		cfg = opts[0]
+	}
+	descending := normalizeSortFlags(cfg.Descending, len(by))
+	nullsLast := normalizeSortFlags(cfg.NullsLast, len(by))
+	return Expr{
+		inner: &pb.Expr{
+			Kind: &pb.Expr_SortBy{
+				SortBy: &pb.SortByExpr{
+					Expr:       e.inner,
+					By:         protoBy,
+					Descending: descending,
+					NullsLast:  nullsLast,
+				},
 			},
 		},
 	}

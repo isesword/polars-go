@@ -1,16 +1,93 @@
 use crate::call_go_expr_map_batches;
 use crate::error::BridgeError;
+use crate::expr_list;
 use crate::expr_str;
 use crate::expr_temporal;
 use crate::proto;
 use polars::lazy::dsl::concat as concat_lf;
-use polars::lazy::dsl::{all, by_name};
+use polars::lazy::dsl::{all, as_struct, by_name};
 use polars::prelude::IntoLazy;
 use polars::prelude::NullValues;
 use polars::prelude::*;
 use polars::series::ops::NullBehavior;
 use polars::sql::SQLContext;
 use std::sync::Arc;
+
+fn summarize_query(query: &str) -> String {
+    let compact = query.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.is_empty() {
+        return "\"\"".into();
+    }
+    let summary = if compact.len() > 96 {
+        format!("{}...", &compact[..96])
+    } else {
+        compact
+    };
+    format!("{summary:?}")
+}
+
+fn literal_to_any_value(lit: &proto::Literal) -> Result<AnyValue<'static>, BridgeError> {
+    use proto::literal::Value;
+
+    let value = lit
+        .value
+        .as_ref()
+        .ok_or_else(|| BridgeError::PlanSemantic("Literal has no value".into()))?;
+
+    match value {
+        Value::IntVal(v) => Ok(AnyValue::Int64(*v)),
+        Value::FloatVal(v) => Ok(AnyValue::Float64(*v)),
+        Value::BoolVal(v) => Ok(AnyValue::Boolean(*v)),
+        Value::StringVal(v) => Ok(AnyValue::StringOwned(v.clone().into())),
+        Value::NullVal(_) => Ok(AnyValue::Null),
+    }
+}
+
+fn build_pivot_on_columns_df(pivot: &proto::Pivot) -> Result<Arc<DataFrame>, BridgeError> {
+    if pivot.on.is_empty() {
+        return Err(BridgeError::InvalidArgument(
+            "lazy pivot requires at least one 'on' column".into(),
+        ));
+    }
+    if pivot.on_columns.is_empty() {
+        return Err(BridgeError::InvalidArgument(
+            "lazy pivot requires explicit on_columns".into(),
+        ));
+    }
+
+    let mut series = Vec::with_capacity(pivot.on.len());
+    for (col_idx, name) in pivot.on.iter().enumerate() {
+        let mut any_values = Vec::with_capacity(pivot.on_columns.len());
+        for (row_idx, row) in pivot.on_columns.iter().enumerate() {
+            if row.values.len() != pivot.on.len() {
+                return Err(BridgeError::InvalidArgument(format!(
+                    "lazy pivot on_columns row {} length mismatch: expected {} values, got {}",
+                    row_idx,
+                    pivot.on.len(),
+                    row.values.len()
+                )));
+            }
+            any_values.push(literal_to_any_value(&row.values[col_idx])?);
+        }
+        let mut s = Series::from_any_values(name.as_str().into(), &any_values, true).map_err(|e| {
+            BridgeError::Execution(format!(
+                "failed to build lazy pivot on_columns dataframe column {:?}: {}",
+                name, e
+            ))
+        })?;
+        s.rename(name.as_str().into());
+        series.push(s.into());
+    }
+
+    DataFrame::new(pivot.on_columns.len(), series)
+        .map(Arc::new)
+        .map_err(|e| {
+        BridgeError::Execution(format!(
+            "failed to build lazy pivot on_columns dataframe: {}",
+            e
+        ))
+    })
+}
 
 /// 执行 Plan 并打印结果（调用 Polars 原生的 Display）
 pub fn execute_and_print(plan: &proto::Plan) -> Result<(), BridgeError> {
@@ -405,6 +482,17 @@ fn build_lazy_frame(
                 },
             ))
         }
+        Kind::Unnest(unnest) => {
+            let input_node = unnest
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Unnest has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            Ok(lf.unnest(
+                by_name(unnest.columns.iter().cloned(), true, false),
+                None,
+            ))
+        }
         Kind::DropNulls(drop_nulls) => {
             let input_node = drop_nulls
                 .input
@@ -501,6 +589,28 @@ fn build_lazy_frame(
             };
             Ok(lf.unpivot(args))
         }
+        Kind::Pivot(pivot) => {
+            let input_node = pivot
+                .input
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("Pivot has no input".into()))?;
+            let lf = build_lazy_frame(input_node, input_dfs)?;
+            let on_columns = build_pivot_on_columns_df(pivot)?;
+            let agg_expr =
+                crate::build_pivot_agg_expr(pivot.aggregate.as_str())?.unwrap_or_else(|| {
+                    element().first()
+                });
+
+            Ok(lf.pivot(
+                by_name(pivot.on.iter().cloned(), true, false),
+                on_columns,
+                by_name(pivot.index.iter().cloned(), true, false),
+                by_name(pivot.values.iter().cloned(), true, false),
+                agg_expr,
+                pivot.maintain_order,
+                pivot.separator.as_str().into(),
+            ))
+        }
         Kind::SqlQuery(sql_query) => {
             if sql_query.query.is_empty() {
                 return Err(BridgeError::PlanSemantic("SqlQuery has empty query".into()));
@@ -515,12 +625,25 @@ fn build_lazy_frame(
 
             let mut ctx = SQLContext::new();
             for (name, input) in sql_query.table_names.iter().zip(sql_query.inputs.iter()) {
-                let lf = build_lazy_frame(input, input_dfs)?;
+                let lf = build_lazy_frame(input, input_dfs).map_err(|e| {
+                    BridgeError::Execution(format!(
+                        "SQL input table {:?} for query {} failed to build: {}",
+                        name,
+                        summarize_query(sql_query.query.as_str()),
+                        e
+                    ))
+                })?;
                 ctx.register(name, lf);
             }
 
-            ctx.execute(sql_query.query.as_str())
-                .map_err(|e| BridgeError::Execution(format!("SQL execution failed: {}", e)))
+            ctx.execute(sql_query.query.as_str()).map_err(|e| {
+                BridgeError::Execution(format!(
+                    "SQL execution failed for query {} with tables {:?}: {}",
+                    summarize_query(sql_query.query.as_str()),
+                    sql_query.table_names,
+                    e
+                ))
+            })
         }
     }
 }
@@ -533,6 +656,9 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
         .as_ref()
         .ok_or_else(|| BridgeError::PlanSemantic("Expr has no kind".into()))?;
 
+    if let Some(result) = expr_list::build_list_expr(kind) {
+        return result;
+    }
     if let Some(result) = expr_str::build_string_expr(kind) {
         return result;
     }
@@ -830,9 +956,34 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
                 .iter()
                 .map(build_expr)
                 .collect::<Result<Vec<_>, _>>()?;
+            let mapping = match proto::WindowMapping::try_from(window.mapping_strategy) {
+                Ok(proto::WindowMapping::GroupToRows) => WindowMapping::GroupsToRows,
+                Ok(proto::WindowMapping::Explode) => WindowMapping::Explode,
+                Ok(proto::WindowMapping::Join) => WindowMapping::Join,
+                Err(_) => {
+                    return Err(BridgeError::Unsupported(format!(
+                        "Unknown window mapping strategy: {}",
+                        window.mapping_strategy
+                    )))
+                }
+            };
 
             if order_by.is_empty() {
-                Ok(e.over(partition_by))
+                e.over_with_options(
+                    if partition_by.is_empty() {
+                        None::<Vec<Expr>>
+                    } else {
+                        Some(partition_by)
+                    },
+                    None::<(Vec<Expr>, SortOptions)>,
+                    mapping,
+                )
+                .map_err(|err| {
+                    BridgeError::Execution(format!(
+                        "Failed to build window expression: {}",
+                        err
+                    ))
+                })
             } else {
                 let sort_options = SortOptions {
                     descending: window.descending,
@@ -846,7 +997,7 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
                         Some(partition_by)
                     },
                     Some((order_by, sort_options)),
-                    Default::default(),
+                    mapping,
                 )
                 .map_err(|err| {
                     BridgeError::Execution(format!(
@@ -1084,6 +1235,48 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
                 .ok_or_else(|| BridgeError::PlanSemantic("IsDuplicated has no expr".into()))?;
             let e = build_expr(expr)?;
             Ok(e.is_duplicated())
+        }
+        Kind::FilterExpr(filter_expr) => {
+            let expr = filter_expr
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("FilterExpr has no expr".into()))?;
+            let predicate = filter_expr
+                .predicate
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("FilterExpr has no predicate".into()))?;
+            let e = build_expr(expr)?;
+            let pred = build_expr(predicate)?;
+            Ok(e.filter(pred))
+        }
+        Kind::SortBy(sort_by) => {
+            let expr = sort_by
+                .expr
+                .as_ref()
+                .ok_or_else(|| BridgeError::PlanSemantic("SortBy has no expr".into()))?;
+            let e = build_expr(expr)?;
+            let by: Vec<Expr> = sort_by
+                .by
+                .iter()
+                .map(build_expr)
+                .collect::<Result<_, _>>()?;
+            let options = SortMultipleOptions::default()
+                .with_order_descending_multi(sort_by.descending.clone())
+                .with_nulls_last_multi(sort_by.nulls_last.clone());
+            Ok(e.sort_by(by, options))
+        }
+        Kind::AsStruct(as_struct_expr) => {
+            let exprs: Vec<Expr> = as_struct_expr
+                .exprs
+                .iter()
+                .map(build_expr)
+                .collect::<Result<_, _>>()?;
+            if exprs.is_empty() {
+                return Err(BridgeError::InvalidArgument(
+                    "AsStruct requires at least one expression".into(),
+                ));
+            }
+            Ok(as_struct(exprs))
         }
         Kind::RollingMin(rolling) => {
             build_rolling_expr(rolling, |e, opts| e.rolling_min(opts), "RollingMin")

@@ -14,7 +14,7 @@ var currentExecutionOptions ExecutionOptions
 // MemoryLimitBytes <= 0 disables the limit.
 func SetExecutionOptions(opts ExecutionOptions) error {
 	if opts.MemoryLimitBytes < 0 {
-		return fmt.Errorf("memory limit must be >= 0")
+		return fmt.Errorf("SetExecutionOptions: MemoryLimitBytes must be >= 0 (got %d); hint: use 0 to disable the limit", opts.MemoryLimitBytes)
 	}
 	brg, err := resolveBridge(nil)
 	if err != nil {

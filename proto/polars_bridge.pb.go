@@ -323,6 +323,55 @@ func (QuantileMethod) EnumDescriptor() ([]byte, []int) {
 	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{4}
 }
 
+type WindowMapping int32
+
+const (
+	WindowMapping_WINDOW_MAPPING_GROUP_TO_ROWS WindowMapping = 0
+	WindowMapping_WINDOW_MAPPING_EXPLODE       WindowMapping = 1
+	WindowMapping_WINDOW_MAPPING_JOIN          WindowMapping = 2
+)
+
+// Enum value maps for WindowMapping.
+var (
+	WindowMapping_name = map[int32]string{
+		0: "WINDOW_MAPPING_GROUP_TO_ROWS",
+		1: "WINDOW_MAPPING_EXPLODE",
+		2: "WINDOW_MAPPING_JOIN",
+	}
+	WindowMapping_value = map[string]int32{
+		"WINDOW_MAPPING_GROUP_TO_ROWS": 0,
+		"WINDOW_MAPPING_EXPLODE":       1,
+		"WINDOW_MAPPING_JOIN":          2,
+	}
+)
+
+func (x WindowMapping) Enum() *WindowMapping {
+	p := new(WindowMapping)
+	*p = x
+	return p
+}
+
+func (x WindowMapping) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WindowMapping) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_polars_bridge_proto_enumTypes[5].Descriptor()
+}
+
+func (WindowMapping) Type() protoreflect.EnumType {
+	return &file_proto_polars_bridge_proto_enumTypes[5]
+}
+
+func (x WindowMapping) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WindowMapping.Descriptor instead.
+func (WindowMapping) EnumDescriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{5}
+}
+
 type RankMethod int32
 
 const (
@@ -362,11 +411,11 @@ func (x RankMethod) String() string {
 }
 
 func (RankMethod) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_polars_bridge_proto_enumTypes[5].Descriptor()
+	return file_proto_polars_bridge_proto_enumTypes[6].Descriptor()
 }
 
 func (RankMethod) Type() protoreflect.EnumType {
-	return &file_proto_polars_bridge_proto_enumTypes[5]
+	return &file_proto_polars_bridge_proto_enumTypes[6]
 }
 
 func (x RankMethod) Number() protoreflect.EnumNumber {
@@ -375,7 +424,7 @@ func (x RankMethod) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RankMethod.Descriptor instead.
 func (RankMethod) EnumDescriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{5}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{6}
 }
 
 type DiffNullBehavior int32
@@ -408,11 +457,11 @@ func (x DiffNullBehavior) String() string {
 }
 
 func (DiffNullBehavior) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_polars_bridge_proto_enumTypes[6].Descriptor()
+	return file_proto_polars_bridge_proto_enumTypes[7].Descriptor()
 }
 
 func (DiffNullBehavior) Type() protoreflect.EnumType {
-	return &file_proto_polars_bridge_proto_enumTypes[6]
+	return &file_proto_polars_bridge_proto_enumTypes[7]
 }
 
 func (x DiffNullBehavior) Number() protoreflect.EnumNumber {
@@ -421,7 +470,59 @@ func (x DiffNullBehavior) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DiffNullBehavior.Descriptor instead.
 func (DiffNullBehavior) EnumDescriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{6}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{7}
+}
+
+type SetOperation int32
+
+const (
+	SetOperation_UNION                SetOperation = 0
+	SetOperation_DIFFERENCE           SetOperation = 1
+	SetOperation_INTERSECTION         SetOperation = 2
+	SetOperation_SYMMETRIC_DIFFERENCE SetOperation = 3
+)
+
+// Enum value maps for SetOperation.
+var (
+	SetOperation_name = map[int32]string{
+		0: "UNION",
+		1: "DIFFERENCE",
+		2: "INTERSECTION",
+		3: "SYMMETRIC_DIFFERENCE",
+	}
+	SetOperation_value = map[string]int32{
+		"UNION":                0,
+		"DIFFERENCE":           1,
+		"INTERSECTION":         2,
+		"SYMMETRIC_DIFFERENCE": 3,
+	}
+)
+
+func (x SetOperation) Enum() *SetOperation {
+	p := new(SetOperation)
+	*p = x
+	return p
+}
+
+func (x SetOperation) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SetOperation) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_polars_bridge_proto_enumTypes[8].Descriptor()
+}
+
+func (SetOperation) Type() protoreflect.EnumType {
+	return &file_proto_polars_bridge_proto_enumTypes[8]
+}
+
+func (x SetOperation) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SetOperation.Descriptor instead.
+func (SetOperation) EnumDescriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{8}
 }
 
 // 数据类型
@@ -494,11 +595,11 @@ func (x DataType) String() string {
 }
 
 func (DataType) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_polars_bridge_proto_enumTypes[7].Descriptor()
+	return file_proto_polars_bridge_proto_enumTypes[9].Descriptor()
 }
 
 func (DataType) Type() protoreflect.EnumType {
-	return &file_proto_polars_bridge_proto_enumTypes[7]
+	return &file_proto_polars_bridge_proto_enumTypes[9]
 }
 
 func (x DataType) Number() protoreflect.EnumNumber {
@@ -507,7 +608,7 @@ func (x DataType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DataType.Descriptor instead.
 func (DataType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{7}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{9}
 }
 
 // Plan 版本 v1
@@ -592,6 +693,8 @@ type Node struct {
 	//	*Node_DropNans
 	//	*Node_FillNan
 	//	*Node_Sample
+	//	*Node_Unnest
+	//	*Node_Pivot
 	Kind          isNode_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -848,6 +951,24 @@ func (x *Node) GetSample() *Sample {
 	return nil
 }
 
+func (x *Node) GetUnnest() *Unnest {
+	if x != nil {
+		if x, ok := x.Kind.(*Node_Unnest); ok {
+			return x.Unnest
+		}
+	}
+	return nil
+}
+
+func (x *Node) GetPivot() *Pivot {
+	if x != nil {
+		if x, ok := x.Kind.(*Node_Pivot); ok {
+			return x.Pivot
+		}
+	}
+	return nil
+}
+
 type isNode_Kind interface {
 	isNode_Kind()
 }
@@ -944,6 +1065,14 @@ type Node_Sample struct {
 	Sample *Sample `protobuf:"bytes,32,opt,name=sample,proto3,oneof"`
 }
 
+type Node_Unnest struct {
+	Unnest *Unnest `protobuf:"bytes,33,opt,name=unnest,proto3,oneof"`
+}
+
+type Node_Pivot struct {
+	Pivot *Pivot `protobuf:"bytes,34,opt,name=pivot,proto3,oneof"`
+}
+
 func (*Node_MemoryScan) isNode_Kind() {}
 
 func (*Node_CsvScan) isNode_Kind() {}
@@ -989,6 +1118,10 @@ func (*Node_DropNans) isNode_Kind() {}
 func (*Node_FillNan) isNode_Kind() {}
 
 func (*Node_Sample) isNode_Kind() {}
+
+func (*Node_Unnest) isNode_Kind() {}
+
+func (*Node_Pivot) isNode_Kind() {}
 
 // Memory Scan（从输入 Arrow 读取）
 type MemoryScan struct {
@@ -2458,6 +2591,202 @@ func (x *Sample) GetSeed() uint64 {
 	return 0
 }
 
+type Unnest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Input         *Node                  `protobuf:"bytes,1,opt,name=input,proto3" json:"input,omitempty"`
+	Columns       []string               `protobuf:"bytes,2,rep,name=columns,proto3" json:"columns,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Unnest) Reset() {
+	*x = Unnest{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Unnest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Unnest) ProtoMessage() {}
+
+func (x *Unnest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Unnest.ProtoReflect.Descriptor instead.
+func (*Unnest) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *Unnest) GetInput() *Node {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+func (x *Unnest) GetColumns() []string {
+	if x != nil {
+		return x.Columns
+	}
+	return nil
+}
+
+type PivotOnColumnRow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Values        []*Literal             `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PivotOnColumnRow) Reset() {
+	*x = PivotOnColumnRow{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PivotOnColumnRow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PivotOnColumnRow) ProtoMessage() {}
+
+func (x *PivotOnColumnRow) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PivotOnColumnRow.ProtoReflect.Descriptor instead.
+func (*PivotOnColumnRow) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *PivotOnColumnRow) GetValues() []*Literal {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+type Pivot struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Input         *Node                  `protobuf:"bytes,1,opt,name=input,proto3" json:"input,omitempty"`
+	On            []string               `protobuf:"bytes,2,rep,name=on,proto3" json:"on,omitempty"`
+	OnColumns     []*PivotOnColumnRow    `protobuf:"bytes,3,rep,name=on_columns,json=onColumns,proto3" json:"on_columns,omitempty"`
+	Index         []string               `protobuf:"bytes,4,rep,name=index,proto3" json:"index,omitempty"`
+	Values        []string               `protobuf:"bytes,5,rep,name=values,proto3" json:"values,omitempty"`
+	Aggregate     string                 `protobuf:"bytes,6,opt,name=aggregate,proto3" json:"aggregate,omitempty"`
+	MaintainOrder bool                   `protobuf:"varint,7,opt,name=maintain_order,json=maintainOrder,proto3" json:"maintain_order,omitempty"`
+	Separator     string                 `protobuf:"bytes,8,opt,name=separator,proto3" json:"separator,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Pivot) Reset() {
+	*x = Pivot{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Pivot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Pivot) ProtoMessage() {}
+
+func (x *Pivot) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Pivot.ProtoReflect.Descriptor instead.
+func (*Pivot) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *Pivot) GetInput() *Node {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+func (x *Pivot) GetOn() []string {
+	if x != nil {
+		return x.On
+	}
+	return nil
+}
+
+func (x *Pivot) GetOnColumns() []*PivotOnColumnRow {
+	if x != nil {
+		return x.OnColumns
+	}
+	return nil
+}
+
+func (x *Pivot) GetIndex() []string {
+	if x != nil {
+		return x.Index
+	}
+	return nil
+}
+
+func (x *Pivot) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+func (x *Pivot) GetAggregate() string {
+	if x != nil {
+		return x.Aggregate
+	}
+	return ""
+}
+
+func (x *Pivot) GetMaintainOrder() bool {
+	if x != nil {
+		return x.MaintainOrder
+	}
+	return false
+}
+
+func (x *Pivot) GetSeparator() string {
+	if x != nil {
+		return x.Separator
+	}
+	return ""
+}
+
 // 表达式
 type Expr struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -2528,6 +2857,46 @@ type Expr struct {
 	//	*Expr_RollingMax
 	//	*Expr_RollingMean
 	//	*Expr_RollingSum
+	//	*Expr_FilterExpr
+	//	*Expr_SortBy
+	//	*Expr_AsStruct
+	//	*Expr_Element
+	//	*Expr_ConcatList
+	//	*Expr_ListEval
+	//	*Expr_ListLen
+	//	*Expr_ListSum
+	//	*Expr_ListMax
+	//	*Expr_ListMin
+	//	*Expr_ListContains
+	//	*Expr_ListSort
+	//	*Expr_ListGet
+	//	*Expr_ListAgg
+	//	*Expr_ListMean
+	//	*Expr_ListMedian
+	//	*Expr_ListStd
+	//	*Expr_ListVar
+	//	*Expr_ListReverse
+	//	*Expr_ListUnique
+	//	*Expr_ListNUnique
+	//	*Expr_ListSlice
+	//	*Expr_ListArgMin
+	//	*Expr_ListArgMax
+	//	*Expr_ListJoin
+	//	*Expr_ListAny
+	//	*Expr_ListAll
+	//	*Expr_ListDropNulls
+	//	*Expr_ListShift
+	//	*Expr_ListDiff
+	//	*Expr_ListCountMatches
+	//	*Expr_ListGather
+	//	*Expr_ListGatherEvery
+	//	*Expr_ListSampleN
+	//	*Expr_ListSampleFraction
+	//	*Expr_ListUnion
+	//	*Expr_ListSetDifference
+	//	*Expr_ListSetIntersection
+	//	*Expr_ListSetSymmetricDifference
+	//	*Expr_ListUniqueStable
 	//	*Expr_StrLenBytes
 	//	*Expr_StrLenChars
 	//	*Expr_StrContains
@@ -2556,7 +2925,7 @@ type Expr struct {
 
 func (x *Expr) Reset() {
 	*x = Expr{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[25]
+	mi := &file_proto_polars_bridge_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2568,7 +2937,7 @@ func (x *Expr) String() string {
 func (*Expr) ProtoMessage() {}
 
 func (x *Expr) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[25]
+	mi := &file_proto_polars_bridge_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2581,7 +2950,7 @@ func (x *Expr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Expr.ProtoReflect.Descriptor instead.
 func (*Expr) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{25}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *Expr) GetKind() isExpr_Kind {
@@ -3176,6 +3545,366 @@ func (x *Expr) GetRollingSum() *Rolling {
 	return nil
 }
 
+func (x *Expr) GetFilterExpr() *FilterExpr {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_FilterExpr); ok {
+			return x.FilterExpr
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetSortBy() *SortByExpr {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_SortBy); ok {
+			return x.SortBy
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetAsStruct() *AsStruct {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_AsStruct); ok {
+			return x.AsStruct
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetElement() *Element {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_Element); ok {
+			return x.Element
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetConcatList() *ConcatList {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ConcatList); ok {
+			return x.ConcatList
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListEval() *ListEval {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListEval); ok {
+			return x.ListEval
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListLen() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListLen); ok {
+			return x.ListLen
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListSum() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListSum); ok {
+			return x.ListSum
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListMax() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListMax); ok {
+			return x.ListMax
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListMin() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListMin); ok {
+			return x.ListMin
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListContains() *ListContains {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListContains); ok {
+			return x.ListContains
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListSort() *ListSort {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListSort); ok {
+			return x.ListSort
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListGet() *ListGet {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListGet); ok {
+			return x.ListGet
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListAgg() *ListAgg {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListAgg); ok {
+			return x.ListAgg
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListMean() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListMean); ok {
+			return x.ListMean
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListMedian() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListMedian); ok {
+			return x.ListMedian
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListStd() *ListMoment {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListStd); ok {
+			return x.ListStd
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListVar() *ListMoment {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListVar); ok {
+			return x.ListVar
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListReverse() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListReverse); ok {
+			return x.ListReverse
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListUnique() *ListUnique {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListUnique); ok {
+			return x.ListUnique
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListNUnique() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListNUnique); ok {
+			return x.ListNUnique
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListSlice() *ListSlice {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListSlice); ok {
+			return x.ListSlice
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListArgMin() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListArgMin); ok {
+			return x.ListArgMin
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListArgMax() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListArgMax); ok {
+			return x.ListArgMax
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListJoin() *ListJoin {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListJoin); ok {
+			return x.ListJoin
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListAny() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListAny); ok {
+			return x.ListAny
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListAll() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListAll); ok {
+			return x.ListAll
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListDropNulls() *ListFunction {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListDropNulls); ok {
+			return x.ListDropNulls
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListShift() *ListShift {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListShift); ok {
+			return x.ListShift
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListDiff() *ListDiff {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListDiff); ok {
+			return x.ListDiff
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListCountMatches() *ListCountMatches {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListCountMatches); ok {
+			return x.ListCountMatches
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListGather() *ListGather {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListGather); ok {
+			return x.ListGather
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListGatherEvery() *ListGatherEvery {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListGatherEvery); ok {
+			return x.ListGatherEvery
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListSampleN() *ListSample {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListSampleN); ok {
+			return x.ListSampleN
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListSampleFraction() *ListSample {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListSampleFraction); ok {
+			return x.ListSampleFraction
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListUnion() *ListSetOperation {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListUnion); ok {
+			return x.ListUnion
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListSetDifference() *ListSetOperation {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListSetDifference); ok {
+			return x.ListSetDifference
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListSetIntersection() *ListSetOperation {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListSetIntersection); ok {
+			return x.ListSetIntersection
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListSetSymmetricDifference() *ListSetOperation {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListSetSymmetricDifference); ok {
+			return x.ListSetSymmetricDifference
+		}
+	}
+	return nil
+}
+
+func (x *Expr) GetListUniqueStable() *ListUnique {
+	if x != nil {
+		if x, ok := x.Kind.(*Expr_ListUniqueStable); ok {
+			return x.ListUniqueStable
+		}
+	}
+	return nil
+}
+
 func (x *Expr) GetStrLenBytes() *StringFunction {
 	if x != nil {
 		if x, ok := x.Kind.(*Expr_StrLenBytes); ok {
@@ -3629,6 +4358,166 @@ type Expr_RollingSum struct {
 	RollingSum *Rolling `protobuf:"bytes,140,opt,name=rolling_sum,json=rollingSum,proto3,oneof"`
 }
 
+type Expr_FilterExpr struct {
+	FilterExpr *FilterExpr `protobuf:"bytes,187,opt,name=filter_expr,json=filterExpr,proto3,oneof"`
+}
+
+type Expr_SortBy struct {
+	SortBy *SortByExpr `protobuf:"bytes,188,opt,name=sort_by,json=sortBy,proto3,oneof"`
+}
+
+type Expr_AsStruct struct {
+	AsStruct *AsStruct `protobuf:"bytes,189,opt,name=as_struct,json=asStruct,proto3,oneof"`
+}
+
+type Expr_Element struct {
+	Element *Element `protobuf:"bytes,150,opt,name=element,proto3,oneof"`
+}
+
+type Expr_ConcatList struct {
+	ConcatList *ConcatList `protobuf:"bytes,151,opt,name=concat_list,json=concatList,proto3,oneof"`
+}
+
+type Expr_ListEval struct {
+	ListEval *ListEval `protobuf:"bytes,152,opt,name=list_eval,json=listEval,proto3,oneof"`
+}
+
+type Expr_ListLen struct {
+	ListLen *ListFunction `protobuf:"bytes,153,opt,name=list_len,json=listLen,proto3,oneof"`
+}
+
+type Expr_ListSum struct {
+	ListSum *ListFunction `protobuf:"bytes,154,opt,name=list_sum,json=listSum,proto3,oneof"`
+}
+
+type Expr_ListMax struct {
+	ListMax *ListFunction `protobuf:"bytes,155,opt,name=list_max,json=listMax,proto3,oneof"`
+}
+
+type Expr_ListMin struct {
+	ListMin *ListFunction `protobuf:"bytes,156,opt,name=list_min,json=listMin,proto3,oneof"`
+}
+
+type Expr_ListContains struct {
+	ListContains *ListContains `protobuf:"bytes,157,opt,name=list_contains,json=listContains,proto3,oneof"`
+}
+
+type Expr_ListSort struct {
+	ListSort *ListSort `protobuf:"bytes,158,opt,name=list_sort,json=listSort,proto3,oneof"`
+}
+
+type Expr_ListGet struct {
+	ListGet *ListGet `protobuf:"bytes,159,opt,name=list_get,json=listGet,proto3,oneof"`
+}
+
+type Expr_ListAgg struct {
+	ListAgg *ListAgg `protobuf:"bytes,160,opt,name=list_agg,json=listAgg,proto3,oneof"`
+}
+
+type Expr_ListMean struct {
+	ListMean *ListFunction `protobuf:"bytes,161,opt,name=list_mean,json=listMean,proto3,oneof"`
+}
+
+type Expr_ListMedian struct {
+	ListMedian *ListFunction `protobuf:"bytes,162,opt,name=list_median,json=listMedian,proto3,oneof"`
+}
+
+type Expr_ListStd struct {
+	ListStd *ListMoment `protobuf:"bytes,163,opt,name=list_std,json=listStd,proto3,oneof"`
+}
+
+type Expr_ListVar struct {
+	ListVar *ListMoment `protobuf:"bytes,164,opt,name=list_var,json=listVar,proto3,oneof"`
+}
+
+type Expr_ListReverse struct {
+	ListReverse *ListFunction `protobuf:"bytes,165,opt,name=list_reverse,json=listReverse,proto3,oneof"`
+}
+
+type Expr_ListUnique struct {
+	ListUnique *ListUnique `protobuf:"bytes,166,opt,name=list_unique,json=listUnique,proto3,oneof"`
+}
+
+type Expr_ListNUnique struct {
+	ListNUnique *ListFunction `protobuf:"bytes,167,opt,name=list_n_unique,json=listNUnique,proto3,oneof"`
+}
+
+type Expr_ListSlice struct {
+	ListSlice *ListSlice `protobuf:"bytes,168,opt,name=list_slice,json=listSlice,proto3,oneof"`
+}
+
+type Expr_ListArgMin struct {
+	ListArgMin *ListFunction `protobuf:"bytes,169,opt,name=list_arg_min,json=listArgMin,proto3,oneof"`
+}
+
+type Expr_ListArgMax struct {
+	ListArgMax *ListFunction `protobuf:"bytes,170,opt,name=list_arg_max,json=listArgMax,proto3,oneof"`
+}
+
+type Expr_ListJoin struct {
+	ListJoin *ListJoin `protobuf:"bytes,171,opt,name=list_join,json=listJoin,proto3,oneof"`
+}
+
+type Expr_ListAny struct {
+	ListAny *ListFunction `protobuf:"bytes,172,opt,name=list_any,json=listAny,proto3,oneof"`
+}
+
+type Expr_ListAll struct {
+	ListAll *ListFunction `protobuf:"bytes,173,opt,name=list_all,json=listAll,proto3,oneof"`
+}
+
+type Expr_ListDropNulls struct {
+	ListDropNulls *ListFunction `protobuf:"bytes,174,opt,name=list_drop_nulls,json=listDropNulls,proto3,oneof"`
+}
+
+type Expr_ListShift struct {
+	ListShift *ListShift `protobuf:"bytes,175,opt,name=list_shift,json=listShift,proto3,oneof"`
+}
+
+type Expr_ListDiff struct {
+	ListDiff *ListDiff `protobuf:"bytes,176,opt,name=list_diff,json=listDiff,proto3,oneof"`
+}
+
+type Expr_ListCountMatches struct {
+	ListCountMatches *ListCountMatches `protobuf:"bytes,177,opt,name=list_count_matches,json=listCountMatches,proto3,oneof"`
+}
+
+type Expr_ListGather struct {
+	ListGather *ListGather `protobuf:"bytes,178,opt,name=list_gather,json=listGather,proto3,oneof"`
+}
+
+type Expr_ListGatherEvery struct {
+	ListGatherEvery *ListGatherEvery `protobuf:"bytes,179,opt,name=list_gather_every,json=listGatherEvery,proto3,oneof"`
+}
+
+type Expr_ListSampleN struct {
+	ListSampleN *ListSample `protobuf:"bytes,180,opt,name=list_sample_n,json=listSampleN,proto3,oneof"`
+}
+
+type Expr_ListSampleFraction struct {
+	ListSampleFraction *ListSample `protobuf:"bytes,181,opt,name=list_sample_fraction,json=listSampleFraction,proto3,oneof"`
+}
+
+type Expr_ListUnion struct {
+	ListUnion *ListSetOperation `protobuf:"bytes,182,opt,name=list_union,json=listUnion,proto3,oneof"`
+}
+
+type Expr_ListSetDifference struct {
+	ListSetDifference *ListSetOperation `protobuf:"bytes,183,opt,name=list_set_difference,json=listSetDifference,proto3,oneof"`
+}
+
+type Expr_ListSetIntersection struct {
+	ListSetIntersection *ListSetOperation `protobuf:"bytes,184,opt,name=list_set_intersection,json=listSetIntersection,proto3,oneof"`
+}
+
+type Expr_ListSetSymmetricDifference struct {
+	ListSetSymmetricDifference *ListSetOperation `protobuf:"bytes,185,opt,name=list_set_symmetric_difference,json=listSetSymmetricDifference,proto3,oneof"`
+}
+
+type Expr_ListUniqueStable struct {
+	ListUniqueStable *ListUnique `protobuf:"bytes,186,opt,name=list_unique_stable,json=listUniqueStable,proto3,oneof"`
+}
+
 type Expr_StrLenBytes struct {
 	// 字符串函数 (50-99)
 	StrLenBytes *StringFunction `protobuf:"bytes,50,opt,name=str_len_bytes,json=strLenBytes,proto3,oneof"`
@@ -3844,6 +4733,86 @@ func (*Expr_RollingMean) isExpr_Kind() {}
 
 func (*Expr_RollingSum) isExpr_Kind() {}
 
+func (*Expr_FilterExpr) isExpr_Kind() {}
+
+func (*Expr_SortBy) isExpr_Kind() {}
+
+func (*Expr_AsStruct) isExpr_Kind() {}
+
+func (*Expr_Element) isExpr_Kind() {}
+
+func (*Expr_ConcatList) isExpr_Kind() {}
+
+func (*Expr_ListEval) isExpr_Kind() {}
+
+func (*Expr_ListLen) isExpr_Kind() {}
+
+func (*Expr_ListSum) isExpr_Kind() {}
+
+func (*Expr_ListMax) isExpr_Kind() {}
+
+func (*Expr_ListMin) isExpr_Kind() {}
+
+func (*Expr_ListContains) isExpr_Kind() {}
+
+func (*Expr_ListSort) isExpr_Kind() {}
+
+func (*Expr_ListGet) isExpr_Kind() {}
+
+func (*Expr_ListAgg) isExpr_Kind() {}
+
+func (*Expr_ListMean) isExpr_Kind() {}
+
+func (*Expr_ListMedian) isExpr_Kind() {}
+
+func (*Expr_ListStd) isExpr_Kind() {}
+
+func (*Expr_ListVar) isExpr_Kind() {}
+
+func (*Expr_ListReverse) isExpr_Kind() {}
+
+func (*Expr_ListUnique) isExpr_Kind() {}
+
+func (*Expr_ListNUnique) isExpr_Kind() {}
+
+func (*Expr_ListSlice) isExpr_Kind() {}
+
+func (*Expr_ListArgMin) isExpr_Kind() {}
+
+func (*Expr_ListArgMax) isExpr_Kind() {}
+
+func (*Expr_ListJoin) isExpr_Kind() {}
+
+func (*Expr_ListAny) isExpr_Kind() {}
+
+func (*Expr_ListAll) isExpr_Kind() {}
+
+func (*Expr_ListDropNulls) isExpr_Kind() {}
+
+func (*Expr_ListShift) isExpr_Kind() {}
+
+func (*Expr_ListDiff) isExpr_Kind() {}
+
+func (*Expr_ListCountMatches) isExpr_Kind() {}
+
+func (*Expr_ListGather) isExpr_Kind() {}
+
+func (*Expr_ListGatherEvery) isExpr_Kind() {}
+
+func (*Expr_ListSampleN) isExpr_Kind() {}
+
+func (*Expr_ListSampleFraction) isExpr_Kind() {}
+
+func (*Expr_ListUnion) isExpr_Kind() {}
+
+func (*Expr_ListSetDifference) isExpr_Kind() {}
+
+func (*Expr_ListSetIntersection) isExpr_Kind() {}
+
+func (*Expr_ListSetSymmetricDifference) isExpr_Kind() {}
+
+func (*Expr_ListUniqueStable) isExpr_Kind() {}
+
 func (*Expr_StrLenBytes) isExpr_Kind() {}
 
 func (*Expr_StrLenChars) isExpr_Kind() {}
@@ -3896,7 +4865,7 @@ type Column struct {
 
 func (x *Column) Reset() {
 	*x = Column{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[26]
+	mi := &file_proto_polars_bridge_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3908,7 +4877,7 @@ func (x *Column) String() string {
 func (*Column) ProtoMessage() {}
 
 func (x *Column) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[26]
+	mi := &file_proto_polars_bridge_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3921,7 +4890,7 @@ func (x *Column) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Column.ProtoReflect.Descriptor instead.
 func (*Column) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{26}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Column) GetName() string {
@@ -3948,7 +4917,7 @@ type Literal struct {
 
 func (x *Literal) Reset() {
 	*x = Literal{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[27]
+	mi := &file_proto_polars_bridge_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3960,7 +4929,7 @@ func (x *Literal) String() string {
 func (*Literal) ProtoMessage() {}
 
 func (x *Literal) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[27]
+	mi := &file_proto_polars_bridge_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3973,7 +4942,7 @@ func (x *Literal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Literal.ProtoReflect.Descriptor instead.
 func (*Literal) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{27}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Literal) GetValue() isLiteral_Value {
@@ -4070,7 +5039,7 @@ type NullValue struct {
 
 func (x *NullValue) Reset() {
 	*x = NullValue{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[28]
+	mi := &file_proto_polars_bridge_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4082,7 +5051,7 @@ func (x *NullValue) String() string {
 func (*NullValue) ProtoMessage() {}
 
 func (x *NullValue) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[28]
+	mi := &file_proto_polars_bridge_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4095,7 +5064,7 @@ func (x *NullValue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NullValue.ProtoReflect.Descriptor instead.
 func (*NullValue) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{28}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{31}
 }
 
 // 二元表达式
@@ -4110,7 +5079,7 @@ type BinaryExpr struct {
 
 func (x *BinaryExpr) Reset() {
 	*x = BinaryExpr{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[29]
+	mi := &file_proto_polars_bridge_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4122,7 +5091,7 @@ func (x *BinaryExpr) String() string {
 func (*BinaryExpr) ProtoMessage() {}
 
 func (x *BinaryExpr) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[29]
+	mi := &file_proto_polars_bridge_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4135,7 +5104,7 @@ func (x *BinaryExpr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BinaryExpr.ProtoReflect.Descriptor instead.
 func (*BinaryExpr) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{29}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *BinaryExpr) GetLeft() *Expr {
@@ -4170,7 +5139,7 @@ type MapBatchesExpr struct {
 
 func (x *MapBatchesExpr) Reset() {
 	*x = MapBatchesExpr{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[30]
+	mi := &file_proto_polars_bridge_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4182,7 +5151,7 @@ func (x *MapBatchesExpr) String() string {
 func (*MapBatchesExpr) ProtoMessage() {}
 
 func (x *MapBatchesExpr) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[30]
+	mi := &file_proto_polars_bridge_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4195,7 +5164,7 @@ func (x *MapBatchesExpr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MapBatchesExpr.ProtoReflect.Descriptor instead.
 func (*MapBatchesExpr) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{30}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *MapBatchesExpr) GetExprs() []*Expr {
@@ -4230,7 +5199,7 @@ type Alias struct {
 
 func (x *Alias) Reset() {
 	*x = Alias{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[31]
+	mi := &file_proto_polars_bridge_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4242,7 +5211,7 @@ func (x *Alias) String() string {
 func (*Alias) ProtoMessage() {}
 
 func (x *Alias) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[31]
+	mi := &file_proto_polars_bridge_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4255,7 +5224,7 @@ func (x *Alias) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Alias.ProtoReflect.Descriptor instead.
 func (*Alias) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{31}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *Alias) GetExpr() *Expr {
@@ -4282,7 +5251,7 @@ type IsNull struct {
 
 func (x *IsNull) Reset() {
 	*x = IsNull{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[32]
+	mi := &file_proto_polars_bridge_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4294,7 +5263,7 @@ func (x *IsNull) String() string {
 func (*IsNull) ProtoMessage() {}
 
 func (x *IsNull) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[32]
+	mi := &file_proto_polars_bridge_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4307,7 +5276,7 @@ func (x *IsNull) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsNull.ProtoReflect.Descriptor instead.
 func (*IsNull) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{32}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *IsNull) GetExpr() *Expr {
@@ -4326,7 +5295,7 @@ type IsNotNull struct {
 
 func (x *IsNotNull) Reset() {
 	*x = IsNotNull{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[33]
+	mi := &file_proto_polars_bridge_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4338,7 +5307,7 @@ func (x *IsNotNull) String() string {
 func (*IsNotNull) ProtoMessage() {}
 
 func (x *IsNotNull) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[33]
+	mi := &file_proto_polars_bridge_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4351,7 +5320,7 @@ func (x *IsNotNull) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsNotNull.ProtoReflect.Descriptor instead.
 func (*IsNotNull) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{33}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *IsNotNull) GetExpr() *Expr {
@@ -4370,7 +5339,7 @@ type IsNan struct {
 
 func (x *IsNan) Reset() {
 	*x = IsNan{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[34]
+	mi := &file_proto_polars_bridge_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4382,7 +5351,7 @@ func (x *IsNan) String() string {
 func (*IsNan) ProtoMessage() {}
 
 func (x *IsNan) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[34]
+	mi := &file_proto_polars_bridge_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4395,7 +5364,7 @@ func (x *IsNan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsNan.ProtoReflect.Descriptor instead.
 func (*IsNan) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{34}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *IsNan) GetExpr() *Expr {
@@ -4414,7 +5383,7 @@ type IsFinite struct {
 
 func (x *IsFinite) Reset() {
 	*x = IsFinite{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[35]
+	mi := &file_proto_polars_bridge_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4426,7 +5395,7 @@ func (x *IsFinite) String() string {
 func (*IsFinite) ProtoMessage() {}
 
 func (x *IsFinite) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[35]
+	mi := &file_proto_polars_bridge_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4439,7 +5408,7 @@ func (x *IsFinite) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsFinite.ProtoReflect.Descriptor instead.
 func (*IsFinite) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{35}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *IsFinite) GetExpr() *Expr {
@@ -4459,7 +5428,7 @@ type Not struct {
 
 func (x *Not) Reset() {
 	*x = Not{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[36]
+	mi := &file_proto_polars_bridge_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4471,7 +5440,7 @@ func (x *Not) String() string {
 func (*Not) ProtoMessage() {}
 
 func (x *Not) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[36]
+	mi := &file_proto_polars_bridge_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4484,7 +5453,7 @@ func (x *Not) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Not.ProtoReflect.Descriptor instead.
 func (*Not) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{36}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *Not) GetExpr() *Expr {
@@ -4503,7 +5472,7 @@ type Wildcard struct {
 
 func (x *Wildcard) Reset() {
 	*x = Wildcard{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[37]
+	mi := &file_proto_polars_bridge_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4515,7 +5484,7 @@ func (x *Wildcard) String() string {
 func (*Wildcard) ProtoMessage() {}
 
 func (x *Wildcard) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[37]
+	mi := &file_proto_polars_bridge_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4528,7 +5497,7 @@ func (x *Wildcard) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Wildcard.ProtoReflect.Descriptor instead.
 func (*Wildcard) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{37}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{40}
 }
 
 // 排除列
@@ -4542,7 +5511,7 @@ type Exclude struct {
 
 func (x *Exclude) Reset() {
 	*x = Exclude{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[38]
+	mi := &file_proto_polars_bridge_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4554,7 +5523,7 @@ func (x *Exclude) String() string {
 func (*Exclude) ProtoMessage() {}
 
 func (x *Exclude) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[38]
+	mi := &file_proto_polars_bridge_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4567,7 +5536,7 @@ func (x *Exclude) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Exclude.ProtoReflect.Descriptor instead.
 func (*Exclude) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{38}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *Exclude) GetExpr() *Expr {
@@ -4596,7 +5565,7 @@ type Cast struct {
 
 func (x *Cast) Reset() {
 	*x = Cast{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[39]
+	mi := &file_proto_polars_bridge_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4608,7 +5577,7 @@ func (x *Cast) String() string {
 func (*Cast) ProtoMessage() {}
 
 func (x *Cast) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[39]
+	mi := &file_proto_polars_bridge_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4621,7 +5590,7 @@ func (x *Cast) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cast.ProtoReflect.Descriptor instead.
 func (*Cast) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{39}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *Cast) GetExpr() *Expr {
@@ -4654,7 +5623,7 @@ type AggExpr struct {
 
 func (x *AggExpr) Reset() {
 	*x = AggExpr{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[40]
+	mi := &file_proto_polars_bridge_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4666,7 +5635,7 @@ func (x *AggExpr) String() string {
 func (*AggExpr) ProtoMessage() {}
 
 func (x *AggExpr) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[40]
+	mi := &file_proto_polars_bridge_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4679,7 +5648,7 @@ func (x *AggExpr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggExpr.ProtoReflect.Descriptor instead.
 func (*AggExpr) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{40}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *AggExpr) GetExpr() *Expr {
@@ -4700,7 +5669,7 @@ type Quantile struct {
 
 func (x *Quantile) Reset() {
 	*x = Quantile{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[41]
+	mi := &file_proto_polars_bridge_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4712,7 +5681,7 @@ func (x *Quantile) String() string {
 func (*Quantile) ProtoMessage() {}
 
 func (x *Quantile) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[41]
+	mi := &file_proto_polars_bridge_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4725,7 +5694,7 @@ func (x *Quantile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Quantile.ProtoReflect.Descriptor instead.
 func (*Quantile) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{41}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *Quantile) GetExpr() *Expr {
@@ -4760,7 +5729,7 @@ type WhenThen struct {
 
 func (x *WhenThen) Reset() {
 	*x = WhenThen{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[42]
+	mi := &file_proto_polars_bridge_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4772,7 +5741,7 @@ func (x *WhenThen) String() string {
 func (*WhenThen) ProtoMessage() {}
 
 func (x *WhenThen) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[42]
+	mi := &file_proto_polars_bridge_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4785,7 +5754,7 @@ func (x *WhenThen) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WhenThen.ProtoReflect.Descriptor instead.
 func (*WhenThen) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{42}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *WhenThen) GetPredicate() *Expr {
@@ -4810,19 +5779,20 @@ func (x *WhenThen) GetFalsy() *Expr {
 }
 
 type Over struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
-	PartitionBy   []*Expr                `protobuf:"bytes,2,rep,name=partition_by,json=partitionBy,proto3" json:"partition_by,omitempty"`
-	OrderBy       []*Expr                `protobuf:"bytes,3,rep,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
-	Descending    bool                   `protobuf:"varint,4,opt,name=descending,proto3" json:"descending,omitempty"`
-	NullsLast     bool                   `protobuf:"varint,5,opt,name=nulls_last,json=nullsLast,proto3" json:"nulls_last,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Expr            *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	PartitionBy     []*Expr                `protobuf:"bytes,2,rep,name=partition_by,json=partitionBy,proto3" json:"partition_by,omitempty"`
+	OrderBy         []*Expr                `protobuf:"bytes,3,rep,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
+	Descending      bool                   `protobuf:"varint,4,opt,name=descending,proto3" json:"descending,omitempty"`
+	NullsLast       bool                   `protobuf:"varint,5,opt,name=nulls_last,json=nullsLast,proto3" json:"nulls_last,omitempty"`
+	MappingStrategy WindowMapping          `protobuf:"varint,6,opt,name=mapping_strategy,json=mappingStrategy,proto3,enum=polars_bridge.WindowMapping" json:"mapping_strategy,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Over) Reset() {
 	*x = Over{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[43]
+	mi := &file_proto_polars_bridge_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4834,7 +5804,7 @@ func (x *Over) String() string {
 func (*Over) ProtoMessage() {}
 
 func (x *Over) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[43]
+	mi := &file_proto_polars_bridge_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4847,7 +5817,7 @@ func (x *Over) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Over.ProtoReflect.Descriptor instead.
 func (*Over) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{43}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *Over) GetExpr() *Expr {
@@ -4885,6 +5855,13 @@ func (x *Over) GetNullsLast() bool {
 	return false
 }
 
+func (x *Over) GetMappingStrategy() WindowMapping {
+	if x != nil {
+		return x.MappingStrategy
+	}
+	return WindowMapping_WINDOW_MAPPING_GROUP_TO_ROWS
+}
+
 type Rank struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
@@ -4897,7 +5874,7 @@ type Rank struct {
 
 func (x *Rank) Reset() {
 	*x = Rank{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[44]
+	mi := &file_proto_polars_bridge_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4909,7 +5886,7 @@ func (x *Rank) String() string {
 func (*Rank) ProtoMessage() {}
 
 func (x *Rank) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[44]
+	mi := &file_proto_polars_bridge_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4922,7 +5899,7 @@ func (x *Rank) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rank.ProtoReflect.Descriptor instead.
 func (*Rank) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{44}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *Rank) GetExpr() *Expr {
@@ -4963,7 +5940,7 @@ type CumSum struct {
 
 func (x *CumSum) Reset() {
 	*x = CumSum{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[45]
+	mi := &file_proto_polars_bridge_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4975,7 +5952,7 @@ func (x *CumSum) String() string {
 func (*CumSum) ProtoMessage() {}
 
 func (x *CumSum) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[45]
+	mi := &file_proto_polars_bridge_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4988,7 +5965,7 @@ func (x *CumSum) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CumSum.ProtoReflect.Descriptor instead.
 func (*CumSum) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{45}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *CumSum) GetExpr() *Expr {
@@ -5015,7 +5992,7 @@ type CumCount struct {
 
 func (x *CumCount) Reset() {
 	*x = CumCount{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[46]
+	mi := &file_proto_polars_bridge_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5027,7 +6004,7 @@ func (x *CumCount) String() string {
 func (*CumCount) ProtoMessage() {}
 
 func (x *CumCount) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[46]
+	mi := &file_proto_polars_bridge_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5040,7 +6017,7 @@ func (x *CumCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CumCount.ProtoReflect.Descriptor instead.
 func (*CumCount) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{46}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *CumCount) GetExpr() *Expr {
@@ -5067,7 +6044,7 @@ type CumMin struct {
 
 func (x *CumMin) Reset() {
 	*x = CumMin{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[47]
+	mi := &file_proto_polars_bridge_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5079,7 +6056,7 @@ func (x *CumMin) String() string {
 func (*CumMin) ProtoMessage() {}
 
 func (x *CumMin) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[47]
+	mi := &file_proto_polars_bridge_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5092,7 +6069,7 @@ func (x *CumMin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CumMin.ProtoReflect.Descriptor instead.
 func (*CumMin) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{47}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *CumMin) GetExpr() *Expr {
@@ -5119,7 +6096,7 @@ type CumMax struct {
 
 func (x *CumMax) Reset() {
 	*x = CumMax{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[48]
+	mi := &file_proto_polars_bridge_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5131,7 +6108,7 @@ func (x *CumMax) String() string {
 func (*CumMax) ProtoMessage() {}
 
 func (x *CumMax) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[48]
+	mi := &file_proto_polars_bridge_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5144,7 +6121,7 @@ func (x *CumMax) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CumMax.ProtoReflect.Descriptor instead.
 func (*CumMax) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{48}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *CumMax) GetExpr() *Expr {
@@ -5171,7 +6148,7 @@ type CumProd struct {
 
 func (x *CumProd) Reset() {
 	*x = CumProd{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[49]
+	mi := &file_proto_polars_bridge_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5183,7 +6160,7 @@ func (x *CumProd) String() string {
 func (*CumProd) ProtoMessage() {}
 
 func (x *CumProd) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[49]
+	mi := &file_proto_polars_bridge_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5196,7 +6173,7 @@ func (x *CumProd) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CumProd.ProtoReflect.Descriptor instead.
 func (*CumProd) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{49}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *CumProd) GetExpr() *Expr {
@@ -5223,7 +6200,7 @@ type Shift struct {
 
 func (x *Shift) Reset() {
 	*x = Shift{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[50]
+	mi := &file_proto_polars_bridge_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5235,7 +6212,7 @@ func (x *Shift) String() string {
 func (*Shift) ProtoMessage() {}
 
 func (x *Shift) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[50]
+	mi := &file_proto_polars_bridge_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5248,7 +6225,7 @@ func (x *Shift) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Shift.ProtoReflect.Descriptor instead.
 func (*Shift) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{50}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *Shift) GetExpr() *Expr {
@@ -5276,7 +6253,7 @@ type Diff struct {
 
 func (x *Diff) Reset() {
 	*x = Diff{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[51]
+	mi := &file_proto_polars_bridge_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5288,7 +6265,7 @@ func (x *Diff) String() string {
 func (*Diff) ProtoMessage() {}
 
 func (x *Diff) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[51]
+	mi := &file_proto_polars_bridge_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5301,7 +6278,7 @@ func (x *Diff) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Diff.ProtoReflect.Descriptor instead.
 func (*Diff) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{51}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *Diff) GetExpr() *Expr {
@@ -5335,7 +6312,7 @@ type ForwardFill struct {
 
 func (x *ForwardFill) Reset() {
 	*x = ForwardFill{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[52]
+	mi := &file_proto_polars_bridge_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5347,7 +6324,7 @@ func (x *ForwardFill) String() string {
 func (*ForwardFill) ProtoMessage() {}
 
 func (x *ForwardFill) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[52]
+	mi := &file_proto_polars_bridge_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5360,7 +6337,7 @@ func (x *ForwardFill) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForwardFill.ProtoReflect.Descriptor instead.
 func (*ForwardFill) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{52}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *ForwardFill) GetExpr() *Expr {
@@ -5387,7 +6364,7 @@ type FillNull struct {
 
 func (x *FillNull) Reset() {
 	*x = FillNull{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[53]
+	mi := &file_proto_polars_bridge_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5399,7 +6376,7 @@ func (x *FillNull) String() string {
 func (*FillNull) ProtoMessage() {}
 
 func (x *FillNull) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[53]
+	mi := &file_proto_polars_bridge_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5412,7 +6389,7 @@ func (x *FillNull) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FillNull.ProtoReflect.Descriptor instead.
 func (*FillNull) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{53}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *FillNull) GetExpr() *Expr {
@@ -5439,7 +6416,7 @@ type BackwardFill struct {
 
 func (x *BackwardFill) Reset() {
 	*x = BackwardFill{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[54]
+	mi := &file_proto_polars_bridge_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5451,7 +6428,7 @@ func (x *BackwardFill) String() string {
 func (*BackwardFill) ProtoMessage() {}
 
 func (x *BackwardFill) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[54]
+	mi := &file_proto_polars_bridge_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5464,7 +6441,7 @@ func (x *BackwardFill) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BackwardFill.ProtoReflect.Descriptor instead.
 func (*BackwardFill) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{54}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *BackwardFill) GetExpr() *Expr {
@@ -5490,7 +6467,7 @@ type Abs struct {
 
 func (x *Abs) Reset() {
 	*x = Abs{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[55]
+	mi := &file_proto_polars_bridge_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5502,7 +6479,7 @@ func (x *Abs) String() string {
 func (*Abs) ProtoMessage() {}
 
 func (x *Abs) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[55]
+	mi := &file_proto_polars_bridge_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5515,7 +6492,7 @@ func (x *Abs) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Abs.ProtoReflect.Descriptor instead.
 func (*Abs) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{55}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *Abs) GetExpr() *Expr {
@@ -5535,7 +6512,7 @@ type Round struct {
 
 func (x *Round) Reset() {
 	*x = Round{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[56]
+	mi := &file_proto_polars_bridge_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5547,7 +6524,7 @@ func (x *Round) String() string {
 func (*Round) ProtoMessage() {}
 
 func (x *Round) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[56]
+	mi := &file_proto_polars_bridge_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5560,7 +6537,7 @@ func (x *Round) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Round.ProtoReflect.Descriptor instead.
 func (*Round) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{56}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *Round) GetExpr() *Expr {
@@ -5586,7 +6563,7 @@ type Sqrt struct {
 
 func (x *Sqrt) Reset() {
 	*x = Sqrt{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[57]
+	mi := &file_proto_polars_bridge_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5598,7 +6575,7 @@ func (x *Sqrt) String() string {
 func (*Sqrt) ProtoMessage() {}
 
 func (x *Sqrt) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[57]
+	mi := &file_proto_polars_bridge_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5611,7 +6588,7 @@ func (x *Sqrt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Sqrt.ProtoReflect.Descriptor instead.
 func (*Sqrt) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{57}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *Sqrt) GetExpr() *Expr {
@@ -5631,7 +6608,7 @@ type Log struct {
 
 func (x *Log) Reset() {
 	*x = Log{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[58]
+	mi := &file_proto_polars_bridge_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5643,7 +6620,7 @@ func (x *Log) String() string {
 func (*Log) ProtoMessage() {}
 
 func (x *Log) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[58]
+	mi := &file_proto_polars_bridge_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5656,7 +6633,7 @@ func (x *Log) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Log.ProtoReflect.Descriptor instead.
 func (*Log) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{58}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *Log) GetExpr() *Expr {
@@ -5684,7 +6661,7 @@ type Clip struct {
 
 func (x *Clip) Reset() {
 	*x = Clip{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[59]
+	mi := &file_proto_polars_bridge_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5696,7 +6673,7 @@ func (x *Clip) String() string {
 func (*Clip) ProtoMessage() {}
 
 func (x *Clip) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[59]
+	mi := &file_proto_polars_bridge_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5709,7 +6686,7 @@ func (x *Clip) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Clip.ProtoReflect.Descriptor instead.
 func (*Clip) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{59}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *Clip) GetExpr() *Expr {
@@ -5742,7 +6719,7 @@ type NullCount struct {
 
 func (x *NullCount) Reset() {
 	*x = NullCount{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[60]
+	mi := &file_proto_polars_bridge_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5754,7 +6731,7 @@ func (x *NullCount) String() string {
 func (*NullCount) ProtoMessage() {}
 
 func (x *NullCount) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[60]
+	mi := &file_proto_polars_bridge_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5767,7 +6744,7 @@ func (x *NullCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NullCount.ProtoReflect.Descriptor instead.
 func (*NullCount) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{60}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *NullCount) GetExpr() *Expr {
@@ -5790,7 +6767,7 @@ type ValueCounts struct {
 
 func (x *ValueCounts) Reset() {
 	*x = ValueCounts{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[61]
+	mi := &file_proto_polars_bridge_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5802,7 +6779,7 @@ func (x *ValueCounts) String() string {
 func (*ValueCounts) ProtoMessage() {}
 
 func (x *ValueCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[61]
+	mi := &file_proto_polars_bridge_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5815,7 +6792,7 @@ func (x *ValueCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValueCounts.ProtoReflect.Descriptor instead.
 func (*ValueCounts) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{61}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *ValueCounts) GetExpr() *Expr {
@@ -5862,7 +6839,7 @@ type ReverseExpr struct {
 
 func (x *ReverseExpr) Reset() {
 	*x = ReverseExpr{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[62]
+	mi := &file_proto_polars_bridge_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5874,7 +6851,7 @@ func (x *ReverseExpr) String() string {
 func (*ReverseExpr) ProtoMessage() {}
 
 func (x *ReverseExpr) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[62]
+	mi := &file_proto_polars_bridge_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5887,7 +6864,7 @@ func (x *ReverseExpr) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReverseExpr.ProtoReflect.Descriptor instead.
 func (*ReverseExpr) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{62}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *ReverseExpr) GetExpr() *Expr {
@@ -5907,7 +6884,7 @@ type FillNan struct {
 
 func (x *FillNan) Reset() {
 	*x = FillNan{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[63]
+	mi := &file_proto_polars_bridge_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5919,7 +6896,7 @@ func (x *FillNan) String() string {
 func (*FillNan) ProtoMessage() {}
 
 func (x *FillNan) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[63]
+	mi := &file_proto_polars_bridge_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5932,7 +6909,7 @@ func (x *FillNan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FillNan.ProtoReflect.Descriptor instead.
 func (*FillNan) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{63}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *FillNan) GetExpr() *Expr {
@@ -5958,7 +6935,7 @@ type IsDuplicated struct {
 
 func (x *IsDuplicated) Reset() {
 	*x = IsDuplicated{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[64]
+	mi := &file_proto_polars_bridge_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5970,7 +6947,7 @@ func (x *IsDuplicated) String() string {
 func (*IsDuplicated) ProtoMessage() {}
 
 func (x *IsDuplicated) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[64]
+	mi := &file_proto_polars_bridge_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5983,12 +6960,176 @@ func (x *IsDuplicated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsDuplicated.ProtoReflect.Descriptor instead.
 func (*IsDuplicated) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{64}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *IsDuplicated) GetExpr() *Expr {
 	if x != nil {
 		return x.Expr
+	}
+	return nil
+}
+
+type FilterExpr struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Predicate     *Expr                  `protobuf:"bytes,2,opt,name=predicate,proto3" json:"predicate,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FilterExpr) Reset() {
+	*x = FilterExpr{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FilterExpr) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FilterExpr) ProtoMessage() {}
+
+func (x *FilterExpr) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FilterExpr.ProtoReflect.Descriptor instead.
+func (*FilterExpr) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *FilterExpr) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *FilterExpr) GetPredicate() *Expr {
+	if x != nil {
+		return x.Predicate
+	}
+	return nil
+}
+
+type SortByExpr struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	By            []*Expr                `protobuf:"bytes,2,rep,name=by,proto3" json:"by,omitempty"`
+	Descending    []bool                 `protobuf:"varint,3,rep,packed,name=descending,proto3" json:"descending,omitempty"`
+	NullsLast     []bool                 `protobuf:"varint,4,rep,packed,name=nulls_last,json=nullsLast,proto3" json:"nulls_last,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SortByExpr) Reset() {
+	*x = SortByExpr{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SortByExpr) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SortByExpr) ProtoMessage() {}
+
+func (x *SortByExpr) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SortByExpr.ProtoReflect.Descriptor instead.
+func (*SortByExpr) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *SortByExpr) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *SortByExpr) GetBy() []*Expr {
+	if x != nil {
+		return x.By
+	}
+	return nil
+}
+
+func (x *SortByExpr) GetDescending() []bool {
+	if x != nil {
+		return x.Descending
+	}
+	return nil
+}
+
+func (x *SortByExpr) GetNullsLast() []bool {
+	if x != nil {
+		return x.NullsLast
+	}
+	return nil
+}
+
+type AsStruct struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Exprs         []*Expr                `protobuf:"bytes,1,rep,name=exprs,proto3" json:"exprs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AsStruct) Reset() {
+	*x = AsStruct{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AsStruct) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AsStruct) ProtoMessage() {}
+
+func (x *AsStruct) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AsStruct.ProtoReflect.Descriptor instead.
+func (*AsStruct) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *AsStruct) GetExprs() []*Expr {
+	if x != nil {
+		return x.Exprs
 	}
 	return nil
 }
@@ -6005,7 +7146,7 @@ type Rolling struct {
 
 func (x *Rolling) Reset() {
 	*x = Rolling{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[65]
+	mi := &file_proto_polars_bridge_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6017,7 +7158,7 @@ func (x *Rolling) String() string {
 func (*Rolling) ProtoMessage() {}
 
 func (x *Rolling) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[65]
+	mi := &file_proto_polars_bridge_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6030,7 +7171,7 @@ func (x *Rolling) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Rolling.ProtoReflect.Descriptor instead.
 func (*Rolling) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{65}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *Rolling) GetExpr() *Expr {
@@ -6061,6 +7202,1066 @@ func (x *Rolling) GetCenter() bool {
 	return false
 }
 
+type Element struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Element) Reset() {
+	*x = Element{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Element) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Element) ProtoMessage() {}
+
+func (x *Element) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Element.ProtoReflect.Descriptor instead.
+func (*Element) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{72}
+}
+
+type ConcatList struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Exprs         []*Expr                `protobuf:"bytes,1,rep,name=exprs,proto3" json:"exprs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConcatList) Reset() {
+	*x = ConcatList{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConcatList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConcatList) ProtoMessage() {}
+
+func (x *ConcatList) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConcatList.ProtoReflect.Descriptor instead.
+func (*ConcatList) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *ConcatList) GetExprs() []*Expr {
+	if x != nil {
+		return x.Exprs
+	}
+	return nil
+}
+
+type ListEval struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Evaluation    *Expr                  `protobuf:"bytes,2,opt,name=evaluation,proto3" json:"evaluation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListEval) Reset() {
+	*x = ListEval{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListEval) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListEval) ProtoMessage() {}
+
+func (x *ListEval) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListEval.ProtoReflect.Descriptor instead.
+func (*ListEval) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *ListEval) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListEval) GetEvaluation() *Expr {
+	if x != nil {
+		return x.Evaluation
+	}
+	return nil
+}
+
+type ListFunction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFunction) Reset() {
+	*x = ListFunction{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFunction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFunction) ProtoMessage() {}
+
+func (x *ListFunction) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFunction.ProtoReflect.Descriptor instead.
+func (*ListFunction) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *ListFunction) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+type ListContains struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Item          *Expr                  `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
+	NullsEqual    bool                   `protobuf:"varint,3,opt,name=nulls_equal,json=nullsEqual,proto3" json:"nulls_equal,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListContains) Reset() {
+	*x = ListContains{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListContains) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListContains) ProtoMessage() {}
+
+func (x *ListContains) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListContains.ProtoReflect.Descriptor instead.
+func (*ListContains) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *ListContains) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListContains) GetItem() *Expr {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *ListContains) GetNullsEqual() bool {
+	if x != nil {
+		return x.NullsEqual
+	}
+	return false
+}
+
+type ListSort struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Descending    bool                   `protobuf:"varint,2,opt,name=descending,proto3" json:"descending,omitempty"`
+	NullsLast     bool                   `protobuf:"varint,3,opt,name=nulls_last,json=nullsLast,proto3" json:"nulls_last,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSort) Reset() {
+	*x = ListSort{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[77]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSort) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSort) ProtoMessage() {}
+
+func (x *ListSort) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[77]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSort.ProtoReflect.Descriptor instead.
+func (*ListSort) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{77}
+}
+
+func (x *ListSort) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListSort) GetDescending() bool {
+	if x != nil {
+		return x.Descending
+	}
+	return false
+}
+
+func (x *ListSort) GetNullsLast() bool {
+	if x != nil {
+		return x.NullsLast
+	}
+	return false
+}
+
+type ListGet struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Index         *Expr                  `protobuf:"bytes,2,opt,name=index,proto3" json:"index,omitempty"`
+	NullOnOob     bool                   `protobuf:"varint,3,opt,name=null_on_oob,json=nullOnOob,proto3" json:"null_on_oob,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListGet) Reset() {
+	*x = ListGet{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[78]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListGet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGet) ProtoMessage() {}
+
+func (x *ListGet) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[78]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGet.ProtoReflect.Descriptor instead.
+func (*ListGet) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{78}
+}
+
+func (x *ListGet) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListGet) GetIndex() *Expr {
+	if x != nil {
+		return x.Index
+	}
+	return nil
+}
+
+func (x *ListGet) GetNullOnOob() bool {
+	if x != nil {
+		return x.NullOnOob
+	}
+	return false
+}
+
+type ListAgg struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Evaluation    *Expr                  `protobuf:"bytes,2,opt,name=evaluation,proto3" json:"evaluation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgg) Reset() {
+	*x = ListAgg{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgg) ProtoMessage() {}
+
+func (x *ListAgg) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgg.ProtoReflect.Descriptor instead.
+func (*ListAgg) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *ListAgg) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListAgg) GetEvaluation() *Expr {
+	if x != nil {
+		return x.Evaluation
+	}
+	return nil
+}
+
+type ListMoment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Ddof          uint32                 `protobuf:"varint,2,opt,name=ddof,proto3" json:"ddof,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMoment) Reset() {
+	*x = ListMoment{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMoment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMoment) ProtoMessage() {}
+
+func (x *ListMoment) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMoment.ProtoReflect.Descriptor instead.
+func (*ListMoment) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *ListMoment) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListMoment) GetDdof() uint32 {
+	if x != nil {
+		return x.Ddof
+	}
+	return 0
+}
+
+type ListUnique struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	MaintainOrder bool                   `protobuf:"varint,2,opt,name=maintain_order,json=maintainOrder,proto3" json:"maintain_order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUnique) Reset() {
+	*x = ListUnique{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUnique) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUnique) ProtoMessage() {}
+
+func (x *ListUnique) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUnique.ProtoReflect.Descriptor instead.
+func (*ListUnique) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{81}
+}
+
+func (x *ListUnique) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListUnique) GetMaintainOrder() bool {
+	if x != nil {
+		return x.MaintainOrder
+	}
+	return false
+}
+
+type ListSlice struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Offset        *Expr                  `protobuf:"bytes,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Length        *Expr                  `protobuf:"bytes,3,opt,name=length,proto3" json:"length,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSlice) Reset() {
+	*x = ListSlice{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSlice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSlice) ProtoMessage() {}
+
+func (x *ListSlice) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSlice.ProtoReflect.Descriptor instead.
+func (*ListSlice) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *ListSlice) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListSlice) GetOffset() *Expr {
+	if x != nil {
+		return x.Offset
+	}
+	return nil
+}
+
+func (x *ListSlice) GetLength() *Expr {
+	if x != nil {
+		return x.Length
+	}
+	return nil
+}
+
+type ListJoin struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Separator     *Expr                  `protobuf:"bytes,2,opt,name=separator,proto3" json:"separator,omitempty"`
+	IgnoreNulls   bool                   `protobuf:"varint,3,opt,name=ignore_nulls,json=ignoreNulls,proto3" json:"ignore_nulls,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListJoin) Reset() {
+	*x = ListJoin{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[83]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListJoin) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListJoin) ProtoMessage() {}
+
+func (x *ListJoin) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[83]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListJoin.ProtoReflect.Descriptor instead.
+func (*ListJoin) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{83}
+}
+
+func (x *ListJoin) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListJoin) GetSeparator() *Expr {
+	if x != nil {
+		return x.Separator
+	}
+	return nil
+}
+
+func (x *ListJoin) GetIgnoreNulls() bool {
+	if x != nil {
+		return x.IgnoreNulls
+	}
+	return false
+}
+
+type ListShift struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Periods       *Expr                  `protobuf:"bytes,2,opt,name=periods,proto3" json:"periods,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListShift) Reset() {
+	*x = ListShift{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[84]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListShift) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListShift) ProtoMessage() {}
+
+func (x *ListShift) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[84]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListShift.ProtoReflect.Descriptor instead.
+func (*ListShift) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{84}
+}
+
+func (x *ListShift) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListShift) GetPeriods() *Expr {
+	if x != nil {
+		return x.Periods
+	}
+	return nil
+}
+
+type ListDiff struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Periods       int64                  `protobuf:"varint,2,opt,name=periods,proto3" json:"periods,omitempty"`
+	NullBehavior  DiffNullBehavior       `protobuf:"varint,3,opt,name=null_behavior,json=nullBehavior,proto3,enum=polars_bridge.DiffNullBehavior" json:"null_behavior,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDiff) Reset() {
+	*x = ListDiff{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[85]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDiff) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDiff) ProtoMessage() {}
+
+func (x *ListDiff) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[85]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDiff.ProtoReflect.Descriptor instead.
+func (*ListDiff) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{85}
+}
+
+func (x *ListDiff) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListDiff) GetPeriods() int64 {
+	if x != nil {
+		return x.Periods
+	}
+	return 0
+}
+
+func (x *ListDiff) GetNullBehavior() DiffNullBehavior {
+	if x != nil {
+		return x.NullBehavior
+	}
+	return DiffNullBehavior_DIFF_NULL_IGNORE
+}
+
+type ListCountMatches struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Element       *Expr                  `protobuf:"bytes,2,opt,name=element,proto3" json:"element,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCountMatches) Reset() {
+	*x = ListCountMatches{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[86]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCountMatches) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCountMatches) ProtoMessage() {}
+
+func (x *ListCountMatches) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[86]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCountMatches.ProtoReflect.Descriptor instead.
+func (*ListCountMatches) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{86}
+}
+
+func (x *ListCountMatches) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListCountMatches) GetElement() *Expr {
+	if x != nil {
+		return x.Element
+	}
+	return nil
+}
+
+type ListGather struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Index         *Expr                  `protobuf:"bytes,2,opt,name=index,proto3" json:"index,omitempty"`
+	NullOnOob     bool                   `protobuf:"varint,3,opt,name=null_on_oob,json=nullOnOob,proto3" json:"null_on_oob,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListGather) Reset() {
+	*x = ListGather{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[87]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListGather) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGather) ProtoMessage() {}
+
+func (x *ListGather) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[87]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGather.ProtoReflect.Descriptor instead.
+func (*ListGather) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{87}
+}
+
+func (x *ListGather) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListGather) GetIndex() *Expr {
+	if x != nil {
+		return x.Index
+	}
+	return nil
+}
+
+func (x *ListGather) GetNullOnOob() bool {
+	if x != nil {
+		return x.NullOnOob
+	}
+	return false
+}
+
+type ListGatherEvery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	N             *Expr                  `protobuf:"bytes,2,opt,name=n,proto3" json:"n,omitempty"`
+	Offset        *Expr                  `protobuf:"bytes,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListGatherEvery) Reset() {
+	*x = ListGatherEvery{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[88]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListGatherEvery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGatherEvery) ProtoMessage() {}
+
+func (x *ListGatherEvery) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[88]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGatherEvery.ProtoReflect.Descriptor instead.
+func (*ListGatherEvery) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{88}
+}
+
+func (x *ListGatherEvery) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListGatherEvery) GetN() *Expr {
+	if x != nil {
+		return x.N
+	}
+	return nil
+}
+
+func (x *ListGatherEvery) GetOffset() *Expr {
+	if x != nil {
+		return x.Offset
+	}
+	return nil
+}
+
+type ListSample struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Expr            *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Value           *Expr                  `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	WithReplacement bool                   `protobuf:"varint,3,opt,name=with_replacement,json=withReplacement,proto3" json:"with_replacement,omitempty"`
+	Shuffle         bool                   `protobuf:"varint,4,opt,name=shuffle,proto3" json:"shuffle,omitempty"`
+	Seed            uint64                 `protobuf:"varint,5,opt,name=seed,proto3" json:"seed,omitempty"`
+	HasSeed         bool                   `protobuf:"varint,6,opt,name=has_seed,json=hasSeed,proto3" json:"has_seed,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ListSample) Reset() {
+	*x = ListSample{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[89]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSample) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSample) ProtoMessage() {}
+
+func (x *ListSample) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[89]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSample.ProtoReflect.Descriptor instead.
+func (*ListSample) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{89}
+}
+
+func (x *ListSample) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListSample) GetValue() *Expr {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *ListSample) GetWithReplacement() bool {
+	if x != nil {
+		return x.WithReplacement
+	}
+	return false
+}
+
+func (x *ListSample) GetShuffle() bool {
+	if x != nil {
+		return x.Shuffle
+	}
+	return false
+}
+
+func (x *ListSample) GetSeed() uint64 {
+	if x != nil {
+		return x.Seed
+	}
+	return 0
+}
+
+func (x *ListSample) GetHasSeed() bool {
+	if x != nil {
+		return x.HasSeed
+	}
+	return false
+}
+
+type ListSetOperation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
+	Other         *Expr                  `protobuf:"bytes,2,opt,name=other,proto3" json:"other,omitempty"`
+	Op            SetOperation           `protobuf:"varint,3,opt,name=op,proto3,enum=polars_bridge.SetOperation" json:"op,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSetOperation) Reset() {
+	*x = ListSetOperation{}
+	mi := &file_proto_polars_bridge_proto_msgTypes[90]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSetOperation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSetOperation) ProtoMessage() {}
+
+func (x *ListSetOperation) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_polars_bridge_proto_msgTypes[90]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSetOperation.ProtoReflect.Descriptor instead.
+func (*ListSetOperation) Descriptor() ([]byte, []int) {
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{90}
+}
+
+func (x *ListSetOperation) GetExpr() *Expr {
+	if x != nil {
+		return x.Expr
+	}
+	return nil
+}
+
+func (x *ListSetOperation) GetOther() *Expr {
+	if x != nil {
+		return x.Other
+	}
+	return nil
+}
+
+func (x *ListSetOperation) GetOp() SetOperation {
+	if x != nil {
+		return x.Op
+	}
+	return SetOperation_UNION
+}
+
 type TemporalUnary struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Expr          *Expr                  `protobuf:"bytes,1,opt,name=expr,proto3" json:"expr,omitempty"`
@@ -6070,7 +8271,7 @@ type TemporalUnary struct {
 
 func (x *TemporalUnary) Reset() {
 	*x = TemporalUnary{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[66]
+	mi := &file_proto_polars_bridge_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6082,7 +8283,7 @@ func (x *TemporalUnary) String() string {
 func (*TemporalUnary) ProtoMessage() {}
 
 func (x *TemporalUnary) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[66]
+	mi := &file_proto_polars_bridge_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6095,7 +8296,7 @@ func (x *TemporalUnary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemporalUnary.ProtoReflect.Descriptor instead.
 func (*TemporalUnary) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{66}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *TemporalUnary) GetExpr() *Expr {
@@ -6115,7 +8316,7 @@ type TemporalParse struct {
 
 func (x *TemporalParse) Reset() {
 	*x = TemporalParse{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[67]
+	mi := &file_proto_polars_bridge_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6127,7 +8328,7 @@ func (x *TemporalParse) String() string {
 func (*TemporalParse) ProtoMessage() {}
 
 func (x *TemporalParse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[67]
+	mi := &file_proto_polars_bridge_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6140,7 +8341,7 @@ func (x *TemporalParse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemporalParse.ProtoReflect.Descriptor instead.
 func (*TemporalParse) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{67}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *TemporalParse) GetExpr() *Expr {
@@ -6167,7 +8368,7 @@ type StringFunction struct {
 
 func (x *StringFunction) Reset() {
 	*x = StringFunction{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[68]
+	mi := &file_proto_polars_bridge_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6179,7 +8380,7 @@ func (x *StringFunction) String() string {
 func (*StringFunction) ProtoMessage() {}
 
 func (x *StringFunction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[68]
+	mi := &file_proto_polars_bridge_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6192,7 +8393,7 @@ func (x *StringFunction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringFunction.ProtoReflect.Descriptor instead.
 func (*StringFunction) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{68}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *StringFunction) GetExpr() *Expr {
@@ -6214,7 +8415,7 @@ type StringContains struct {
 
 func (x *StringContains) Reset() {
 	*x = StringContains{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[69]
+	mi := &file_proto_polars_bridge_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6226,7 +8427,7 @@ func (x *StringContains) String() string {
 func (*StringContains) ProtoMessage() {}
 
 func (x *StringContains) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[69]
+	mi := &file_proto_polars_bridge_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6239,7 +8440,7 @@ func (x *StringContains) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringContains.ProtoReflect.Descriptor instead.
 func (*StringContains) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{69}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *StringContains) GetExpr() *Expr {
@@ -6274,7 +8475,7 @@ type StringStartsWith struct {
 
 func (x *StringStartsWith) Reset() {
 	*x = StringStartsWith{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[70]
+	mi := &file_proto_polars_bridge_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6286,7 +8487,7 @@ func (x *StringStartsWith) String() string {
 func (*StringStartsWith) ProtoMessage() {}
 
 func (x *StringStartsWith) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[70]
+	mi := &file_proto_polars_bridge_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6299,7 +8500,7 @@ func (x *StringStartsWith) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringStartsWith.ProtoReflect.Descriptor instead.
 func (*StringStartsWith) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{70}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *StringStartsWith) GetExpr() *Expr {
@@ -6327,7 +8528,7 @@ type StringEndsWith struct {
 
 func (x *StringEndsWith) Reset() {
 	*x = StringEndsWith{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[71]
+	mi := &file_proto_polars_bridge_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6339,7 +8540,7 @@ func (x *StringEndsWith) String() string {
 func (*StringEndsWith) ProtoMessage() {}
 
 func (x *StringEndsWith) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[71]
+	mi := &file_proto_polars_bridge_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6352,7 +8553,7 @@ func (x *StringEndsWith) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringEndsWith.ProtoReflect.Descriptor instead.
 func (*StringEndsWith) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{71}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *StringEndsWith) GetExpr() *Expr {
@@ -6381,7 +8582,7 @@ type StringExtract struct {
 
 func (x *StringExtract) Reset() {
 	*x = StringExtract{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[72]
+	mi := &file_proto_polars_bridge_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6393,7 +8594,7 @@ func (x *StringExtract) String() string {
 func (*StringExtract) ProtoMessage() {}
 
 func (x *StringExtract) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[72]
+	mi := &file_proto_polars_bridge_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6406,7 +8607,7 @@ func (x *StringExtract) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringExtract.ProtoReflect.Descriptor instead.
 func (*StringExtract) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{72}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *StringExtract) GetExpr() *Expr {
@@ -6443,7 +8644,7 @@ type StringReplace struct {
 
 func (x *StringReplace) Reset() {
 	*x = StringReplace{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[73]
+	mi := &file_proto_polars_bridge_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6455,7 +8656,7 @@ func (x *StringReplace) String() string {
 func (*StringReplace) ProtoMessage() {}
 
 func (x *StringReplace) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[73]
+	mi := &file_proto_polars_bridge_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6468,7 +8669,7 @@ func (x *StringReplace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringReplace.ProtoReflect.Descriptor instead.
 func (*StringReplace) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{73}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *StringReplace) GetExpr() *Expr {
@@ -6512,7 +8713,7 @@ type StringReplaceN struct {
 
 func (x *StringReplaceN) Reset() {
 	*x = StringReplaceN{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[74]
+	mi := &file_proto_polars_bridge_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6524,7 +8725,7 @@ func (x *StringReplaceN) String() string {
 func (*StringReplaceN) ProtoMessage() {}
 
 func (x *StringReplaceN) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[74]
+	mi := &file_proto_polars_bridge_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6537,7 +8738,7 @@ func (x *StringReplaceN) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringReplaceN.ProtoReflect.Descriptor instead.
 func (*StringReplaceN) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{74}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *StringReplaceN) GetExpr() *Expr {
@@ -6585,7 +8786,7 @@ type StringPattern struct {
 
 func (x *StringPattern) Reset() {
 	*x = StringPattern{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[75]
+	mi := &file_proto_polars_bridge_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6597,7 +8798,7 @@ func (x *StringPattern) String() string {
 func (*StringPattern) ProtoMessage() {}
 
 func (x *StringPattern) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[75]
+	mi := &file_proto_polars_bridge_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6610,7 +8811,7 @@ func (x *StringPattern) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringPattern.ProtoReflect.Descriptor instead.
 func (*StringPattern) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{75}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *StringPattern) GetExpr() *Expr {
@@ -6637,7 +8838,7 @@ type StringAffix struct {
 
 func (x *StringAffix) Reset() {
 	*x = StringAffix{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[76]
+	mi := &file_proto_polars_bridge_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6649,7 +8850,7 @@ func (x *StringAffix) String() string {
 func (*StringAffix) ProtoMessage() {}
 
 func (x *StringAffix) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[76]
+	mi := &file_proto_polars_bridge_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6662,7 +8863,7 @@ func (x *StringAffix) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringAffix.ProtoReflect.Descriptor instead.
 func (*StringAffix) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{76}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *StringAffix) GetExpr() *Expr {
@@ -6690,7 +8891,7 @@ type StringStripChars struct {
 
 func (x *StringStripChars) Reset() {
 	*x = StringStripChars{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[77]
+	mi := &file_proto_polars_bridge_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6702,7 +8903,7 @@ func (x *StringStripChars) String() string {
 func (*StringStripChars) ProtoMessage() {}
 
 func (x *StringStripChars) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[77]
+	mi := &file_proto_polars_bridge_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6715,7 +8916,7 @@ func (x *StringStripChars) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringStripChars.ProtoReflect.Descriptor instead.
 func (*StringStripChars) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{77}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *StringStripChars) GetExpr() *Expr {
@@ -6744,7 +8945,7 @@ type StringSlice struct {
 
 func (x *StringSlice) Reset() {
 	*x = StringSlice{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[78]
+	mi := &file_proto_polars_bridge_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6756,7 +8957,7 @@ func (x *StringSlice) String() string {
 func (*StringSlice) ProtoMessage() {}
 
 func (x *StringSlice) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[78]
+	mi := &file_proto_polars_bridge_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6769,7 +8970,7 @@ func (x *StringSlice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringSlice.ProtoReflect.Descriptor instead.
 func (*StringSlice) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{78}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *StringSlice) GetExpr() *Expr {
@@ -6804,7 +9005,7 @@ type StringSplit struct {
 
 func (x *StringSplit) Reset() {
 	*x = StringSplit{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[79]
+	mi := &file_proto_polars_bridge_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6816,7 +9017,7 @@ func (x *StringSplit) String() string {
 func (*StringSplit) ProtoMessage() {}
 
 func (x *StringSplit) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[79]
+	mi := &file_proto_polars_bridge_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6829,7 +9030,7 @@ func (x *StringSplit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringSplit.ProtoReflect.Descriptor instead.
 func (*StringSplit) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{79}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *StringSplit) GetExpr() *Expr {
@@ -6858,7 +9059,7 @@ type StringPad struct {
 
 func (x *StringPad) Reset() {
 	*x = StringPad{}
-	mi := &file_proto_polars_bridge_proto_msgTypes[80]
+	mi := &file_proto_polars_bridge_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6870,7 +9071,7 @@ func (x *StringPad) String() string {
 func (*StringPad) ProtoMessage() {}
 
 func (x *StringPad) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_polars_bridge_proto_msgTypes[80]
+	mi := &file_proto_polars_bridge_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6883,7 +9084,7 @@ func (x *StringPad) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StringPad.ProtoReflect.Descriptor instead.
 func (*StringPad) Descriptor() ([]byte, []int) {
-	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{80}
+	return file_proto_polars_bridge_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *StringPad) GetExpr() *Expr {
@@ -6914,7 +9115,8 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"\x19proto/polars_bridge.proto\x12\rpolars_bridge\"R\n" +
 	"\x04Plan\x12!\n" +
 	"\fplan_version\x18\x01 \x01(\rR\vplanVersion\x12'\n" +
-	"\x04root\x18\x02 \x01(\v2\x13.polars_bridge.NodeR\x04root\"\xdc\t\n" +
+	"\x04root\x18\x02 \x01(\v2\x13.polars_bridge.NodeR\x04root\"\xbb\n" +
+	"\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12<\n" +
 	"\vmemory_scan\x18\n" +
@@ -6942,7 +9144,9 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"\areverse\x18\x1d \x01(\v2\x16.polars_bridge.ReverseH\x00R\areverse\x126\n" +
 	"\tdrop_nans\x18\x1e \x01(\v2\x17.polars_bridge.DropNansH\x00R\bdropNans\x128\n" +
 	"\bfill_nan\x18\x1f \x01(\v2\x1b.polars_bridge.FillNanFrameH\x00R\afillNan\x12/\n" +
-	"\x06sample\x18  \x01(\v2\x15.polars_bridge.SampleH\x00R\x06sampleB\x06\n" +
+	"\x06sample\x18  \x01(\v2\x15.polars_bridge.SampleH\x00R\x06sample\x12/\n" +
+	"\x06unnest\x18! \x01(\v2\x15.polars_bridge.UnnestH\x00R\x06unnest\x12,\n" +
+	"\x05pivot\x18\" \x01(\v2\x14.polars_bridge.PivotH\x00R\x05pivotB\x06\n" +
 	"\x04kindJ\x04\b2\x10dJ\x05\bd\x10\x96\x01\"L\n" +
 	"\n" +
 	"MemoryScan\x12!\n" +
@@ -7075,7 +9279,22 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"\x10with_replacement\x18\x04 \x01(\bR\x0fwithReplacement\x12\x18\n" +
 	"\ashuffle\x18\x05 \x01(\bR\ashuffle\x12\x17\n" +
 	"\x04seed\x18\x06 \x01(\x04H\x00R\x04seed\x88\x01\x01B\a\n" +
-	"\x05_seed\"\xcd&\n" +
+	"\x05_seed\"M\n" +
+	"\x06Unnest\x12)\n" +
+	"\x05input\x18\x01 \x01(\v2\x13.polars_bridge.NodeR\x05input\x12\x18\n" +
+	"\acolumns\x18\x02 \x03(\tR\acolumns\"B\n" +
+	"\x10PivotOnColumnRow\x12.\n" +
+	"\x06values\x18\x01 \x03(\v2\x16.polars_bridge.LiteralR\x06values\"\x93\x02\n" +
+	"\x05Pivot\x12)\n" +
+	"\x05input\x18\x01 \x01(\v2\x13.polars_bridge.NodeR\x05input\x12\x0e\n" +
+	"\x02on\x18\x02 \x03(\tR\x02on\x12>\n" +
+	"\n" +
+	"on_columns\x18\x03 \x03(\v2\x1f.polars_bridge.PivotOnColumnRowR\tonColumns\x12\x14\n" +
+	"\x05index\x18\x04 \x03(\tR\x05index\x12\x16\n" +
+	"\x06values\x18\x05 \x03(\tR\x06values\x12\x1c\n" +
+	"\taggregate\x18\x06 \x01(\tR\taggregate\x12%\n" +
+	"\x0emaintain_order\x18\a \x01(\bR\rmaintainOrder\x12\x1c\n" +
+	"\tseparator\x18\b \x01(\tR\tseparator\"\xf5:\n" +
 	"\x04Expr\x12)\n" +
 	"\x03col\x18\x01 \x01(\v2\x15.polars_bridge.ColumnH\x00R\x03col\x12*\n" +
 	"\x03lit\x18\x02 \x01(\v2\x16.polars_bridge.LiteralH\x00R\x03lit\x123\n" +
@@ -7149,7 +9368,57 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"rollingMax\x12<\n" +
 	"\frolling_mean\x18\x8b\x01 \x01(\v2\x16.polars_bridge.RollingH\x00R\vrollingMean\x12:\n" +
 	"\vrolling_sum\x18\x8c\x01 \x01(\v2\x16.polars_bridge.RollingH\x00R\n" +
-	"rollingSum\x12C\n" +
+	"rollingSum\x12=\n" +
+	"\vfilter_expr\x18\xbb\x01 \x01(\v2\x19.polars_bridge.FilterExprH\x00R\n" +
+	"filterExpr\x125\n" +
+	"\asort_by\x18\xbc\x01 \x01(\v2\x19.polars_bridge.SortByExprH\x00R\x06sortBy\x127\n" +
+	"\tas_struct\x18\xbd\x01 \x01(\v2\x17.polars_bridge.AsStructH\x00R\basStruct\x123\n" +
+	"\aelement\x18\x96\x01 \x01(\v2\x16.polars_bridge.ElementH\x00R\aelement\x12=\n" +
+	"\vconcat_list\x18\x97\x01 \x01(\v2\x19.polars_bridge.ConcatListH\x00R\n" +
+	"concatList\x127\n" +
+	"\tlist_eval\x18\x98\x01 \x01(\v2\x17.polars_bridge.ListEvalH\x00R\blistEval\x129\n" +
+	"\blist_len\x18\x99\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\alistLen\x129\n" +
+	"\blist_sum\x18\x9a\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\alistSum\x129\n" +
+	"\blist_max\x18\x9b\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\alistMax\x129\n" +
+	"\blist_min\x18\x9c\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\alistMin\x12C\n" +
+	"\rlist_contains\x18\x9d\x01 \x01(\v2\x1b.polars_bridge.ListContainsH\x00R\flistContains\x127\n" +
+	"\tlist_sort\x18\x9e\x01 \x01(\v2\x17.polars_bridge.ListSortH\x00R\blistSort\x124\n" +
+	"\blist_get\x18\x9f\x01 \x01(\v2\x16.polars_bridge.ListGetH\x00R\alistGet\x124\n" +
+	"\blist_agg\x18\xa0\x01 \x01(\v2\x16.polars_bridge.ListAggH\x00R\alistAgg\x12;\n" +
+	"\tlist_mean\x18\xa1\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\blistMean\x12?\n" +
+	"\vlist_median\x18\xa2\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\n" +
+	"listMedian\x127\n" +
+	"\blist_std\x18\xa3\x01 \x01(\v2\x19.polars_bridge.ListMomentH\x00R\alistStd\x127\n" +
+	"\blist_var\x18\xa4\x01 \x01(\v2\x19.polars_bridge.ListMomentH\x00R\alistVar\x12A\n" +
+	"\flist_reverse\x18\xa5\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\vlistReverse\x12=\n" +
+	"\vlist_unique\x18\xa6\x01 \x01(\v2\x19.polars_bridge.ListUniqueH\x00R\n" +
+	"listUnique\x12B\n" +
+	"\rlist_n_unique\x18\xa7\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\vlistNUnique\x12:\n" +
+	"\n" +
+	"list_slice\x18\xa8\x01 \x01(\v2\x18.polars_bridge.ListSliceH\x00R\tlistSlice\x12@\n" +
+	"\flist_arg_min\x18\xa9\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\n" +
+	"listArgMin\x12@\n" +
+	"\flist_arg_max\x18\xaa\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\n" +
+	"listArgMax\x127\n" +
+	"\tlist_join\x18\xab\x01 \x01(\v2\x17.polars_bridge.ListJoinH\x00R\blistJoin\x129\n" +
+	"\blist_any\x18\xac\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\alistAny\x129\n" +
+	"\blist_all\x18\xad\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\alistAll\x12F\n" +
+	"\x0flist_drop_nulls\x18\xae\x01 \x01(\v2\x1b.polars_bridge.ListFunctionH\x00R\rlistDropNulls\x12:\n" +
+	"\n" +
+	"list_shift\x18\xaf\x01 \x01(\v2\x18.polars_bridge.ListShiftH\x00R\tlistShift\x127\n" +
+	"\tlist_diff\x18\xb0\x01 \x01(\v2\x17.polars_bridge.ListDiffH\x00R\blistDiff\x12P\n" +
+	"\x12list_count_matches\x18\xb1\x01 \x01(\v2\x1f.polars_bridge.ListCountMatchesH\x00R\x10listCountMatches\x12=\n" +
+	"\vlist_gather\x18\xb2\x01 \x01(\v2\x19.polars_bridge.ListGatherH\x00R\n" +
+	"listGather\x12M\n" +
+	"\x11list_gather_every\x18\xb3\x01 \x01(\v2\x1e.polars_bridge.ListGatherEveryH\x00R\x0flistGatherEvery\x12@\n" +
+	"\rlist_sample_n\x18\xb4\x01 \x01(\v2\x19.polars_bridge.ListSampleH\x00R\vlistSampleN\x12N\n" +
+	"\x14list_sample_fraction\x18\xb5\x01 \x01(\v2\x19.polars_bridge.ListSampleH\x00R\x12listSampleFraction\x12A\n" +
+	"\n" +
+	"list_union\x18\xb6\x01 \x01(\v2\x1f.polars_bridge.ListSetOperationH\x00R\tlistUnion\x12R\n" +
+	"\x13list_set_difference\x18\xb7\x01 \x01(\v2\x1f.polars_bridge.ListSetOperationH\x00R\x11listSetDifference\x12V\n" +
+	"\x15list_set_intersection\x18\xb8\x01 \x01(\v2\x1f.polars_bridge.ListSetOperationH\x00R\x13listSetIntersection\x12e\n" +
+	"\x1dlist_set_symmetric_difference\x18\xb9\x01 \x01(\v2\x1f.polars_bridge.ListSetOperationH\x00R\x1alistSetSymmetricDifference\x12J\n" +
+	"\x12list_unique_stable\x18\xba\x01 \x01(\v2\x19.polars_bridge.ListUniqueH\x00R\x10listUniqueStable\x12C\n" +
 	"\rstr_len_bytes\x182 \x01(\v2\x1d.polars_bridge.StringFunctionH\x00R\vstrLenBytes\x12C\n" +
 	"\rstr_len_chars\x183 \x01(\v2\x1d.polars_bridge.StringFunctionH\x00R\vstrLenChars\x12B\n" +
 	"\fstr_contains\x184 \x01(\v2\x1d.polars_bridge.StringContainsH\x00R\vstrContains\x12I\n" +
@@ -7226,7 +9495,7 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"\bWhenThen\x121\n" +
 	"\tpredicate\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\tpredicate\x12+\n" +
 	"\x06truthy\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\x06truthy\x12)\n" +
-	"\x05falsy\x18\x03 \x01(\v2\x13.polars_bridge.ExprR\x05falsy\"\xd6\x01\n" +
+	"\x05falsy\x18\x03 \x01(\v2\x13.polars_bridge.ExprR\x05falsy\"\x9f\x02\n" +
 	"\x04Over\x12'\n" +
 	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x126\n" +
 	"\fpartition_by\x18\x02 \x03(\v2\x13.polars_bridge.ExprR\vpartitionBy\x12.\n" +
@@ -7235,7 +9504,8 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"descending\x18\x04 \x01(\bR\n" +
 	"descending\x12\x1d\n" +
 	"\n" +
-	"nulls_last\x18\x05 \x01(\bR\tnullsLast\"\xa4\x01\n" +
+	"nulls_last\x18\x05 \x01(\bR\tnullsLast\x12G\n" +
+	"\x10mapping_strategy\x18\x06 \x01(\x0e2\x1c.polars_bridge.WindowMappingR\x0fmappingStrategy\"\xa4\x01\n" +
 	"\x04Rank\x12'\n" +
 	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x121\n" +
 	"\x06method\x18\x02 \x01(\x0e2\x19.polars_bridge.RankMethodR\x06method\x12\x1e\n" +
@@ -7307,14 +9577,108 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"\n" +
 	"fill_value\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\tfillValue\"7\n" +
 	"\fIsDuplicated\x12'\n" +
-	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\"\x8c\x01\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\"h\n" +
+	"\n" +
+	"FilterExpr\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x121\n" +
+	"\tpredicate\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\tpredicate\"\x99\x01\n" +
+	"\n" +
+	"SortByExpr\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12#\n" +
+	"\x02by\x18\x02 \x03(\v2\x13.polars_bridge.ExprR\x02by\x12\x1e\n" +
+	"\n" +
+	"descending\x18\x03 \x03(\bR\n" +
+	"descending\x12\x1d\n" +
+	"\n" +
+	"nulls_last\x18\x04 \x03(\bR\tnullsLast\"5\n" +
+	"\bAsStruct\x12)\n" +
+	"\x05exprs\x18\x01 \x03(\v2\x13.polars_bridge.ExprR\x05exprs\"\x8c\x01\n" +
 	"\aRolling\x12'\n" +
 	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12\x1f\n" +
 	"\vwindow_size\x18\x02 \x01(\x04R\n" +
 	"windowSize\x12\x1f\n" +
 	"\vmin_periods\x18\x03 \x01(\x04R\n" +
 	"minPeriods\x12\x16\n" +
-	"\x06center\x18\x04 \x01(\bR\x06center\"8\n" +
+	"\x06center\x18\x04 \x01(\bR\x06center\"\t\n" +
+	"\aElement\"7\n" +
+	"\n" +
+	"ConcatList\x12)\n" +
+	"\x05exprs\x18\x01 \x03(\v2\x13.polars_bridge.ExprR\x05exprs\"h\n" +
+	"\bListEval\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x123\n" +
+	"\n" +
+	"evaluation\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\n" +
+	"evaluation\"7\n" +
+	"\fListFunction\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\"\x81\x01\n" +
+	"\fListContains\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12'\n" +
+	"\x04item\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\x04item\x12\x1f\n" +
+	"\vnulls_equal\x18\x03 \x01(\bR\n" +
+	"nullsEqual\"r\n" +
+	"\bListSort\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12\x1e\n" +
+	"\n" +
+	"descending\x18\x02 \x01(\bR\n" +
+	"descending\x12\x1d\n" +
+	"\n" +
+	"nulls_last\x18\x03 \x01(\bR\tnullsLast\"}\n" +
+	"\aListGet\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12)\n" +
+	"\x05index\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\x05index\x12\x1e\n" +
+	"\vnull_on_oob\x18\x03 \x01(\bR\tnullOnOob\"g\n" +
+	"\aListAgg\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x123\n" +
+	"\n" +
+	"evaluation\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\n" +
+	"evaluation\"I\n" +
+	"\n" +
+	"ListMoment\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12\x12\n" +
+	"\x04ddof\x18\x02 \x01(\rR\x04ddof\"\\\n" +
+	"\n" +
+	"ListUnique\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12%\n" +
+	"\x0emaintain_order\x18\x02 \x01(\bR\rmaintainOrder\"\x8e\x01\n" +
+	"\tListSlice\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12+\n" +
+	"\x06offset\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\x06offset\x12+\n" +
+	"\x06length\x18\x03 \x01(\v2\x13.polars_bridge.ExprR\x06length\"\x89\x01\n" +
+	"\bListJoin\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x121\n" +
+	"\tseparator\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\tseparator\x12!\n" +
+	"\fignore_nulls\x18\x03 \x01(\bR\vignoreNulls\"c\n" +
+	"\tListShift\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12-\n" +
+	"\aperiods\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\aperiods\"\x93\x01\n" +
+	"\bListDiff\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12\x18\n" +
+	"\aperiods\x18\x02 \x01(\x03R\aperiods\x12D\n" +
+	"\rnull_behavior\x18\x03 \x01(\x0e2\x1f.polars_bridge.DiffNullBehaviorR\fnullBehavior\"j\n" +
+	"\x10ListCountMatches\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12-\n" +
+	"\aelement\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\aelement\"\x80\x01\n" +
+	"\n" +
+	"ListGather\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12)\n" +
+	"\x05index\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\x05index\x12\x1e\n" +
+	"\vnull_on_oob\x18\x03 \x01(\bR\tnullOnOob\"\x8a\x01\n" +
+	"\x0fListGatherEvery\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12!\n" +
+	"\x01n\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\x01n\x12+\n" +
+	"\x06offset\x18\x03 \x01(\v2\x13.polars_bridge.ExprR\x06offset\"\xd4\x01\n" +
+	"\n" +
+	"ListSample\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12)\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\x05value\x12)\n" +
+	"\x10with_replacement\x18\x03 \x01(\bR\x0fwithReplacement\x12\x18\n" +
+	"\ashuffle\x18\x04 \x01(\bR\ashuffle\x12\x12\n" +
+	"\x04seed\x18\x05 \x01(\x04R\x04seed\x12\x19\n" +
+	"\bhas_seed\x18\x06 \x01(\bR\ahasSeed\"\x93\x01\n" +
+	"\x10ListSetOperation\x12'\n" +
+	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\x12)\n" +
+	"\x05other\x18\x02 \x01(\v2\x13.polars_bridge.ExprR\x05other\x12+\n" +
+	"\x02op\x18\x03 \x01(\x0e2\x1b.polars_bridge.SetOperationR\x02op\"8\n" +
 	"\rTemporalUnary\x12'\n" +
 	"\x04expr\x18\x01 \x01(\v2\x13.polars_bridge.ExprR\x04expr\"P\n" +
 	"\rTemporalParse\x12'\n" +
@@ -7411,7 +9775,11 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"\x0fQUANTILE_HIGHER\x10\x02\x12\x15\n" +
 	"\x11QUANTILE_MIDPOINT\x10\x03\x12\x13\n" +
 	"\x0fQUANTILE_LINEAR\x10\x04\x12\x19\n" +
-	"\x15QUANTILE_EQUIPROBABLE\x10\x05*\\\n" +
+	"\x15QUANTILE_EQUIPROBABLE\x10\x05*f\n" +
+	"\rWindowMapping\x12 \n" +
+	"\x1cWINDOW_MAPPING_GROUP_TO_ROWS\x10\x00\x12\x1a\n" +
+	"\x16WINDOW_MAPPING_EXPLODE\x10\x01\x12\x17\n" +
+	"\x13WINDOW_MAPPING_JOIN\x10\x02*\\\n" +
 	"\n" +
 	"RankMethod\x12\x0e\n" +
 	"\n" +
@@ -7422,7 +9790,13 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"\fRANK_ORDINAL\x10\x04*<\n" +
 	"\x10DiffNullBehavior\x12\x14\n" +
 	"\x10DIFF_NULL_IGNORE\x10\x00\x12\x12\n" +
-	"\x0eDIFF_NULL_DROP\x10\x01*\xb4\x01\n" +
+	"\x0eDIFF_NULL_DROP\x10\x01*U\n" +
+	"\fSetOperation\x12\t\n" +
+	"\x05UNION\x10\x00\x12\x0e\n" +
+	"\n" +
+	"DIFFERENCE\x10\x01\x12\x10\n" +
+	"\fINTERSECTION\x10\x02\x12\x18\n" +
+	"\x14SYMMETRIC_DIFFERENCE\x10\x03*\xb4\x01\n" +
 	"\bDataType\x12\t\n" +
 	"\x05INT64\x10\x00\x12\t\n" +
 	"\x05INT32\x10\x01\x12\t\n" +
@@ -7456,319 +9830,432 @@ func file_proto_polars_bridge_proto_rawDescGZIP() []byte {
 	return file_proto_polars_bridge_proto_rawDescData
 }
 
-var file_proto_polars_bridge_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_proto_polars_bridge_proto_msgTypes = make([]protoimpl.MessageInfo, 82)
+var file_proto_polars_bridge_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
+var file_proto_polars_bridge_proto_msgTypes = make([]protoimpl.MessageInfo, 107)
 var file_proto_polars_bridge_proto_goTypes = []any{
 	(CsvEncoding)(0),         // 0: polars_bridge.CsvEncoding
 	(JoinType)(0),            // 1: polars_bridge.JoinType
 	(UniqueKeepStrategy)(0),  // 2: polars_bridge.UniqueKeepStrategy
 	(BinaryOperator)(0),      // 3: polars_bridge.BinaryOperator
 	(QuantileMethod)(0),      // 4: polars_bridge.QuantileMethod
-	(RankMethod)(0),          // 5: polars_bridge.RankMethod
-	(DiffNullBehavior)(0),    // 6: polars_bridge.DiffNullBehavior
-	(DataType)(0),            // 7: polars_bridge.DataType
-	(*Plan)(nil),             // 8: polars_bridge.Plan
-	(*Node)(nil),             // 9: polars_bridge.Node
-	(*MemoryScan)(nil),       // 10: polars_bridge.MemoryScan
-	(*CsvScan)(nil),          // 11: polars_bridge.CsvScan
-	(*ParquetScan)(nil),      // 12: polars_bridge.ParquetScan
-	(*Project)(nil),          // 13: polars_bridge.Project
-	(*Filter)(nil),           // 14: polars_bridge.Filter
-	(*WithColumns)(nil),      // 15: polars_bridge.WithColumns
-	(*Limit)(nil),            // 16: polars_bridge.Limit
-	(*GroupBy)(nil),          // 17: polars_bridge.GroupBy
-	(*Join)(nil),             // 18: polars_bridge.Join
-	(*Sort)(nil),             // 19: polars_bridge.Sort
-	(*Unique)(nil),           // 20: polars_bridge.Unique
-	(*Concat)(nil),           // 21: polars_bridge.Concat
-	(*SqlQuery)(nil),         // 22: polars_bridge.SqlQuery
-	(*Drop)(nil),             // 23: polars_bridge.Drop
-	(*Rename)(nil),           // 24: polars_bridge.Rename
-	(*Slice)(nil),            // 25: polars_bridge.Slice
-	(*Explode)(nil),          // 26: polars_bridge.Explode
-	(*DropNulls)(nil),        // 27: polars_bridge.DropNulls
-	(*Unpivot)(nil),          // 28: polars_bridge.Unpivot
-	(*Reverse)(nil),          // 29: polars_bridge.Reverse
-	(*DropNans)(nil),         // 30: polars_bridge.DropNans
-	(*FillNanFrame)(nil),     // 31: polars_bridge.FillNanFrame
-	(*Sample)(nil),           // 32: polars_bridge.Sample
-	(*Expr)(nil),             // 33: polars_bridge.Expr
-	(*Column)(nil),           // 34: polars_bridge.Column
-	(*Literal)(nil),          // 35: polars_bridge.Literal
-	(*NullValue)(nil),        // 36: polars_bridge.NullValue
-	(*BinaryExpr)(nil),       // 37: polars_bridge.BinaryExpr
-	(*MapBatchesExpr)(nil),   // 38: polars_bridge.MapBatchesExpr
-	(*Alias)(nil),            // 39: polars_bridge.Alias
-	(*IsNull)(nil),           // 40: polars_bridge.IsNull
-	(*IsNotNull)(nil),        // 41: polars_bridge.IsNotNull
-	(*IsNan)(nil),            // 42: polars_bridge.IsNan
-	(*IsFinite)(nil),         // 43: polars_bridge.IsFinite
-	(*Not)(nil),              // 44: polars_bridge.Not
-	(*Wildcard)(nil),         // 45: polars_bridge.Wildcard
-	(*Exclude)(nil),          // 46: polars_bridge.Exclude
-	(*Cast)(nil),             // 47: polars_bridge.Cast
-	(*AggExpr)(nil),          // 48: polars_bridge.AggExpr
-	(*Quantile)(nil),         // 49: polars_bridge.Quantile
-	(*WhenThen)(nil),         // 50: polars_bridge.WhenThen
-	(*Over)(nil),             // 51: polars_bridge.Over
-	(*Rank)(nil),             // 52: polars_bridge.Rank
-	(*CumSum)(nil),           // 53: polars_bridge.CumSum
-	(*CumCount)(nil),         // 54: polars_bridge.CumCount
-	(*CumMin)(nil),           // 55: polars_bridge.CumMin
-	(*CumMax)(nil),           // 56: polars_bridge.CumMax
-	(*CumProd)(nil),          // 57: polars_bridge.CumProd
-	(*Shift)(nil),            // 58: polars_bridge.Shift
-	(*Diff)(nil),             // 59: polars_bridge.Diff
-	(*ForwardFill)(nil),      // 60: polars_bridge.ForwardFill
-	(*FillNull)(nil),         // 61: polars_bridge.FillNull
-	(*BackwardFill)(nil),     // 62: polars_bridge.BackwardFill
-	(*Abs)(nil),              // 63: polars_bridge.Abs
-	(*Round)(nil),            // 64: polars_bridge.Round
-	(*Sqrt)(nil),             // 65: polars_bridge.Sqrt
-	(*Log)(nil),              // 66: polars_bridge.Log
-	(*Clip)(nil),             // 67: polars_bridge.Clip
-	(*NullCount)(nil),        // 68: polars_bridge.NullCount
-	(*ValueCounts)(nil),      // 69: polars_bridge.ValueCounts
-	(*ReverseExpr)(nil),      // 70: polars_bridge.ReverseExpr
-	(*FillNan)(nil),          // 71: polars_bridge.FillNan
-	(*IsDuplicated)(nil),     // 72: polars_bridge.IsDuplicated
-	(*Rolling)(nil),          // 73: polars_bridge.Rolling
-	(*TemporalUnary)(nil),    // 74: polars_bridge.TemporalUnary
-	(*TemporalParse)(nil),    // 75: polars_bridge.TemporalParse
-	(*StringFunction)(nil),   // 76: polars_bridge.StringFunction
-	(*StringContains)(nil),   // 77: polars_bridge.StringContains
-	(*StringStartsWith)(nil), // 78: polars_bridge.StringStartsWith
-	(*StringEndsWith)(nil),   // 79: polars_bridge.StringEndsWith
-	(*StringExtract)(nil),    // 80: polars_bridge.StringExtract
-	(*StringReplace)(nil),    // 81: polars_bridge.StringReplace
-	(*StringReplaceN)(nil),   // 82: polars_bridge.StringReplaceN
-	(*StringPattern)(nil),    // 83: polars_bridge.StringPattern
-	(*StringAffix)(nil),      // 84: polars_bridge.StringAffix
-	(*StringStripChars)(nil), // 85: polars_bridge.StringStripChars
-	(*StringSlice)(nil),      // 86: polars_bridge.StringSlice
-	(*StringSplit)(nil),      // 87: polars_bridge.StringSplit
-	(*StringPad)(nil),        // 88: polars_bridge.StringPad
-	nil,                      // 89: polars_bridge.CsvScan.SchemaEntry
+	(WindowMapping)(0),       // 5: polars_bridge.WindowMapping
+	(RankMethod)(0),          // 6: polars_bridge.RankMethod
+	(DiffNullBehavior)(0),    // 7: polars_bridge.DiffNullBehavior
+	(SetOperation)(0),        // 8: polars_bridge.SetOperation
+	(DataType)(0),            // 9: polars_bridge.DataType
+	(*Plan)(nil),             // 10: polars_bridge.Plan
+	(*Node)(nil),             // 11: polars_bridge.Node
+	(*MemoryScan)(nil),       // 12: polars_bridge.MemoryScan
+	(*CsvScan)(nil),          // 13: polars_bridge.CsvScan
+	(*ParquetScan)(nil),      // 14: polars_bridge.ParquetScan
+	(*Project)(nil),          // 15: polars_bridge.Project
+	(*Filter)(nil),           // 16: polars_bridge.Filter
+	(*WithColumns)(nil),      // 17: polars_bridge.WithColumns
+	(*Limit)(nil),            // 18: polars_bridge.Limit
+	(*GroupBy)(nil),          // 19: polars_bridge.GroupBy
+	(*Join)(nil),             // 20: polars_bridge.Join
+	(*Sort)(nil),             // 21: polars_bridge.Sort
+	(*Unique)(nil),           // 22: polars_bridge.Unique
+	(*Concat)(nil),           // 23: polars_bridge.Concat
+	(*SqlQuery)(nil),         // 24: polars_bridge.SqlQuery
+	(*Drop)(nil),             // 25: polars_bridge.Drop
+	(*Rename)(nil),           // 26: polars_bridge.Rename
+	(*Slice)(nil),            // 27: polars_bridge.Slice
+	(*Explode)(nil),          // 28: polars_bridge.Explode
+	(*DropNulls)(nil),        // 29: polars_bridge.DropNulls
+	(*Unpivot)(nil),          // 30: polars_bridge.Unpivot
+	(*Reverse)(nil),          // 31: polars_bridge.Reverse
+	(*DropNans)(nil),         // 32: polars_bridge.DropNans
+	(*FillNanFrame)(nil),     // 33: polars_bridge.FillNanFrame
+	(*Sample)(nil),           // 34: polars_bridge.Sample
+	(*Unnest)(nil),           // 35: polars_bridge.Unnest
+	(*PivotOnColumnRow)(nil), // 36: polars_bridge.PivotOnColumnRow
+	(*Pivot)(nil),            // 37: polars_bridge.Pivot
+	(*Expr)(nil),             // 38: polars_bridge.Expr
+	(*Column)(nil),           // 39: polars_bridge.Column
+	(*Literal)(nil),          // 40: polars_bridge.Literal
+	(*NullValue)(nil),        // 41: polars_bridge.NullValue
+	(*BinaryExpr)(nil),       // 42: polars_bridge.BinaryExpr
+	(*MapBatchesExpr)(nil),   // 43: polars_bridge.MapBatchesExpr
+	(*Alias)(nil),            // 44: polars_bridge.Alias
+	(*IsNull)(nil),           // 45: polars_bridge.IsNull
+	(*IsNotNull)(nil),        // 46: polars_bridge.IsNotNull
+	(*IsNan)(nil),            // 47: polars_bridge.IsNan
+	(*IsFinite)(nil),         // 48: polars_bridge.IsFinite
+	(*Not)(nil),              // 49: polars_bridge.Not
+	(*Wildcard)(nil),         // 50: polars_bridge.Wildcard
+	(*Exclude)(nil),          // 51: polars_bridge.Exclude
+	(*Cast)(nil),             // 52: polars_bridge.Cast
+	(*AggExpr)(nil),          // 53: polars_bridge.AggExpr
+	(*Quantile)(nil),         // 54: polars_bridge.Quantile
+	(*WhenThen)(nil),         // 55: polars_bridge.WhenThen
+	(*Over)(nil),             // 56: polars_bridge.Over
+	(*Rank)(nil),             // 57: polars_bridge.Rank
+	(*CumSum)(nil),           // 58: polars_bridge.CumSum
+	(*CumCount)(nil),         // 59: polars_bridge.CumCount
+	(*CumMin)(nil),           // 60: polars_bridge.CumMin
+	(*CumMax)(nil),           // 61: polars_bridge.CumMax
+	(*CumProd)(nil),          // 62: polars_bridge.CumProd
+	(*Shift)(nil),            // 63: polars_bridge.Shift
+	(*Diff)(nil),             // 64: polars_bridge.Diff
+	(*ForwardFill)(nil),      // 65: polars_bridge.ForwardFill
+	(*FillNull)(nil),         // 66: polars_bridge.FillNull
+	(*BackwardFill)(nil),     // 67: polars_bridge.BackwardFill
+	(*Abs)(nil),              // 68: polars_bridge.Abs
+	(*Round)(nil),            // 69: polars_bridge.Round
+	(*Sqrt)(nil),             // 70: polars_bridge.Sqrt
+	(*Log)(nil),              // 71: polars_bridge.Log
+	(*Clip)(nil),             // 72: polars_bridge.Clip
+	(*NullCount)(nil),        // 73: polars_bridge.NullCount
+	(*ValueCounts)(nil),      // 74: polars_bridge.ValueCounts
+	(*ReverseExpr)(nil),      // 75: polars_bridge.ReverseExpr
+	(*FillNan)(nil),          // 76: polars_bridge.FillNan
+	(*IsDuplicated)(nil),     // 77: polars_bridge.IsDuplicated
+	(*FilterExpr)(nil),       // 78: polars_bridge.FilterExpr
+	(*SortByExpr)(nil),       // 79: polars_bridge.SortByExpr
+	(*AsStruct)(nil),         // 80: polars_bridge.AsStruct
+	(*Rolling)(nil),          // 81: polars_bridge.Rolling
+	(*Element)(nil),          // 82: polars_bridge.Element
+	(*ConcatList)(nil),       // 83: polars_bridge.ConcatList
+	(*ListEval)(nil),         // 84: polars_bridge.ListEval
+	(*ListFunction)(nil),     // 85: polars_bridge.ListFunction
+	(*ListContains)(nil),     // 86: polars_bridge.ListContains
+	(*ListSort)(nil),         // 87: polars_bridge.ListSort
+	(*ListGet)(nil),          // 88: polars_bridge.ListGet
+	(*ListAgg)(nil),          // 89: polars_bridge.ListAgg
+	(*ListMoment)(nil),       // 90: polars_bridge.ListMoment
+	(*ListUnique)(nil),       // 91: polars_bridge.ListUnique
+	(*ListSlice)(nil),        // 92: polars_bridge.ListSlice
+	(*ListJoin)(nil),         // 93: polars_bridge.ListJoin
+	(*ListShift)(nil),        // 94: polars_bridge.ListShift
+	(*ListDiff)(nil),         // 95: polars_bridge.ListDiff
+	(*ListCountMatches)(nil), // 96: polars_bridge.ListCountMatches
+	(*ListGather)(nil),       // 97: polars_bridge.ListGather
+	(*ListGatherEvery)(nil),  // 98: polars_bridge.ListGatherEvery
+	(*ListSample)(nil),       // 99: polars_bridge.ListSample
+	(*ListSetOperation)(nil), // 100: polars_bridge.ListSetOperation
+	(*TemporalUnary)(nil),    // 101: polars_bridge.TemporalUnary
+	(*TemporalParse)(nil),    // 102: polars_bridge.TemporalParse
+	(*StringFunction)(nil),   // 103: polars_bridge.StringFunction
+	(*StringContains)(nil),   // 104: polars_bridge.StringContains
+	(*StringStartsWith)(nil), // 105: polars_bridge.StringStartsWith
+	(*StringEndsWith)(nil),   // 106: polars_bridge.StringEndsWith
+	(*StringExtract)(nil),    // 107: polars_bridge.StringExtract
+	(*StringReplace)(nil),    // 108: polars_bridge.StringReplace
+	(*StringReplaceN)(nil),   // 109: polars_bridge.StringReplaceN
+	(*StringPattern)(nil),    // 110: polars_bridge.StringPattern
+	(*StringAffix)(nil),      // 111: polars_bridge.StringAffix
+	(*StringStripChars)(nil), // 112: polars_bridge.StringStripChars
+	(*StringSlice)(nil),      // 113: polars_bridge.StringSlice
+	(*StringSplit)(nil),      // 114: polars_bridge.StringSplit
+	(*StringPad)(nil),        // 115: polars_bridge.StringPad
+	nil,                      // 116: polars_bridge.CsvScan.SchemaEntry
 }
 var file_proto_polars_bridge_proto_depIdxs = []int32{
-	9,   // 0: polars_bridge.Plan.root:type_name -> polars_bridge.Node
-	10,  // 1: polars_bridge.Node.memory_scan:type_name -> polars_bridge.MemoryScan
-	11,  // 2: polars_bridge.Node.csv_scan:type_name -> polars_bridge.CsvScan
-	12,  // 3: polars_bridge.Node.parquet_scan:type_name -> polars_bridge.ParquetScan
-	13,  // 4: polars_bridge.Node.project:type_name -> polars_bridge.Project
-	14,  // 5: polars_bridge.Node.filter:type_name -> polars_bridge.Filter
-	15,  // 6: polars_bridge.Node.with_columns:type_name -> polars_bridge.WithColumns
-	16,  // 7: polars_bridge.Node.limit:type_name -> polars_bridge.Limit
-	17,  // 8: polars_bridge.Node.group_by:type_name -> polars_bridge.GroupBy
-	18,  // 9: polars_bridge.Node.join:type_name -> polars_bridge.Join
-	19,  // 10: polars_bridge.Node.sort:type_name -> polars_bridge.Sort
-	20,  // 11: polars_bridge.Node.unique:type_name -> polars_bridge.Unique
-	21,  // 12: polars_bridge.Node.concat:type_name -> polars_bridge.Concat
-	22,  // 13: polars_bridge.Node.sql_query:type_name -> polars_bridge.SqlQuery
-	23,  // 14: polars_bridge.Node.drop:type_name -> polars_bridge.Drop
-	24,  // 15: polars_bridge.Node.rename:type_name -> polars_bridge.Rename
-	25,  // 16: polars_bridge.Node.slice:type_name -> polars_bridge.Slice
-	26,  // 17: polars_bridge.Node.explode:type_name -> polars_bridge.Explode
-	27,  // 18: polars_bridge.Node.drop_nulls:type_name -> polars_bridge.DropNulls
-	28,  // 19: polars_bridge.Node.unpivot:type_name -> polars_bridge.Unpivot
-	29,  // 20: polars_bridge.Node.reverse:type_name -> polars_bridge.Reverse
-	30,  // 21: polars_bridge.Node.drop_nans:type_name -> polars_bridge.DropNans
-	31,  // 22: polars_bridge.Node.fill_nan:type_name -> polars_bridge.FillNanFrame
-	32,  // 23: polars_bridge.Node.sample:type_name -> polars_bridge.Sample
-	89,  // 24: polars_bridge.CsvScan.schema:type_name -> polars_bridge.CsvScan.SchemaEntry
-	0,   // 25: polars_bridge.CsvScan.encoding:type_name -> polars_bridge.CsvEncoding
-	9,   // 26: polars_bridge.Project.input:type_name -> polars_bridge.Node
-	33,  // 27: polars_bridge.Project.expressions:type_name -> polars_bridge.Expr
-	9,   // 28: polars_bridge.Filter.input:type_name -> polars_bridge.Node
-	33,  // 29: polars_bridge.Filter.predicate:type_name -> polars_bridge.Expr
-	9,   // 30: polars_bridge.WithColumns.input:type_name -> polars_bridge.Node
-	33,  // 31: polars_bridge.WithColumns.expressions:type_name -> polars_bridge.Expr
-	9,   // 32: polars_bridge.Limit.input:type_name -> polars_bridge.Node
-	9,   // 33: polars_bridge.GroupBy.input:type_name -> polars_bridge.Node
-	33,  // 34: polars_bridge.GroupBy.keys:type_name -> polars_bridge.Expr
-	33,  // 35: polars_bridge.GroupBy.aggs:type_name -> polars_bridge.Expr
-	9,   // 36: polars_bridge.Join.left:type_name -> polars_bridge.Node
-	9,   // 37: polars_bridge.Join.right:type_name -> polars_bridge.Node
-	33,  // 38: polars_bridge.Join.left_on:type_name -> polars_bridge.Expr
-	33,  // 39: polars_bridge.Join.right_on:type_name -> polars_bridge.Expr
-	1,   // 40: polars_bridge.Join.how:type_name -> polars_bridge.JoinType
-	9,   // 41: polars_bridge.Sort.input:type_name -> polars_bridge.Node
-	33,  // 42: polars_bridge.Sort.by:type_name -> polars_bridge.Expr
-	9,   // 43: polars_bridge.Unique.input:type_name -> polars_bridge.Node
-	2,   // 44: polars_bridge.Unique.keep:type_name -> polars_bridge.UniqueKeepStrategy
-	9,   // 45: polars_bridge.Concat.inputs:type_name -> polars_bridge.Node
-	9,   // 46: polars_bridge.SqlQuery.inputs:type_name -> polars_bridge.Node
-	9,   // 47: polars_bridge.Drop.input:type_name -> polars_bridge.Node
-	9,   // 48: polars_bridge.Rename.input:type_name -> polars_bridge.Node
-	9,   // 49: polars_bridge.Slice.input:type_name -> polars_bridge.Node
-	9,   // 50: polars_bridge.Explode.input:type_name -> polars_bridge.Node
-	9,   // 51: polars_bridge.DropNulls.input:type_name -> polars_bridge.Node
-	9,   // 52: polars_bridge.Unpivot.input:type_name -> polars_bridge.Node
-	9,   // 53: polars_bridge.Reverse.input:type_name -> polars_bridge.Node
-	9,   // 54: polars_bridge.DropNans.input:type_name -> polars_bridge.Node
-	9,   // 55: polars_bridge.FillNanFrame.input:type_name -> polars_bridge.Node
-	33,  // 56: polars_bridge.FillNanFrame.fill_value:type_name -> polars_bridge.Expr
-	9,   // 57: polars_bridge.Sample.input:type_name -> polars_bridge.Node
-	34,  // 58: polars_bridge.Expr.col:type_name -> polars_bridge.Column
-	35,  // 59: polars_bridge.Expr.lit:type_name -> polars_bridge.Literal
-	37,  // 60: polars_bridge.Expr.binary:type_name -> polars_bridge.BinaryExpr
-	39,  // 61: polars_bridge.Expr.alias:type_name -> polars_bridge.Alias
-	40,  // 62: polars_bridge.Expr.is_null:type_name -> polars_bridge.IsNull
-	41,  // 63: polars_bridge.Expr.is_not_null:type_name -> polars_bridge.IsNotNull
-	44,  // 64: polars_bridge.Expr.not:type_name -> polars_bridge.Not
-	45,  // 65: polars_bridge.Expr.wildcard:type_name -> polars_bridge.Wildcard
-	46,  // 66: polars_bridge.Expr.exclude:type_name -> polars_bridge.Exclude
-	47,  // 67: polars_bridge.Expr.cast:type_name -> polars_bridge.Cast
-	48,  // 68: polars_bridge.Expr.sum:type_name -> polars_bridge.AggExpr
-	48,  // 69: polars_bridge.Expr.mean:type_name -> polars_bridge.AggExpr
-	48,  // 70: polars_bridge.Expr.min:type_name -> polars_bridge.AggExpr
-	48,  // 71: polars_bridge.Expr.max:type_name -> polars_bridge.AggExpr
-	48,  // 72: polars_bridge.Expr.count:type_name -> polars_bridge.AggExpr
-	48,  // 73: polars_bridge.Expr.first:type_name -> polars_bridge.AggExpr
-	48,  // 74: polars_bridge.Expr.last:type_name -> polars_bridge.AggExpr
-	48,  // 75: polars_bridge.Expr.len:type_name -> polars_bridge.AggExpr
-	48,  // 76: polars_bridge.Expr.n_unique:type_name -> polars_bridge.AggExpr
-	48,  // 77: polars_bridge.Expr.median:type_name -> polars_bridge.AggExpr
-	48,  // 78: polars_bridge.Expr.std:type_name -> polars_bridge.AggExpr
-	48,  // 79: polars_bridge.Expr.var:type_name -> polars_bridge.AggExpr
-	49,  // 80: polars_bridge.Expr.quantile:type_name -> polars_bridge.Quantile
-	50,  // 81: polars_bridge.Expr.when_then:type_name -> polars_bridge.WhenThen
-	38,  // 82: polars_bridge.Expr.map_batches:type_name -> polars_bridge.MapBatchesExpr
-	51,  // 83: polars_bridge.Expr.over:type_name -> polars_bridge.Over
-	52,  // 84: polars_bridge.Expr.rank:type_name -> polars_bridge.Rank
-	53,  // 85: polars_bridge.Expr.cum_sum:type_name -> polars_bridge.CumSum
-	54,  // 86: polars_bridge.Expr.cum_count:type_name -> polars_bridge.CumCount
-	55,  // 87: polars_bridge.Expr.cum_min:type_name -> polars_bridge.CumMin
-	56,  // 88: polars_bridge.Expr.cum_max:type_name -> polars_bridge.CumMax
-	57,  // 89: polars_bridge.Expr.cum_prod:type_name -> polars_bridge.CumProd
-	58,  // 90: polars_bridge.Expr.shift:type_name -> polars_bridge.Shift
-	59,  // 91: polars_bridge.Expr.diff:type_name -> polars_bridge.Diff
-	74,  // 92: polars_bridge.Expr.dt_year:type_name -> polars_bridge.TemporalUnary
-	74,  // 93: polars_bridge.Expr.dt_month:type_name -> polars_bridge.TemporalUnary
-	74,  // 94: polars_bridge.Expr.dt_day:type_name -> polars_bridge.TemporalUnary
-	74,  // 95: polars_bridge.Expr.dt_weekday:type_name -> polars_bridge.TemporalUnary
-	75,  // 96: polars_bridge.Expr.str_to_date:type_name -> polars_bridge.TemporalParse
-	75,  // 97: polars_bridge.Expr.str_to_datetime:type_name -> polars_bridge.TemporalParse
-	74,  // 98: polars_bridge.Expr.dt_hour:type_name -> polars_bridge.TemporalUnary
-	74,  // 99: polars_bridge.Expr.dt_minute:type_name -> polars_bridge.TemporalUnary
-	74,  // 100: polars_bridge.Expr.dt_second:type_name -> polars_bridge.TemporalUnary
-	74,  // 101: polars_bridge.Expr.dt_month_start:type_name -> polars_bridge.TemporalUnary
-	74,  // 102: polars_bridge.Expr.dt_month_end:type_name -> polars_bridge.TemporalUnary
-	75,  // 103: polars_bridge.Expr.str_to_time:type_name -> polars_bridge.TemporalParse
-	60,  // 104: polars_bridge.Expr.forward_fill:type_name -> polars_bridge.ForwardFill
-	61,  // 105: polars_bridge.Expr.fill_null:type_name -> polars_bridge.FillNull
-	62,  // 106: polars_bridge.Expr.backward_fill:type_name -> polars_bridge.BackwardFill
-	42,  // 107: polars_bridge.Expr.is_nan:type_name -> polars_bridge.IsNan
-	43,  // 108: polars_bridge.Expr.is_finite:type_name -> polars_bridge.IsFinite
-	63,  // 109: polars_bridge.Expr.abs:type_name -> polars_bridge.Abs
-	64,  // 110: polars_bridge.Expr.round:type_name -> polars_bridge.Round
-	65,  // 111: polars_bridge.Expr.sqrt:type_name -> polars_bridge.Sqrt
-	66,  // 112: polars_bridge.Expr.log:type_name -> polars_bridge.Log
-	67,  // 113: polars_bridge.Expr.clip:type_name -> polars_bridge.Clip
-	68,  // 114: polars_bridge.Expr.null_count:type_name -> polars_bridge.NullCount
-	69,  // 115: polars_bridge.Expr.value_counts:type_name -> polars_bridge.ValueCounts
-	70,  // 116: polars_bridge.Expr.reverse:type_name -> polars_bridge.ReverseExpr
-	71,  // 117: polars_bridge.Expr.fill_nan:type_name -> polars_bridge.FillNan
-	72,  // 118: polars_bridge.Expr.is_duplicated:type_name -> polars_bridge.IsDuplicated
-	73,  // 119: polars_bridge.Expr.rolling_min:type_name -> polars_bridge.Rolling
-	73,  // 120: polars_bridge.Expr.rolling_max:type_name -> polars_bridge.Rolling
-	73,  // 121: polars_bridge.Expr.rolling_mean:type_name -> polars_bridge.Rolling
-	73,  // 122: polars_bridge.Expr.rolling_sum:type_name -> polars_bridge.Rolling
-	76,  // 123: polars_bridge.Expr.str_len_bytes:type_name -> polars_bridge.StringFunction
-	76,  // 124: polars_bridge.Expr.str_len_chars:type_name -> polars_bridge.StringFunction
-	77,  // 125: polars_bridge.Expr.str_contains:type_name -> polars_bridge.StringContains
-	78,  // 126: polars_bridge.Expr.str_starts_with:type_name -> polars_bridge.StringStartsWith
-	79,  // 127: polars_bridge.Expr.str_ends_with:type_name -> polars_bridge.StringEndsWith
-	80,  // 128: polars_bridge.Expr.str_extract:type_name -> polars_bridge.StringExtract
-	81,  // 129: polars_bridge.Expr.str_replace:type_name -> polars_bridge.StringReplace
-	81,  // 130: polars_bridge.Expr.str_replace_all:type_name -> polars_bridge.StringReplace
-	76,  // 131: polars_bridge.Expr.str_to_lowercase:type_name -> polars_bridge.StringFunction
-	76,  // 132: polars_bridge.Expr.str_to_uppercase:type_name -> polars_bridge.StringFunction
-	76,  // 133: polars_bridge.Expr.str_to_titlecase:type_name -> polars_bridge.StringFunction
-	85,  // 134: polars_bridge.Expr.str_strip_chars:type_name -> polars_bridge.StringStripChars
-	86,  // 135: polars_bridge.Expr.str_slice:type_name -> polars_bridge.StringSlice
-	87,  // 136: polars_bridge.Expr.str_split:type_name -> polars_bridge.StringSplit
-	88,  // 137: polars_bridge.Expr.str_pad_start:type_name -> polars_bridge.StringPad
-	88,  // 138: polars_bridge.Expr.str_pad_end:type_name -> polars_bridge.StringPad
-	84,  // 139: polars_bridge.Expr.str_strip_prefix:type_name -> polars_bridge.StringAffix
-	84,  // 140: polars_bridge.Expr.str_strip_suffix:type_name -> polars_bridge.StringAffix
-	83,  // 141: polars_bridge.Expr.str_extract_all:type_name -> polars_bridge.StringPattern
-	77,  // 142: polars_bridge.Expr.str_count_matches:type_name -> polars_bridge.StringContains
-	82,  // 143: polars_bridge.Expr.str_replace_n:type_name -> polars_bridge.StringReplaceN
-	36,  // 144: polars_bridge.Literal.null_val:type_name -> polars_bridge.NullValue
-	33,  // 145: polars_bridge.BinaryExpr.left:type_name -> polars_bridge.Expr
-	3,   // 146: polars_bridge.BinaryExpr.op:type_name -> polars_bridge.BinaryOperator
-	33,  // 147: polars_bridge.BinaryExpr.right:type_name -> polars_bridge.Expr
-	33,  // 148: polars_bridge.MapBatchesExpr.exprs:type_name -> polars_bridge.Expr
-	7,   // 149: polars_bridge.MapBatchesExpr.output_type:type_name -> polars_bridge.DataType
-	33,  // 150: polars_bridge.Alias.expr:type_name -> polars_bridge.Expr
-	33,  // 151: polars_bridge.IsNull.expr:type_name -> polars_bridge.Expr
-	33,  // 152: polars_bridge.IsNotNull.expr:type_name -> polars_bridge.Expr
-	33,  // 153: polars_bridge.IsNan.expr:type_name -> polars_bridge.Expr
-	33,  // 154: polars_bridge.IsFinite.expr:type_name -> polars_bridge.Expr
-	33,  // 155: polars_bridge.Not.expr:type_name -> polars_bridge.Expr
-	33,  // 156: polars_bridge.Exclude.expr:type_name -> polars_bridge.Expr
-	33,  // 157: polars_bridge.Cast.expr:type_name -> polars_bridge.Expr
-	7,   // 158: polars_bridge.Cast.data_type:type_name -> polars_bridge.DataType
-	33,  // 159: polars_bridge.AggExpr.expr:type_name -> polars_bridge.Expr
-	33,  // 160: polars_bridge.Quantile.expr:type_name -> polars_bridge.Expr
-	4,   // 161: polars_bridge.Quantile.method:type_name -> polars_bridge.QuantileMethod
-	33,  // 162: polars_bridge.WhenThen.predicate:type_name -> polars_bridge.Expr
-	33,  // 163: polars_bridge.WhenThen.truthy:type_name -> polars_bridge.Expr
-	33,  // 164: polars_bridge.WhenThen.falsy:type_name -> polars_bridge.Expr
-	33,  // 165: polars_bridge.Over.expr:type_name -> polars_bridge.Expr
-	33,  // 166: polars_bridge.Over.partition_by:type_name -> polars_bridge.Expr
-	33,  // 167: polars_bridge.Over.order_by:type_name -> polars_bridge.Expr
-	33,  // 168: polars_bridge.Rank.expr:type_name -> polars_bridge.Expr
-	5,   // 169: polars_bridge.Rank.method:type_name -> polars_bridge.RankMethod
-	33,  // 170: polars_bridge.CumSum.expr:type_name -> polars_bridge.Expr
-	33,  // 171: polars_bridge.CumCount.expr:type_name -> polars_bridge.Expr
-	33,  // 172: polars_bridge.CumMin.expr:type_name -> polars_bridge.Expr
-	33,  // 173: polars_bridge.CumMax.expr:type_name -> polars_bridge.Expr
-	33,  // 174: polars_bridge.CumProd.expr:type_name -> polars_bridge.Expr
-	33,  // 175: polars_bridge.Shift.expr:type_name -> polars_bridge.Expr
-	33,  // 176: polars_bridge.Diff.expr:type_name -> polars_bridge.Expr
-	6,   // 177: polars_bridge.Diff.null_behavior:type_name -> polars_bridge.DiffNullBehavior
-	33,  // 178: polars_bridge.ForwardFill.expr:type_name -> polars_bridge.Expr
-	33,  // 179: polars_bridge.FillNull.expr:type_name -> polars_bridge.Expr
-	33,  // 180: polars_bridge.FillNull.fill_value:type_name -> polars_bridge.Expr
-	33,  // 181: polars_bridge.BackwardFill.expr:type_name -> polars_bridge.Expr
-	33,  // 182: polars_bridge.Abs.expr:type_name -> polars_bridge.Expr
-	33,  // 183: polars_bridge.Round.expr:type_name -> polars_bridge.Expr
-	33,  // 184: polars_bridge.Sqrt.expr:type_name -> polars_bridge.Expr
-	33,  // 185: polars_bridge.Log.expr:type_name -> polars_bridge.Expr
-	33,  // 186: polars_bridge.Log.base:type_name -> polars_bridge.Expr
-	33,  // 187: polars_bridge.Clip.expr:type_name -> polars_bridge.Expr
-	33,  // 188: polars_bridge.Clip.min:type_name -> polars_bridge.Expr
-	33,  // 189: polars_bridge.Clip.max:type_name -> polars_bridge.Expr
-	33,  // 190: polars_bridge.NullCount.expr:type_name -> polars_bridge.Expr
-	33,  // 191: polars_bridge.ValueCounts.expr:type_name -> polars_bridge.Expr
-	33,  // 192: polars_bridge.ReverseExpr.expr:type_name -> polars_bridge.Expr
-	33,  // 193: polars_bridge.FillNan.expr:type_name -> polars_bridge.Expr
-	33,  // 194: polars_bridge.FillNan.fill_value:type_name -> polars_bridge.Expr
-	33,  // 195: polars_bridge.IsDuplicated.expr:type_name -> polars_bridge.Expr
-	33,  // 196: polars_bridge.Rolling.expr:type_name -> polars_bridge.Expr
-	33,  // 197: polars_bridge.TemporalUnary.expr:type_name -> polars_bridge.Expr
-	33,  // 198: polars_bridge.TemporalParse.expr:type_name -> polars_bridge.Expr
-	33,  // 199: polars_bridge.StringFunction.expr:type_name -> polars_bridge.Expr
-	33,  // 200: polars_bridge.StringContains.expr:type_name -> polars_bridge.Expr
-	33,  // 201: polars_bridge.StringStartsWith.expr:type_name -> polars_bridge.Expr
-	33,  // 202: polars_bridge.StringEndsWith.expr:type_name -> polars_bridge.Expr
-	33,  // 203: polars_bridge.StringExtract.expr:type_name -> polars_bridge.Expr
-	33,  // 204: polars_bridge.StringReplace.expr:type_name -> polars_bridge.Expr
-	33,  // 205: polars_bridge.StringReplaceN.expr:type_name -> polars_bridge.Expr
-	33,  // 206: polars_bridge.StringPattern.expr:type_name -> polars_bridge.Expr
-	33,  // 207: polars_bridge.StringAffix.expr:type_name -> polars_bridge.Expr
-	33,  // 208: polars_bridge.StringStripChars.expr:type_name -> polars_bridge.Expr
-	33,  // 209: polars_bridge.StringSlice.expr:type_name -> polars_bridge.Expr
-	33,  // 210: polars_bridge.StringSplit.expr:type_name -> polars_bridge.Expr
-	33,  // 211: polars_bridge.StringPad.expr:type_name -> polars_bridge.Expr
-	7,   // 212: polars_bridge.CsvScan.SchemaEntry.value:type_name -> polars_bridge.DataType
-	213, // [213:213] is the sub-list for method output_type
-	213, // [213:213] is the sub-list for method input_type
-	213, // [213:213] is the sub-list for extension type_name
-	213, // [213:213] is the sub-list for extension extendee
-	0,   // [0:213] is the sub-list for field type_name
+	11,  // 0: polars_bridge.Plan.root:type_name -> polars_bridge.Node
+	12,  // 1: polars_bridge.Node.memory_scan:type_name -> polars_bridge.MemoryScan
+	13,  // 2: polars_bridge.Node.csv_scan:type_name -> polars_bridge.CsvScan
+	14,  // 3: polars_bridge.Node.parquet_scan:type_name -> polars_bridge.ParquetScan
+	15,  // 4: polars_bridge.Node.project:type_name -> polars_bridge.Project
+	16,  // 5: polars_bridge.Node.filter:type_name -> polars_bridge.Filter
+	17,  // 6: polars_bridge.Node.with_columns:type_name -> polars_bridge.WithColumns
+	18,  // 7: polars_bridge.Node.limit:type_name -> polars_bridge.Limit
+	19,  // 8: polars_bridge.Node.group_by:type_name -> polars_bridge.GroupBy
+	20,  // 9: polars_bridge.Node.join:type_name -> polars_bridge.Join
+	21,  // 10: polars_bridge.Node.sort:type_name -> polars_bridge.Sort
+	22,  // 11: polars_bridge.Node.unique:type_name -> polars_bridge.Unique
+	23,  // 12: polars_bridge.Node.concat:type_name -> polars_bridge.Concat
+	24,  // 13: polars_bridge.Node.sql_query:type_name -> polars_bridge.SqlQuery
+	25,  // 14: polars_bridge.Node.drop:type_name -> polars_bridge.Drop
+	26,  // 15: polars_bridge.Node.rename:type_name -> polars_bridge.Rename
+	27,  // 16: polars_bridge.Node.slice:type_name -> polars_bridge.Slice
+	28,  // 17: polars_bridge.Node.explode:type_name -> polars_bridge.Explode
+	29,  // 18: polars_bridge.Node.drop_nulls:type_name -> polars_bridge.DropNulls
+	30,  // 19: polars_bridge.Node.unpivot:type_name -> polars_bridge.Unpivot
+	31,  // 20: polars_bridge.Node.reverse:type_name -> polars_bridge.Reverse
+	32,  // 21: polars_bridge.Node.drop_nans:type_name -> polars_bridge.DropNans
+	33,  // 22: polars_bridge.Node.fill_nan:type_name -> polars_bridge.FillNanFrame
+	34,  // 23: polars_bridge.Node.sample:type_name -> polars_bridge.Sample
+	35,  // 24: polars_bridge.Node.unnest:type_name -> polars_bridge.Unnest
+	37,  // 25: polars_bridge.Node.pivot:type_name -> polars_bridge.Pivot
+	116, // 26: polars_bridge.CsvScan.schema:type_name -> polars_bridge.CsvScan.SchemaEntry
+	0,   // 27: polars_bridge.CsvScan.encoding:type_name -> polars_bridge.CsvEncoding
+	11,  // 28: polars_bridge.Project.input:type_name -> polars_bridge.Node
+	38,  // 29: polars_bridge.Project.expressions:type_name -> polars_bridge.Expr
+	11,  // 30: polars_bridge.Filter.input:type_name -> polars_bridge.Node
+	38,  // 31: polars_bridge.Filter.predicate:type_name -> polars_bridge.Expr
+	11,  // 32: polars_bridge.WithColumns.input:type_name -> polars_bridge.Node
+	38,  // 33: polars_bridge.WithColumns.expressions:type_name -> polars_bridge.Expr
+	11,  // 34: polars_bridge.Limit.input:type_name -> polars_bridge.Node
+	11,  // 35: polars_bridge.GroupBy.input:type_name -> polars_bridge.Node
+	38,  // 36: polars_bridge.GroupBy.keys:type_name -> polars_bridge.Expr
+	38,  // 37: polars_bridge.GroupBy.aggs:type_name -> polars_bridge.Expr
+	11,  // 38: polars_bridge.Join.left:type_name -> polars_bridge.Node
+	11,  // 39: polars_bridge.Join.right:type_name -> polars_bridge.Node
+	38,  // 40: polars_bridge.Join.left_on:type_name -> polars_bridge.Expr
+	38,  // 41: polars_bridge.Join.right_on:type_name -> polars_bridge.Expr
+	1,   // 42: polars_bridge.Join.how:type_name -> polars_bridge.JoinType
+	11,  // 43: polars_bridge.Sort.input:type_name -> polars_bridge.Node
+	38,  // 44: polars_bridge.Sort.by:type_name -> polars_bridge.Expr
+	11,  // 45: polars_bridge.Unique.input:type_name -> polars_bridge.Node
+	2,   // 46: polars_bridge.Unique.keep:type_name -> polars_bridge.UniqueKeepStrategy
+	11,  // 47: polars_bridge.Concat.inputs:type_name -> polars_bridge.Node
+	11,  // 48: polars_bridge.SqlQuery.inputs:type_name -> polars_bridge.Node
+	11,  // 49: polars_bridge.Drop.input:type_name -> polars_bridge.Node
+	11,  // 50: polars_bridge.Rename.input:type_name -> polars_bridge.Node
+	11,  // 51: polars_bridge.Slice.input:type_name -> polars_bridge.Node
+	11,  // 52: polars_bridge.Explode.input:type_name -> polars_bridge.Node
+	11,  // 53: polars_bridge.DropNulls.input:type_name -> polars_bridge.Node
+	11,  // 54: polars_bridge.Unpivot.input:type_name -> polars_bridge.Node
+	11,  // 55: polars_bridge.Reverse.input:type_name -> polars_bridge.Node
+	11,  // 56: polars_bridge.DropNans.input:type_name -> polars_bridge.Node
+	11,  // 57: polars_bridge.FillNanFrame.input:type_name -> polars_bridge.Node
+	38,  // 58: polars_bridge.FillNanFrame.fill_value:type_name -> polars_bridge.Expr
+	11,  // 59: polars_bridge.Sample.input:type_name -> polars_bridge.Node
+	11,  // 60: polars_bridge.Unnest.input:type_name -> polars_bridge.Node
+	40,  // 61: polars_bridge.PivotOnColumnRow.values:type_name -> polars_bridge.Literal
+	11,  // 62: polars_bridge.Pivot.input:type_name -> polars_bridge.Node
+	36,  // 63: polars_bridge.Pivot.on_columns:type_name -> polars_bridge.PivotOnColumnRow
+	39,  // 64: polars_bridge.Expr.col:type_name -> polars_bridge.Column
+	40,  // 65: polars_bridge.Expr.lit:type_name -> polars_bridge.Literal
+	42,  // 66: polars_bridge.Expr.binary:type_name -> polars_bridge.BinaryExpr
+	44,  // 67: polars_bridge.Expr.alias:type_name -> polars_bridge.Alias
+	45,  // 68: polars_bridge.Expr.is_null:type_name -> polars_bridge.IsNull
+	46,  // 69: polars_bridge.Expr.is_not_null:type_name -> polars_bridge.IsNotNull
+	49,  // 70: polars_bridge.Expr.not:type_name -> polars_bridge.Not
+	50,  // 71: polars_bridge.Expr.wildcard:type_name -> polars_bridge.Wildcard
+	51,  // 72: polars_bridge.Expr.exclude:type_name -> polars_bridge.Exclude
+	52,  // 73: polars_bridge.Expr.cast:type_name -> polars_bridge.Cast
+	53,  // 74: polars_bridge.Expr.sum:type_name -> polars_bridge.AggExpr
+	53,  // 75: polars_bridge.Expr.mean:type_name -> polars_bridge.AggExpr
+	53,  // 76: polars_bridge.Expr.min:type_name -> polars_bridge.AggExpr
+	53,  // 77: polars_bridge.Expr.max:type_name -> polars_bridge.AggExpr
+	53,  // 78: polars_bridge.Expr.count:type_name -> polars_bridge.AggExpr
+	53,  // 79: polars_bridge.Expr.first:type_name -> polars_bridge.AggExpr
+	53,  // 80: polars_bridge.Expr.last:type_name -> polars_bridge.AggExpr
+	53,  // 81: polars_bridge.Expr.len:type_name -> polars_bridge.AggExpr
+	53,  // 82: polars_bridge.Expr.n_unique:type_name -> polars_bridge.AggExpr
+	53,  // 83: polars_bridge.Expr.median:type_name -> polars_bridge.AggExpr
+	53,  // 84: polars_bridge.Expr.std:type_name -> polars_bridge.AggExpr
+	53,  // 85: polars_bridge.Expr.var:type_name -> polars_bridge.AggExpr
+	54,  // 86: polars_bridge.Expr.quantile:type_name -> polars_bridge.Quantile
+	55,  // 87: polars_bridge.Expr.when_then:type_name -> polars_bridge.WhenThen
+	43,  // 88: polars_bridge.Expr.map_batches:type_name -> polars_bridge.MapBatchesExpr
+	56,  // 89: polars_bridge.Expr.over:type_name -> polars_bridge.Over
+	57,  // 90: polars_bridge.Expr.rank:type_name -> polars_bridge.Rank
+	58,  // 91: polars_bridge.Expr.cum_sum:type_name -> polars_bridge.CumSum
+	59,  // 92: polars_bridge.Expr.cum_count:type_name -> polars_bridge.CumCount
+	60,  // 93: polars_bridge.Expr.cum_min:type_name -> polars_bridge.CumMin
+	61,  // 94: polars_bridge.Expr.cum_max:type_name -> polars_bridge.CumMax
+	62,  // 95: polars_bridge.Expr.cum_prod:type_name -> polars_bridge.CumProd
+	63,  // 96: polars_bridge.Expr.shift:type_name -> polars_bridge.Shift
+	64,  // 97: polars_bridge.Expr.diff:type_name -> polars_bridge.Diff
+	101, // 98: polars_bridge.Expr.dt_year:type_name -> polars_bridge.TemporalUnary
+	101, // 99: polars_bridge.Expr.dt_month:type_name -> polars_bridge.TemporalUnary
+	101, // 100: polars_bridge.Expr.dt_day:type_name -> polars_bridge.TemporalUnary
+	101, // 101: polars_bridge.Expr.dt_weekday:type_name -> polars_bridge.TemporalUnary
+	102, // 102: polars_bridge.Expr.str_to_date:type_name -> polars_bridge.TemporalParse
+	102, // 103: polars_bridge.Expr.str_to_datetime:type_name -> polars_bridge.TemporalParse
+	101, // 104: polars_bridge.Expr.dt_hour:type_name -> polars_bridge.TemporalUnary
+	101, // 105: polars_bridge.Expr.dt_minute:type_name -> polars_bridge.TemporalUnary
+	101, // 106: polars_bridge.Expr.dt_second:type_name -> polars_bridge.TemporalUnary
+	101, // 107: polars_bridge.Expr.dt_month_start:type_name -> polars_bridge.TemporalUnary
+	101, // 108: polars_bridge.Expr.dt_month_end:type_name -> polars_bridge.TemporalUnary
+	102, // 109: polars_bridge.Expr.str_to_time:type_name -> polars_bridge.TemporalParse
+	65,  // 110: polars_bridge.Expr.forward_fill:type_name -> polars_bridge.ForwardFill
+	66,  // 111: polars_bridge.Expr.fill_null:type_name -> polars_bridge.FillNull
+	67,  // 112: polars_bridge.Expr.backward_fill:type_name -> polars_bridge.BackwardFill
+	47,  // 113: polars_bridge.Expr.is_nan:type_name -> polars_bridge.IsNan
+	48,  // 114: polars_bridge.Expr.is_finite:type_name -> polars_bridge.IsFinite
+	68,  // 115: polars_bridge.Expr.abs:type_name -> polars_bridge.Abs
+	69,  // 116: polars_bridge.Expr.round:type_name -> polars_bridge.Round
+	70,  // 117: polars_bridge.Expr.sqrt:type_name -> polars_bridge.Sqrt
+	71,  // 118: polars_bridge.Expr.log:type_name -> polars_bridge.Log
+	72,  // 119: polars_bridge.Expr.clip:type_name -> polars_bridge.Clip
+	73,  // 120: polars_bridge.Expr.null_count:type_name -> polars_bridge.NullCount
+	74,  // 121: polars_bridge.Expr.value_counts:type_name -> polars_bridge.ValueCounts
+	75,  // 122: polars_bridge.Expr.reverse:type_name -> polars_bridge.ReverseExpr
+	76,  // 123: polars_bridge.Expr.fill_nan:type_name -> polars_bridge.FillNan
+	77,  // 124: polars_bridge.Expr.is_duplicated:type_name -> polars_bridge.IsDuplicated
+	81,  // 125: polars_bridge.Expr.rolling_min:type_name -> polars_bridge.Rolling
+	81,  // 126: polars_bridge.Expr.rolling_max:type_name -> polars_bridge.Rolling
+	81,  // 127: polars_bridge.Expr.rolling_mean:type_name -> polars_bridge.Rolling
+	81,  // 128: polars_bridge.Expr.rolling_sum:type_name -> polars_bridge.Rolling
+	78,  // 129: polars_bridge.Expr.filter_expr:type_name -> polars_bridge.FilterExpr
+	79,  // 130: polars_bridge.Expr.sort_by:type_name -> polars_bridge.SortByExpr
+	80,  // 131: polars_bridge.Expr.as_struct:type_name -> polars_bridge.AsStruct
+	82,  // 132: polars_bridge.Expr.element:type_name -> polars_bridge.Element
+	83,  // 133: polars_bridge.Expr.concat_list:type_name -> polars_bridge.ConcatList
+	84,  // 134: polars_bridge.Expr.list_eval:type_name -> polars_bridge.ListEval
+	85,  // 135: polars_bridge.Expr.list_len:type_name -> polars_bridge.ListFunction
+	85,  // 136: polars_bridge.Expr.list_sum:type_name -> polars_bridge.ListFunction
+	85,  // 137: polars_bridge.Expr.list_max:type_name -> polars_bridge.ListFunction
+	85,  // 138: polars_bridge.Expr.list_min:type_name -> polars_bridge.ListFunction
+	86,  // 139: polars_bridge.Expr.list_contains:type_name -> polars_bridge.ListContains
+	87,  // 140: polars_bridge.Expr.list_sort:type_name -> polars_bridge.ListSort
+	88,  // 141: polars_bridge.Expr.list_get:type_name -> polars_bridge.ListGet
+	89,  // 142: polars_bridge.Expr.list_agg:type_name -> polars_bridge.ListAgg
+	85,  // 143: polars_bridge.Expr.list_mean:type_name -> polars_bridge.ListFunction
+	85,  // 144: polars_bridge.Expr.list_median:type_name -> polars_bridge.ListFunction
+	90,  // 145: polars_bridge.Expr.list_std:type_name -> polars_bridge.ListMoment
+	90,  // 146: polars_bridge.Expr.list_var:type_name -> polars_bridge.ListMoment
+	85,  // 147: polars_bridge.Expr.list_reverse:type_name -> polars_bridge.ListFunction
+	91,  // 148: polars_bridge.Expr.list_unique:type_name -> polars_bridge.ListUnique
+	85,  // 149: polars_bridge.Expr.list_n_unique:type_name -> polars_bridge.ListFunction
+	92,  // 150: polars_bridge.Expr.list_slice:type_name -> polars_bridge.ListSlice
+	85,  // 151: polars_bridge.Expr.list_arg_min:type_name -> polars_bridge.ListFunction
+	85,  // 152: polars_bridge.Expr.list_arg_max:type_name -> polars_bridge.ListFunction
+	93,  // 153: polars_bridge.Expr.list_join:type_name -> polars_bridge.ListJoin
+	85,  // 154: polars_bridge.Expr.list_any:type_name -> polars_bridge.ListFunction
+	85,  // 155: polars_bridge.Expr.list_all:type_name -> polars_bridge.ListFunction
+	85,  // 156: polars_bridge.Expr.list_drop_nulls:type_name -> polars_bridge.ListFunction
+	94,  // 157: polars_bridge.Expr.list_shift:type_name -> polars_bridge.ListShift
+	95,  // 158: polars_bridge.Expr.list_diff:type_name -> polars_bridge.ListDiff
+	96,  // 159: polars_bridge.Expr.list_count_matches:type_name -> polars_bridge.ListCountMatches
+	97,  // 160: polars_bridge.Expr.list_gather:type_name -> polars_bridge.ListGather
+	98,  // 161: polars_bridge.Expr.list_gather_every:type_name -> polars_bridge.ListGatherEvery
+	99,  // 162: polars_bridge.Expr.list_sample_n:type_name -> polars_bridge.ListSample
+	99,  // 163: polars_bridge.Expr.list_sample_fraction:type_name -> polars_bridge.ListSample
+	100, // 164: polars_bridge.Expr.list_union:type_name -> polars_bridge.ListSetOperation
+	100, // 165: polars_bridge.Expr.list_set_difference:type_name -> polars_bridge.ListSetOperation
+	100, // 166: polars_bridge.Expr.list_set_intersection:type_name -> polars_bridge.ListSetOperation
+	100, // 167: polars_bridge.Expr.list_set_symmetric_difference:type_name -> polars_bridge.ListSetOperation
+	91,  // 168: polars_bridge.Expr.list_unique_stable:type_name -> polars_bridge.ListUnique
+	103, // 169: polars_bridge.Expr.str_len_bytes:type_name -> polars_bridge.StringFunction
+	103, // 170: polars_bridge.Expr.str_len_chars:type_name -> polars_bridge.StringFunction
+	104, // 171: polars_bridge.Expr.str_contains:type_name -> polars_bridge.StringContains
+	105, // 172: polars_bridge.Expr.str_starts_with:type_name -> polars_bridge.StringStartsWith
+	106, // 173: polars_bridge.Expr.str_ends_with:type_name -> polars_bridge.StringEndsWith
+	107, // 174: polars_bridge.Expr.str_extract:type_name -> polars_bridge.StringExtract
+	108, // 175: polars_bridge.Expr.str_replace:type_name -> polars_bridge.StringReplace
+	108, // 176: polars_bridge.Expr.str_replace_all:type_name -> polars_bridge.StringReplace
+	103, // 177: polars_bridge.Expr.str_to_lowercase:type_name -> polars_bridge.StringFunction
+	103, // 178: polars_bridge.Expr.str_to_uppercase:type_name -> polars_bridge.StringFunction
+	103, // 179: polars_bridge.Expr.str_to_titlecase:type_name -> polars_bridge.StringFunction
+	112, // 180: polars_bridge.Expr.str_strip_chars:type_name -> polars_bridge.StringStripChars
+	113, // 181: polars_bridge.Expr.str_slice:type_name -> polars_bridge.StringSlice
+	114, // 182: polars_bridge.Expr.str_split:type_name -> polars_bridge.StringSplit
+	115, // 183: polars_bridge.Expr.str_pad_start:type_name -> polars_bridge.StringPad
+	115, // 184: polars_bridge.Expr.str_pad_end:type_name -> polars_bridge.StringPad
+	111, // 185: polars_bridge.Expr.str_strip_prefix:type_name -> polars_bridge.StringAffix
+	111, // 186: polars_bridge.Expr.str_strip_suffix:type_name -> polars_bridge.StringAffix
+	110, // 187: polars_bridge.Expr.str_extract_all:type_name -> polars_bridge.StringPattern
+	104, // 188: polars_bridge.Expr.str_count_matches:type_name -> polars_bridge.StringContains
+	109, // 189: polars_bridge.Expr.str_replace_n:type_name -> polars_bridge.StringReplaceN
+	41,  // 190: polars_bridge.Literal.null_val:type_name -> polars_bridge.NullValue
+	38,  // 191: polars_bridge.BinaryExpr.left:type_name -> polars_bridge.Expr
+	3,   // 192: polars_bridge.BinaryExpr.op:type_name -> polars_bridge.BinaryOperator
+	38,  // 193: polars_bridge.BinaryExpr.right:type_name -> polars_bridge.Expr
+	38,  // 194: polars_bridge.MapBatchesExpr.exprs:type_name -> polars_bridge.Expr
+	9,   // 195: polars_bridge.MapBatchesExpr.output_type:type_name -> polars_bridge.DataType
+	38,  // 196: polars_bridge.Alias.expr:type_name -> polars_bridge.Expr
+	38,  // 197: polars_bridge.IsNull.expr:type_name -> polars_bridge.Expr
+	38,  // 198: polars_bridge.IsNotNull.expr:type_name -> polars_bridge.Expr
+	38,  // 199: polars_bridge.IsNan.expr:type_name -> polars_bridge.Expr
+	38,  // 200: polars_bridge.IsFinite.expr:type_name -> polars_bridge.Expr
+	38,  // 201: polars_bridge.Not.expr:type_name -> polars_bridge.Expr
+	38,  // 202: polars_bridge.Exclude.expr:type_name -> polars_bridge.Expr
+	38,  // 203: polars_bridge.Cast.expr:type_name -> polars_bridge.Expr
+	9,   // 204: polars_bridge.Cast.data_type:type_name -> polars_bridge.DataType
+	38,  // 205: polars_bridge.AggExpr.expr:type_name -> polars_bridge.Expr
+	38,  // 206: polars_bridge.Quantile.expr:type_name -> polars_bridge.Expr
+	4,   // 207: polars_bridge.Quantile.method:type_name -> polars_bridge.QuantileMethod
+	38,  // 208: polars_bridge.WhenThen.predicate:type_name -> polars_bridge.Expr
+	38,  // 209: polars_bridge.WhenThen.truthy:type_name -> polars_bridge.Expr
+	38,  // 210: polars_bridge.WhenThen.falsy:type_name -> polars_bridge.Expr
+	38,  // 211: polars_bridge.Over.expr:type_name -> polars_bridge.Expr
+	38,  // 212: polars_bridge.Over.partition_by:type_name -> polars_bridge.Expr
+	38,  // 213: polars_bridge.Over.order_by:type_name -> polars_bridge.Expr
+	5,   // 214: polars_bridge.Over.mapping_strategy:type_name -> polars_bridge.WindowMapping
+	38,  // 215: polars_bridge.Rank.expr:type_name -> polars_bridge.Expr
+	6,   // 216: polars_bridge.Rank.method:type_name -> polars_bridge.RankMethod
+	38,  // 217: polars_bridge.CumSum.expr:type_name -> polars_bridge.Expr
+	38,  // 218: polars_bridge.CumCount.expr:type_name -> polars_bridge.Expr
+	38,  // 219: polars_bridge.CumMin.expr:type_name -> polars_bridge.Expr
+	38,  // 220: polars_bridge.CumMax.expr:type_name -> polars_bridge.Expr
+	38,  // 221: polars_bridge.CumProd.expr:type_name -> polars_bridge.Expr
+	38,  // 222: polars_bridge.Shift.expr:type_name -> polars_bridge.Expr
+	38,  // 223: polars_bridge.Diff.expr:type_name -> polars_bridge.Expr
+	7,   // 224: polars_bridge.Diff.null_behavior:type_name -> polars_bridge.DiffNullBehavior
+	38,  // 225: polars_bridge.ForwardFill.expr:type_name -> polars_bridge.Expr
+	38,  // 226: polars_bridge.FillNull.expr:type_name -> polars_bridge.Expr
+	38,  // 227: polars_bridge.FillNull.fill_value:type_name -> polars_bridge.Expr
+	38,  // 228: polars_bridge.BackwardFill.expr:type_name -> polars_bridge.Expr
+	38,  // 229: polars_bridge.Abs.expr:type_name -> polars_bridge.Expr
+	38,  // 230: polars_bridge.Round.expr:type_name -> polars_bridge.Expr
+	38,  // 231: polars_bridge.Sqrt.expr:type_name -> polars_bridge.Expr
+	38,  // 232: polars_bridge.Log.expr:type_name -> polars_bridge.Expr
+	38,  // 233: polars_bridge.Log.base:type_name -> polars_bridge.Expr
+	38,  // 234: polars_bridge.Clip.expr:type_name -> polars_bridge.Expr
+	38,  // 235: polars_bridge.Clip.min:type_name -> polars_bridge.Expr
+	38,  // 236: polars_bridge.Clip.max:type_name -> polars_bridge.Expr
+	38,  // 237: polars_bridge.NullCount.expr:type_name -> polars_bridge.Expr
+	38,  // 238: polars_bridge.ValueCounts.expr:type_name -> polars_bridge.Expr
+	38,  // 239: polars_bridge.ReverseExpr.expr:type_name -> polars_bridge.Expr
+	38,  // 240: polars_bridge.FillNan.expr:type_name -> polars_bridge.Expr
+	38,  // 241: polars_bridge.FillNan.fill_value:type_name -> polars_bridge.Expr
+	38,  // 242: polars_bridge.IsDuplicated.expr:type_name -> polars_bridge.Expr
+	38,  // 243: polars_bridge.FilterExpr.expr:type_name -> polars_bridge.Expr
+	38,  // 244: polars_bridge.FilterExpr.predicate:type_name -> polars_bridge.Expr
+	38,  // 245: polars_bridge.SortByExpr.expr:type_name -> polars_bridge.Expr
+	38,  // 246: polars_bridge.SortByExpr.by:type_name -> polars_bridge.Expr
+	38,  // 247: polars_bridge.AsStruct.exprs:type_name -> polars_bridge.Expr
+	38,  // 248: polars_bridge.Rolling.expr:type_name -> polars_bridge.Expr
+	38,  // 249: polars_bridge.ConcatList.exprs:type_name -> polars_bridge.Expr
+	38,  // 250: polars_bridge.ListEval.expr:type_name -> polars_bridge.Expr
+	38,  // 251: polars_bridge.ListEval.evaluation:type_name -> polars_bridge.Expr
+	38,  // 252: polars_bridge.ListFunction.expr:type_name -> polars_bridge.Expr
+	38,  // 253: polars_bridge.ListContains.expr:type_name -> polars_bridge.Expr
+	38,  // 254: polars_bridge.ListContains.item:type_name -> polars_bridge.Expr
+	38,  // 255: polars_bridge.ListSort.expr:type_name -> polars_bridge.Expr
+	38,  // 256: polars_bridge.ListGet.expr:type_name -> polars_bridge.Expr
+	38,  // 257: polars_bridge.ListGet.index:type_name -> polars_bridge.Expr
+	38,  // 258: polars_bridge.ListAgg.expr:type_name -> polars_bridge.Expr
+	38,  // 259: polars_bridge.ListAgg.evaluation:type_name -> polars_bridge.Expr
+	38,  // 260: polars_bridge.ListMoment.expr:type_name -> polars_bridge.Expr
+	38,  // 261: polars_bridge.ListUnique.expr:type_name -> polars_bridge.Expr
+	38,  // 262: polars_bridge.ListSlice.expr:type_name -> polars_bridge.Expr
+	38,  // 263: polars_bridge.ListSlice.offset:type_name -> polars_bridge.Expr
+	38,  // 264: polars_bridge.ListSlice.length:type_name -> polars_bridge.Expr
+	38,  // 265: polars_bridge.ListJoin.expr:type_name -> polars_bridge.Expr
+	38,  // 266: polars_bridge.ListJoin.separator:type_name -> polars_bridge.Expr
+	38,  // 267: polars_bridge.ListShift.expr:type_name -> polars_bridge.Expr
+	38,  // 268: polars_bridge.ListShift.periods:type_name -> polars_bridge.Expr
+	38,  // 269: polars_bridge.ListDiff.expr:type_name -> polars_bridge.Expr
+	7,   // 270: polars_bridge.ListDiff.null_behavior:type_name -> polars_bridge.DiffNullBehavior
+	38,  // 271: polars_bridge.ListCountMatches.expr:type_name -> polars_bridge.Expr
+	38,  // 272: polars_bridge.ListCountMatches.element:type_name -> polars_bridge.Expr
+	38,  // 273: polars_bridge.ListGather.expr:type_name -> polars_bridge.Expr
+	38,  // 274: polars_bridge.ListGather.index:type_name -> polars_bridge.Expr
+	38,  // 275: polars_bridge.ListGatherEvery.expr:type_name -> polars_bridge.Expr
+	38,  // 276: polars_bridge.ListGatherEvery.n:type_name -> polars_bridge.Expr
+	38,  // 277: polars_bridge.ListGatherEvery.offset:type_name -> polars_bridge.Expr
+	38,  // 278: polars_bridge.ListSample.expr:type_name -> polars_bridge.Expr
+	38,  // 279: polars_bridge.ListSample.value:type_name -> polars_bridge.Expr
+	38,  // 280: polars_bridge.ListSetOperation.expr:type_name -> polars_bridge.Expr
+	38,  // 281: polars_bridge.ListSetOperation.other:type_name -> polars_bridge.Expr
+	8,   // 282: polars_bridge.ListSetOperation.op:type_name -> polars_bridge.SetOperation
+	38,  // 283: polars_bridge.TemporalUnary.expr:type_name -> polars_bridge.Expr
+	38,  // 284: polars_bridge.TemporalParse.expr:type_name -> polars_bridge.Expr
+	38,  // 285: polars_bridge.StringFunction.expr:type_name -> polars_bridge.Expr
+	38,  // 286: polars_bridge.StringContains.expr:type_name -> polars_bridge.Expr
+	38,  // 287: polars_bridge.StringStartsWith.expr:type_name -> polars_bridge.Expr
+	38,  // 288: polars_bridge.StringEndsWith.expr:type_name -> polars_bridge.Expr
+	38,  // 289: polars_bridge.StringExtract.expr:type_name -> polars_bridge.Expr
+	38,  // 290: polars_bridge.StringReplace.expr:type_name -> polars_bridge.Expr
+	38,  // 291: polars_bridge.StringReplaceN.expr:type_name -> polars_bridge.Expr
+	38,  // 292: polars_bridge.StringPattern.expr:type_name -> polars_bridge.Expr
+	38,  // 293: polars_bridge.StringAffix.expr:type_name -> polars_bridge.Expr
+	38,  // 294: polars_bridge.StringStripChars.expr:type_name -> polars_bridge.Expr
+	38,  // 295: polars_bridge.StringSlice.expr:type_name -> polars_bridge.Expr
+	38,  // 296: polars_bridge.StringSplit.expr:type_name -> polars_bridge.Expr
+	38,  // 297: polars_bridge.StringPad.expr:type_name -> polars_bridge.Expr
+	9,   // 298: polars_bridge.CsvScan.SchemaEntry.value:type_name -> polars_bridge.DataType
+	299, // [299:299] is the sub-list for method output_type
+	299, // [299:299] is the sub-list for method input_type
+	299, // [299:299] is the sub-list for extension type_name
+	299, // [299:299] is the sub-list for extension extendee
+	0,   // [0:299] is the sub-list for field type_name
 }
 
 func init() { file_proto_polars_bridge_proto_init() }
@@ -7800,11 +10287,13 @@ func file_proto_polars_bridge_proto_init() {
 		(*Node_DropNans)(nil),
 		(*Node_FillNan)(nil),
 		(*Node_Sample)(nil),
+		(*Node_Unnest)(nil),
+		(*Node_Pivot)(nil),
 	}
 	file_proto_polars_bridge_proto_msgTypes[3].OneofWrappers = []any{}
 	file_proto_polars_bridge_proto_msgTypes[4].OneofWrappers = []any{}
 	file_proto_polars_bridge_proto_msgTypes[24].OneofWrappers = []any{}
-	file_proto_polars_bridge_proto_msgTypes[25].OneofWrappers = []any{
+	file_proto_polars_bridge_proto_msgTypes[28].OneofWrappers = []any{
 		(*Expr_Col)(nil),
 		(*Expr_Lit)(nil),
 		(*Expr_Binary)(nil),
@@ -7870,6 +10359,46 @@ func file_proto_polars_bridge_proto_init() {
 		(*Expr_RollingMax)(nil),
 		(*Expr_RollingMean)(nil),
 		(*Expr_RollingSum)(nil),
+		(*Expr_FilterExpr)(nil),
+		(*Expr_SortBy)(nil),
+		(*Expr_AsStruct)(nil),
+		(*Expr_Element)(nil),
+		(*Expr_ConcatList)(nil),
+		(*Expr_ListEval)(nil),
+		(*Expr_ListLen)(nil),
+		(*Expr_ListSum)(nil),
+		(*Expr_ListMax)(nil),
+		(*Expr_ListMin)(nil),
+		(*Expr_ListContains)(nil),
+		(*Expr_ListSort)(nil),
+		(*Expr_ListGet)(nil),
+		(*Expr_ListAgg)(nil),
+		(*Expr_ListMean)(nil),
+		(*Expr_ListMedian)(nil),
+		(*Expr_ListStd)(nil),
+		(*Expr_ListVar)(nil),
+		(*Expr_ListReverse)(nil),
+		(*Expr_ListUnique)(nil),
+		(*Expr_ListNUnique)(nil),
+		(*Expr_ListSlice)(nil),
+		(*Expr_ListArgMin)(nil),
+		(*Expr_ListArgMax)(nil),
+		(*Expr_ListJoin)(nil),
+		(*Expr_ListAny)(nil),
+		(*Expr_ListAll)(nil),
+		(*Expr_ListDropNulls)(nil),
+		(*Expr_ListShift)(nil),
+		(*Expr_ListDiff)(nil),
+		(*Expr_ListCountMatches)(nil),
+		(*Expr_ListGather)(nil),
+		(*Expr_ListGatherEvery)(nil),
+		(*Expr_ListSampleN)(nil),
+		(*Expr_ListSampleFraction)(nil),
+		(*Expr_ListUnion)(nil),
+		(*Expr_ListSetDifference)(nil),
+		(*Expr_ListSetIntersection)(nil),
+		(*Expr_ListSetSymmetricDifference)(nil),
+		(*Expr_ListUniqueStable)(nil),
 		(*Expr_StrLenBytes)(nil),
 		(*Expr_StrLenChars)(nil),
 		(*Expr_StrContains)(nil),
@@ -7892,24 +10421,24 @@ func file_proto_polars_bridge_proto_init() {
 		(*Expr_StrCountMatches)(nil),
 		(*Expr_StrReplaceN)(nil),
 	}
-	file_proto_polars_bridge_proto_msgTypes[27].OneofWrappers = []any{
+	file_proto_polars_bridge_proto_msgTypes[30].OneofWrappers = []any{
 		(*Literal_IntVal)(nil),
 		(*Literal_FloatVal)(nil),
 		(*Literal_BoolVal)(nil),
 		(*Literal_StringVal)(nil),
 		(*Literal_NullVal)(nil),
 	}
-	file_proto_polars_bridge_proto_msgTypes[44].OneofWrappers = []any{}
-	file_proto_polars_bridge_proto_msgTypes[52].OneofWrappers = []any{}
-	file_proto_polars_bridge_proto_msgTypes[54].OneofWrappers = []any{}
-	file_proto_polars_bridge_proto_msgTypes[78].OneofWrappers = []any{}
+	file_proto_polars_bridge_proto_msgTypes[47].OneofWrappers = []any{}
+	file_proto_polars_bridge_proto_msgTypes[55].OneofWrappers = []any{}
+	file_proto_polars_bridge_proto_msgTypes[57].OneofWrappers = []any{}
+	file_proto_polars_bridge_proto_msgTypes[103].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_polars_bridge_proto_rawDesc), len(file_proto_polars_bridge_proto_rawDesc)),
-			NumEnums:      8,
-			NumMessages:   82,
+			NumEnums:      10,
+			NumMessages:   107,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

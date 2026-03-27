@@ -226,6 +226,11 @@ func (df *EagerFrame) Explode(columns ...string) *LazyFrame {
 	return df.Lazy().Explode(columns...)
 }
 
+// Unnest unnests struct columns into their fields.
+func (df *EagerFrame) Unnest(columns ...string) *LazyFrame {
+	return df.Lazy().Unnest(columns...)
+}
+
 // Reverse reverses row order.
 func (df *EagerFrame) Reverse() *LazyFrame {
 	return df.Lazy().Reverse()
@@ -290,4 +295,10 @@ func (df *EagerFrame) Pivot(opts PivotOptions) (*EagerFrame, error) {
 		return nil, fmt.Errorf("dataframe is nil")
 	}
 	return pivotEagerFrame(df.brg, df.handle, opts)
+}
+
+// PivotLazy performs a lazy pivot that requires explicit OnColumns, aligned
+// with Python Polars LazyFrame.pivot semantics.
+func (df *EagerFrame) PivotLazy(opts LazyPivotOptions) *LazyFrame {
+	return df.Lazy().Pivot(opts)
 }

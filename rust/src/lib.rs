@@ -1,8 +1,13 @@
 use polars::datatypes::{DataType, TimeUnit};
 use polars::io::json::{JsonFormat, JsonWriter};
+use polars::io::SerWriter;
+use polars::lazy::prelude::NDJsonWriterOptions;
+use polars::prelude::{ExternalCompression, FileWriteFormat, SinkTarget, UnifiedSinkArgs};
 use polars::prelude::{by_name, element};
-use polars::prelude::{AnyValue, DataFrame, IntoLazy, SerWriter, Series};
+use polars::prelude::{AnyValue, DataFrame, IntoLazy, Series};
 use polars::sql::SQLContext;
+use polars_plan::prelude::SinkDestination;
+use polars_utils::pl_path::PlRefPath;
 use prost::Message;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -22,6 +27,7 @@ mod proto {
 mod arrow_bridge;
 mod error;
 mod executor;
+mod expr_list;
 mod expr_str;
 mod expr_temporal;
 
@@ -153,6 +159,33 @@ fn export_dataframe_json(df: &DataFrame, format: c_int) -> Result<String, Bridge
 
     String::from_utf8(buffer.into_inner())
         .map_err(|e| BridgeError::Execution(format!("JSON output was not valid UTF-8: {}", e)))
+}
+
+fn ndjson_external_compression(
+    compression_code: c_int,
+    compression_level: c_int,
+) -> Result<ExternalCompression, BridgeError> {
+    match compression_code {
+        0 => Ok(ExternalCompression::Uncompressed),
+        1 => {
+            if compression_level < 0 {
+                return Err(BridgeError::InvalidArgument(format!(
+                    "bridge_plan_sink_ndjson: compression_level must be non-negative for gzip, got {}",
+                    compression_level
+                )));
+            }
+            let level = if compression_level == 0 {
+                None
+            } else {
+                Some(compression_level as u32)
+            };
+            Ok(ExternalCompression::Gzip { level })
+        },
+        other => Err(BridgeError::InvalidArgument(format!(
+            "bridge_plan_sink_ndjson: unsupported compression code {}; supported values: 0 (none), 1 (gzip)",
+            other
+        ))),
+    }
 }
 
 // 错误处理宏
@@ -288,13 +321,20 @@ pub extern "C" fn bridge_plan_compile(
     out_plan_handle_ptr: *mut u64,
 ) -> c_int {
     ffi_guard!({
-        if plan_bytes_ptr.is_null() || out_plan_handle_ptr.is_null() {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if plan_bytes_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_compile: plan_bytes_ptr is null".into(),
+            ));
+        }
+        if out_plan_handle_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_compile: out_plan_handle_ptr is null".into(),
+            ));
         }
 
         let plan_bytes = unsafe { slice::from_raw_parts(plan_bytes_ptr, plan_bytes_len) };
-        let plan =
-            proto::Plan::decode(plan_bytes).map_err(|e| BridgeError::PlanDecode(e.to_string()))?;
+        let plan = proto::Plan::decode(plan_bytes)
+            .map_err(|e| BridgeError::PlanDecode(format!("failed to decode protobuf plan: {}", e)))?;
 
         if plan.plan_version != 1 {
             return Err(BridgeError::PlanVersionUnsupported(plan.plan_version));
@@ -328,8 +368,20 @@ pub extern "C" fn bridge_plan_explain(
     out_len: *mut usize,
 ) -> c_int {
     ffi_guard!({
-        if plan_handle == 0 || out_ptr.is_null() || out_len.is_null() {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if plan_handle == 0 {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_explain: plan_handle must not be zero".into(),
+            ));
+        }
+        if out_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_explain: out_ptr is null".into(),
+            ));
+        }
+        if out_len.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_explain: out_len is null".into(),
+            ));
         }
 
         let plan = unsafe { &*(plan_handle as *const proto::Plan) };
@@ -348,7 +400,7 @@ pub extern "C" fn bridge_plan_explain(
             .map(|handle| {
                 if *handle == 0 {
                     return Err(BridgeError::InvalidArgument(
-                        "Input dataframe handle must not be zero".into(),
+                        "bridge_plan_explain: input dataframe handle must not be zero".into(),
                     ));
                 }
                 Ok(unsafe { &*(*handle as *const DataFrame) })
@@ -373,12 +425,19 @@ pub extern "C" fn bridge_plan_collect_df(
     out_df_handle_ptr: *mut u64,
 ) -> c_int {
     ffi_guard!({
-        if plan_handle == 0 || out_df_handle_ptr.is_null() {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if plan_handle == 0 {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_collect_df: plan_handle must not be zero".into(),
+            ));
+        }
+        if out_df_handle_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_collect_df: out_df_handle_ptr is null".into(),
+            ));
         }
         if input_df_handles_ptr.is_null() && input_df_handles_len != 0 {
             return Err(BridgeError::InvalidArgument(
-                "Input dataframe handles pointer is null".into(),
+                "bridge_plan_collect_df: input_df_handles_ptr is null while input_df_handles_len is non-zero".into(),
             ));
         }
 
@@ -393,7 +452,7 @@ pub extern "C" fn bridge_plan_collect_df(
             .map(|handle| {
                 if *handle == 0 {
                     return Err(BridgeError::InvalidArgument(
-                        "Input dataframe handle must not be zero".into(),
+                        "bridge_plan_collect_df: input dataframe handle must not be zero".into(),
                     ));
                 }
                 Ok(unsafe { &*(*handle as *const DataFrame) })
@@ -412,6 +471,97 @@ pub extern "C" fn bridge_plan_collect_df(
     })
 }
 
+#[no_mangle]
+pub extern "C" fn bridge_plan_sink_ndjson(
+    plan_handle: u64,
+    path_ptr: *const u8,
+    path_len: usize,
+    input_df_handles_ptr: *const u64,
+    input_df_handles_len: usize,
+    compression_code: c_int,
+    compression_level: c_int,
+) -> c_int {
+    ffi_guard!({
+        if plan_handle == 0 {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_sink_ndjson: plan_handle must not be zero".into(),
+            ));
+        }
+        if path_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_sink_ndjson: path_ptr is null".into(),
+            ));
+        }
+        if path_len == 0 {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_sink_ndjson: path is empty".into(),
+            ));
+        }
+        if input_df_handles_ptr.is_null() && input_df_handles_len != 0 {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_sink_ndjson: input_df_handles_ptr is null while input_df_handles_len is non-zero".into(),
+            ));
+        }
+
+        let path_bytes = unsafe { slice::from_raw_parts(path_ptr, path_len) };
+        let path = std::str::from_utf8(path_bytes).map_err(|e| {
+            BridgeError::InvalidArgument(format!(
+                "bridge_plan_sink_ndjson: path is not valid UTF-8: {}",
+                e
+            ))
+        })?;
+
+        let compression = ndjson_external_compression(compression_code, compression_level)?;
+        let plan = unsafe { &*(plan_handle as *const proto::Plan) };
+        let input_df_handles = if input_df_handles_len == 0 {
+            &[][..]
+        } else {
+            unsafe { slice::from_raw_parts(input_df_handles_ptr, input_df_handles_len) }
+        };
+        let input_dfs: Vec<&DataFrame> = input_df_handles
+            .iter()
+            .map(|handle| {
+                if *handle == 0 {
+                    return Err(BridgeError::InvalidArgument(
+                        "bridge_plan_sink_ndjson: input dataframe handle must not be zero".into(),
+                    ));
+                }
+                Ok(unsafe { &*(*handle as *const DataFrame) })
+            })
+            .collect::<Result<_, _>>()?;
+
+        enforce_input_memory_limit(&input_dfs, "ndjson sink")?;
+
+        let lf = executor::build_plan_lazy_frame(plan, &input_dfs)?;
+        let sink = lf
+            .sink(
+                SinkDestination::File {
+                    target: SinkTarget::Path(PlRefPath::new(path)),
+                },
+                FileWriteFormat::NDJson(NDJsonWriterOptions {
+                    compression,
+                    check_extension: false,
+                }),
+                UnifiedSinkArgs::default(),
+            )
+            .map_err(|e| {
+                BridgeError::Execution(format!(
+                    "bridge_plan_sink_ndjson: failed to build sink for path {:?}: {}",
+                    path, e
+                ))
+            })?;
+
+        sink.collect().map_err(|e| {
+            BridgeError::Execution(format!(
+                "bridge_plan_sink_ndjson: failed to write NDJSON to {:?}: {}",
+                path, e
+            ))
+        })?;
+
+        Ok(0)
+    })
+}
+
 // 4c. DataFrame -> Arrow C Data Interface
 #[no_mangle]
 pub extern "C" fn bridge_df_to_arrow(
@@ -420,8 +570,20 @@ pub extern "C" fn bridge_df_to_arrow(
     output_array: *mut ArrowArray,
 ) -> c_int {
     ffi_guard!({
-        if df_handle == 0 || output_schema.is_null() || output_array.is_null() {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if df_handle == 0 {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_to_arrow: df_handle must not be zero".into(),
+            ));
+        }
+        if output_schema.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_to_arrow: output_schema is null".into(),
+            ));
+        }
+        if output_array.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_to_arrow: output_array is null".into(),
+            ));
         }
 
         let df = unsafe { &*(df_handle as *const DataFrame) };
@@ -552,8 +714,20 @@ pub extern "C" fn bridge_plan_execute_arrow(
     output_array: *mut ArrowArray,
 ) -> c_int {
     ffi_guard!({
-        if plan_handle == 0 || output_schema.is_null() || output_array.is_null() {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if plan_handle == 0 {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_execute_arrow: plan_handle must not be zero".into(),
+            ));
+        }
+        if output_schema.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_execute_arrow: output_schema is null".into(),
+            ));
+        }
+        if output_array.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_plan_execute_arrow: output_array is null".into(),
+            ));
         }
 
         if (input_schema.is_null() && !input_array.is_null())
@@ -592,18 +766,33 @@ pub extern "C" fn bridge_df_from_columns(
     out_df_handle: *mut u64,
 ) -> c_int {
     ffi_guard!({
-        if json_ptr.is_null() || out_df_handle.is_null() {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if json_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_from_columns: json_ptr is null".into(),
+            ));
+        }
+        if out_df_handle.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_from_columns: out_df_handle is null".into(),
+            ));
         }
 
         // 读取 JSON 数据
         let json_slice = unsafe { slice::from_raw_parts(json_ptr as *const u8, json_len) };
-        let json_str = std::str::from_utf8(json_slice)
-            .map_err(|e| BridgeError::InvalidArgument(format!("Invalid UTF-8: {}", e)))?;
+        let json_str = std::str::from_utf8(json_slice).map_err(|e| {
+            BridgeError::InvalidArgument(format!(
+                "bridge_df_from_columns: payload is not valid UTF-8: {}",
+                e
+            ))
+        })?;
 
         // 解析 JSON
-        let payload: ColumnPayload = serde_json::from_str(json_str)
-            .map_err(|e| BridgeError::InvalidArgument(format!("Invalid JSON: {}", e)))?;
+        let payload: ColumnPayload = serde_json::from_str(json_str).map_err(|e| {
+            BridgeError::InvalidArgument(format!(
+                "bridge_df_from_columns: payload is not valid JSON column data: {}",
+                e
+            ))
+        })?;
 
         let (columns, schema) = payload.into_parts();
 
@@ -612,11 +801,19 @@ pub extern "C" fn bridge_df_from_columns(
 
         for col in columns {
             let name = col["name"].as_str().ok_or_else(|| {
-                BridgeError::InvalidArgument("Column missing 'name' field".into())
+                BridgeError::InvalidArgument(
+                    "bridge_df_from_columns: each column object must contain a string 'name' field"
+                        .into(),
+                )
             })?;
 
             let values = col["values"].as_array().ok_or_else(|| {
-                BridgeError::InvalidArgument("Column missing 'values' array".into())
+                BridgeError::InvalidArgument(
+                    format!(
+                        "bridge_df_from_columns: column {:?} must contain a 'values' array",
+                        name
+                    ),
+                )
             })?;
 
             let target_type = if let Some(dtype_name) = schema.get(name) {
@@ -637,12 +834,17 @@ pub extern "C" fn bridge_df_from_columns(
                 .collect::<Result<_, _>>()?;
 
             let mut series = Series::from_any_values(name.into(), &any_values, true)
-                .map_err(|e| BridgeError::Execution(format!("Failed to create series: {}", e)))?;
+                .map_err(|e| {
+                    BridgeError::Execution(format!(
+                        "failed to create series for column {:?}: {}",
+                        name, e
+                    ))
+                })?;
 
             if let Some(target_type) = target_type {
                 series = series.cast(&target_type).map_err(|e| {
                     BridgeError::Execution(format!(
-                        "Failed to cast column '{}' to {:?}: {}",
+                        "failed to cast column {:?} to {:?}: {}",
                         name, target_type, e
                     ))
                 })?;
@@ -653,7 +855,7 @@ pub extern "C" fn bridge_df_from_columns(
         // 创建 DataFrame
         let columns: Vec<_> = series_vec.into_iter().map(|s| s.into()).collect();
         let df = DataFrame::new_infer_height(columns)
-            .map_err(|e| BridgeError::Execution(format!("Failed to create DataFrame: {}", e)))?;
+            .map_err(|e| BridgeError::Execution(format!("failed to create dataframe from columns: {}", e)))?;
         enforce_memory_limit(&df, "dataframe import from columns")?;
 
         // 存储 DataFrame 并返回句柄
@@ -715,7 +917,7 @@ fn build_pivot_agg_expr(name: &str) -> Result<Option<polars::prelude::Expr>, Bri
         "count" | "len" => element().count(),
         other => {
             return Err(BridgeError::Unsupported(format!(
-                "unsupported pivot aggregate {}",
+                "unsupported pivot aggregate {:?}; supported values: first, last, sum, min, max, mean, median, count, len",
                 other
             )))
         }
@@ -731,14 +933,29 @@ pub extern "C" fn bridge_df_pivot(
     out_df_handle: *mut u64,
 ) -> c_int {
     ffi_guard!({
-        if df_handle == 0 || options_ptr.is_null() || out_df_handle.is_null() {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if df_handle == 0 {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_pivot: df_handle must not be zero".into(),
+            ));
+        }
+        if options_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_pivot: options_ptr is null".into(),
+            ));
+        }
+        if out_df_handle.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_pivot: out_df_handle is null".into(),
+            ));
         }
 
         let df = unsafe { &*(df_handle as *const DataFrame) };
         let options_slice = unsafe { slice::from_raw_parts(options_ptr as *const u8, options_len) };
         let opts: PivotRequest = serde_json::from_slice(options_slice).map_err(|e| {
-            BridgeError::InvalidArgument(format!("Invalid pivot options JSON: {}", e))
+            BridgeError::InvalidArgument(format!(
+                "bridge_df_pivot: options payload is not valid JSON: {}",
+                e
+            ))
         })?;
         let _ = opts.sort_columns;
 
@@ -774,7 +991,7 @@ pub extern "C" fn bridge_df_pivot(
                     None,
                 )
             })
-            .map_err(|e| BridgeError::Execution(format!("Failed to derive pivot columns: {}", e)))?;
+            .map_err(|e| BridgeError::Execution(format!("failed to derive pivot columns: {}", e)))?;
 
         let result = df
             .clone()
@@ -795,7 +1012,7 @@ pub extern "C" fn bridge_df_pivot(
                 separator.unwrap_or("").into(),
             )
             .collect()
-            .map_err(|e| BridgeError::Execution(format!("Pivot failed: {}", e)))?;
+            .map_err(|e| BridgeError::Execution(format!("pivot execution failed: {}", e)))?;
 
         let handle = Box::into_raw(Box::new(result)) as u64;
         unsafe { *out_df_handle = handle };
@@ -814,23 +1031,42 @@ pub extern "C" fn bridge_sql_collect_df(
     out_df_handle: *mut u64,
 ) -> c_int {
     ffi_guard!({
-        if query_ptr.is_null() || table_names_json_ptr.is_null() || out_df_handle.is_null() {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if query_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_sql_collect_df: query_ptr is null".into(),
+            ));
+        }
+        if table_names_json_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_sql_collect_df: table_names_json_ptr is null".into(),
+            ));
+        }
+        if out_df_handle.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_sql_collect_df: out_df_handle is null".into(),
+            ));
         }
         if input_df_handles_ptr.is_null() && input_df_handles_len != 0 {
             return Err(BridgeError::InvalidArgument(
-                "Input dataframe handles pointer is null".into(),
+                "bridge_sql_collect_df: input_df_handles_ptr is null while input_df_handles_len is non-zero".into(),
             ));
         }
 
         let query_slice = unsafe { slice::from_raw_parts(query_ptr as *const u8, query_len) };
-        let query = std::str::from_utf8(query_slice)
-            .map_err(|e| BridgeError::InvalidArgument(format!("Invalid UTF-8 query: {}", e)))?;
+        let query = std::str::from_utf8(query_slice).map_err(|e| {
+            BridgeError::InvalidArgument(format!(
+                "bridge_sql_collect_df: query is not valid UTF-8: {}",
+                e
+            ))
+        })?;
         let names_slice = unsafe {
             slice::from_raw_parts(table_names_json_ptr as *const u8, table_names_json_len)
         };
         let table_names: Vec<String> = serde_json::from_slice(names_slice).map_err(|e| {
-            BridgeError::InvalidArgument(format!("Invalid table names JSON: {}", e))
+            BridgeError::InvalidArgument(format!(
+                "bridge_sql_collect_df: table_names_json is invalid JSON: {}",
+                e
+            ))
         })?;
 
         if table_names.len() != input_df_handles_len {
@@ -867,10 +1103,24 @@ pub extern "C" fn bridge_sql_collect_df(
 
         let lf = ctx
             .execute(query)
-            .map_err(|e| BridgeError::Execution(format!("SQL execution failed: {}", e)))?;
+            .map_err(|e| {
+                BridgeError::Execution(format!(
+                    "SQL execution failed for query {:?} with tables {:?}: {}",
+                    query,
+                    table_names,
+                    e
+                ))
+            })?;
         let df = lf
             .collect()
-            .map_err(|e| BridgeError::Execution(format!("SQL collect failed: {}", e)))?;
+            .map_err(|e| {
+                BridgeError::Execution(format!(
+                    "SQL collect failed for query {:?} with tables {:?}: {}",
+                    query,
+                    table_names,
+                    e
+                ))
+            })?;
         enforce_memory_limit(&df, "sql collect")?;
 
         let handle = Box::into_raw(Box::new(df)) as u64;
@@ -896,28 +1146,52 @@ pub extern "C" fn bridge_sql_collect_df_from_plans(
     out_df_handle: *mut u64,
 ) -> c_int {
     ffi_guard!({
-        if query_ptr.is_null()
-            || table_names_json_ptr.is_null()
-            || plan_handles_ptr.is_null()
-            || input_df_offsets_ptr.is_null()
-            || out_df_handle.is_null()
-        {
-            return Err(BridgeError::InvalidArgument("Null pointers".into()));
+        if query_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_sql_collect_df_from_plans: query_ptr is null".into(),
+            ));
+        }
+        if table_names_json_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_sql_collect_df_from_plans: table_names_json_ptr is null".into(),
+            ));
+        }
+        if plan_handles_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_sql_collect_df_from_plans: plan_handles_ptr is null".into(),
+            ));
+        }
+        if input_df_offsets_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_sql_collect_df_from_plans: input_df_offsets_ptr is null".into(),
+            ));
+        }
+        if out_df_handle.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_sql_collect_df_from_plans: out_df_handle is null".into(),
+            ));
         }
         if input_df_handles_ptr.is_null() && input_df_handles_len != 0 {
             return Err(BridgeError::InvalidArgument(
-                "Input dataframe handles pointer is null".into(),
+                "bridge_sql_collect_df_from_plans: input_df_handles_ptr is null while input_df_handles_len is non-zero".into(),
             ));
         }
 
         let query_slice = unsafe { slice::from_raw_parts(query_ptr as *const u8, query_len) };
-        let query = std::str::from_utf8(query_slice)
-            .map_err(|e| BridgeError::InvalidArgument(format!("Invalid UTF-8 query: {}", e)))?;
+        let query = std::str::from_utf8(query_slice).map_err(|e| {
+            BridgeError::InvalidArgument(format!(
+                "bridge_sql_collect_df_from_plans: query is not valid UTF-8: {}",
+                e
+            ))
+        })?;
         let names_slice = unsafe {
             slice::from_raw_parts(table_names_json_ptr as *const u8, table_names_json_len)
         };
         let table_names: Vec<String> = serde_json::from_slice(names_slice).map_err(|e| {
-            BridgeError::InvalidArgument(format!("Invalid table names JSON: {}", e))
+            BridgeError::InvalidArgument(format!(
+                "bridge_sql_collect_df_from_plans: table_names_json is invalid JSON: {}",
+                e
+            ))
         })?;
 
         let plan_handles = unsafe { slice::from_raw_parts(plan_handles_ptr, plan_handles_len) };
@@ -995,10 +1269,24 @@ pub extern "C" fn bridge_sql_collect_df_from_plans(
 
         let lf = ctx
             .execute(query)
-            .map_err(|e| BridgeError::Execution(format!("SQL execution failed: {}", e)))?;
+            .map_err(|e| {
+                BridgeError::Execution(format!(
+                    "SQL execution failed for query {:?} with tables {:?}: {}",
+                    query,
+                    table_names,
+                    e
+                ))
+            })?;
         let df = lf
             .collect()
-            .map_err(|e| BridgeError::Execution(format!("SQL collect failed: {}", e)))?;
+            .map_err(|e| {
+                BridgeError::Execution(format!(
+                    "SQL collect failed for query {:?} with tables {:?}: {}",
+                    query,
+                    table_names,
+                    e
+                ))
+            })?;
         enforce_memory_limit(&df, "sql collect")?;
 
         let handle = Box::into_raw(Box::new(df)) as u64;

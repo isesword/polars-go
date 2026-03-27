@@ -37,6 +37,8 @@ message Node {
     DropNans drop_nans = 30;
     FillNanFrame fill_nan = 31;
     Sample sample = 32;
+    Unnest unnest = 33;
+    Pivot pivot = 34;
   }
 
   reserved 50 to 99;   // window reserved
@@ -221,6 +223,26 @@ message Sample {
   optional uint64 seed = 6;
 }
 
+message Unnest {
+  Node input = 1;
+  repeated string columns = 2;
+}
+
+message PivotOnColumnRow {
+  repeated Literal values = 1;
+}
+
+message Pivot {
+  Node input = 1;
+  repeated string on = 2;
+  repeated PivotOnColumnRow on_columns = 3;
+  repeated string index = 4;
+  repeated string values = 5;
+  string aggregate = 6;
+  bool maintain_order = 7;
+  string separator = 8;
+}
+
 // 表达式
 message Expr {
   oneof kind {
@@ -289,6 +311,46 @@ message Expr {
     Rolling rolling_max = 138;
     Rolling rolling_mean = 139;
     Rolling rolling_sum = 140;
+    FilterExpr filter_expr = 187;
+    SortByExpr sort_by = 188;
+    AsStruct as_struct = 189;
+    Element element = 150;
+    ConcatList concat_list = 151;
+    ListEval list_eval = 152;
+    ListFunction list_len = 153;
+    ListFunction list_sum = 154;
+    ListFunction list_max = 155;
+    ListFunction list_min = 156;
+    ListContains list_contains = 157;
+    ListSort list_sort = 158;
+    ListGet list_get = 159;
+    ListAgg list_agg = 160;
+    ListFunction list_mean = 161;
+    ListFunction list_median = 162;
+    ListMoment list_std = 163;
+    ListMoment list_var = 164;
+    ListFunction list_reverse = 165;
+    ListUnique list_unique = 166;
+    ListFunction list_n_unique = 167;
+    ListSlice list_slice = 168;
+    ListFunction list_arg_min = 169;
+    ListFunction list_arg_max = 170;
+    ListJoin list_join = 171;
+    ListFunction list_any = 172;
+    ListFunction list_all = 173;
+    ListFunction list_drop_nulls = 174;
+    ListShift list_shift = 175;
+    ListDiff list_diff = 176;
+    ListCountMatches list_count_matches = 177;
+    ListGather list_gather = 178;
+    ListGatherEvery list_gather_every = 179;
+    ListSample list_sample_n = 180;
+    ListSample list_sample_fraction = 181;
+    ListSetOperation list_union = 182;
+    ListSetOperation list_set_difference = 183;
+    ListSetOperation list_set_intersection = 184;
+    ListSetOperation list_set_symmetric_difference = 185;
+    ListUnique list_unique_stable = 186;
     
     // 字符串函数 (50-99)
     StringFunction str_len_bytes = 50;
@@ -444,6 +506,13 @@ message Over {
   repeated Expr order_by = 3;
   bool descending = 4;
   bool nulls_last = 5;
+  WindowMapping mapping_strategy = 6;
+}
+
+enum WindowMapping {
+  WINDOW_MAPPING_GROUP_TO_ROWS = 0;
+  WINDOW_MAPPING_EXPLODE = 1;
+  WINDOW_MAPPING_JOIN = 2;
 }
 
 enum RankMethod {
@@ -566,11 +635,137 @@ message IsDuplicated {
   Expr expr = 1;
 }
 
+message FilterExpr {
+  Expr expr = 1;
+  Expr predicate = 2;
+}
+
+message SortByExpr {
+  Expr expr = 1;
+  repeated Expr by = 2;
+  repeated bool descending = 3;
+  repeated bool nulls_last = 4;
+}
+
+message AsStruct {
+  repeated Expr exprs = 1;
+}
+
 message Rolling {
   Expr expr = 1;
   uint64 window_size = 2;
   uint64 min_periods = 3;
   bool center = 4;
+}
+
+message Element {}
+
+message ConcatList {
+  repeated Expr exprs = 1;
+}
+
+message ListEval {
+  Expr expr = 1;
+  Expr evaluation = 2;
+}
+
+message ListFunction {
+  Expr expr = 1;
+}
+
+message ListContains {
+  Expr expr = 1;
+  Expr item = 2;
+  bool nulls_equal = 3;
+}
+
+message ListSort {
+  Expr expr = 1;
+  bool descending = 2;
+  bool nulls_last = 3;
+}
+
+message ListGet {
+  Expr expr = 1;
+  Expr index = 2;
+  bool null_on_oob = 3;
+}
+
+message ListAgg {
+  Expr expr = 1;
+  Expr evaluation = 2;
+}
+
+message ListMoment {
+  Expr expr = 1;
+  uint32 ddof = 2;
+}
+
+message ListUnique {
+  Expr expr = 1;
+  bool maintain_order = 2;
+}
+
+message ListSlice {
+  Expr expr = 1;
+  Expr offset = 2;
+  Expr length = 3;
+}
+
+message ListJoin {
+  Expr expr = 1;
+  Expr separator = 2;
+  bool ignore_nulls = 3;
+}
+
+message ListShift {
+  Expr expr = 1;
+  Expr periods = 2;
+}
+
+message ListDiff {
+  Expr expr = 1;
+  int64 periods = 2;
+  DiffNullBehavior null_behavior = 3;
+}
+
+message ListCountMatches {
+  Expr expr = 1;
+  Expr element = 2;
+}
+
+message ListGather {
+  Expr expr = 1;
+  Expr index = 2;
+  bool null_on_oob = 3;
+}
+
+message ListGatherEvery {
+  Expr expr = 1;
+  Expr n = 2;
+  Expr offset = 3;
+}
+
+message ListSample {
+  Expr expr = 1;
+  Expr value = 2;
+  bool with_replacement = 3;
+  bool shuffle = 4;
+  uint64 seed = 5;
+  bool has_seed = 6;
+}
+
+enum SetOperation {
+  UNION = 0;
+  DIFFERENCE = 1;
+  INTERSECTION = 2;
+  SYMMETRIC_DIFFERENCE = 3;
+}
+
+message ListSetOperation {
+  Expr expr = 1;
+  Expr other = 2;
+  SetOperation op = 3;
 }
 
 message TemporalUnary {

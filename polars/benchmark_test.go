@@ -1,7 +1,10 @@
 package polars
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,7 +14,16 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
+	"github.com/xuri/excelize/v2"
 )
+
+type benchmarkStructRow struct {
+	ID         int64  `polars:"id"`
+	Name       string `polars:"name"`
+	Age        int64  `polars:"age"`
+	Salary     int64  `polars:"salary"`
+	Department string `polars:"department"`
+}
 
 func benchmarkRows(n int) []map[string]any {
 	rows := make([]map[string]any, n)
@@ -26,6 +38,85 @@ func benchmarkRows(n int) []map[string]any {
 		}
 	}
 	return rows
+}
+
+func benchmarkStructRows(n int) []benchmarkStructRow {
+	rows := benchmarkRows(n)
+	out := make([]benchmarkStructRow, len(rows))
+	for i, row := range rows {
+		out[i] = benchmarkStructRow{
+			ID:         row["id"].(int64),
+			Name:       row["name"].(string),
+			Age:        row["age"].(int64),
+			Salary:     row["salary"].(int64),
+			Department: row["department"].(string),
+		}
+	}
+	return out
+}
+
+func benchmarkJoinFrames(b *testing.B, n int) (*DataFrame, *DataFrame) {
+	b.Helper()
+	leftRows := make([]map[string]any, n)
+	rightRows := make([]map[string]any, n)
+	for i := 0; i < n; i++ {
+		leftRows[i] = map[string]any{
+			"id":         int64(i + 1),
+			"department": fmt.Sprintf("dept_%02d", i%16),
+			"salary":     int64(50000 + (i%17)*1250),
+		}
+		rightRows[i] = map[string]any{
+			"id":    int64(i + 1),
+			"level": fmt.Sprintf("L%d", i%6),
+			"bonus": int64(1000 + (i%9)*100),
+		}
+	}
+	left, err := NewDataFrame(leftRows, WithArrowSchema(arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "department", Type: arrow.BinaryTypes.String},
+		{Name: "salary", Type: arrow.PrimitiveTypes.Int64},
+	}, nil)))
+	if err != nil {
+		b.Fatalf("failed to create left join dataframe: %v", err)
+	}
+	right, err := NewDataFrame(rightRows, WithArrowSchema(arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "level", Type: arrow.BinaryTypes.String},
+		{Name: "bonus", Type: arrow.PrimitiveTypes.Int64},
+	}, nil)))
+	if err != nil {
+		left.Close()
+		b.Fatalf("failed to create right join dataframe: %v", err)
+	}
+	return left, right
+}
+
+func benchmarkExcelFixture(b *testing.B, rows []map[string]any) string {
+	b.Helper()
+	path := filepath.Join(b.TempDir(), "bench.xlsx")
+	file := excelize.NewFile()
+	defer file.Close()
+
+	if err := file.SetSheetRow("Sheet1", "A1", &[]any{"id", "name", "age", "salary", "department"}); err != nil {
+		b.Fatalf("failed to write excel header: %v", err)
+	}
+	for i, row := range rows {
+		cell := fmt.Sprintf("A%d", i+2)
+		record := []any{
+			row["id"],
+			row["name"],
+			row["age"],
+			row["salary"],
+			row["department"],
+		}
+		if err := file.SetSheetRow("Sheet1", cell, &record); err != nil {
+			b.Fatalf("failed to write excel row %d: %v", i, err)
+		}
+	}
+	if err := file.SaveAs(path); err != nil {
+		b.Fatalf("failed to save excel benchmark fixture: %v", err)
+	}
+	return path
 }
 
 func benchmarkPrimitiveSchema() map[string]DataType {
@@ -203,14 +294,6 @@ func BenchmarkToStructs(b *testing.B) {
 		b.Skip("struct export requires cgo")
 	}
 
-	type benchRow struct {
-		ID         int64   `polars:"id"`
-		Name       string  `polars:"name"`
-		Age        int64   `polars:"age"`
-		Salary     float64 `polars:"salary"`
-		Department string  `polars:"department"`
-	}
-
 	for _, size := range []int{1000, 4000, 16000} {
 		df, err := NewDataFrame(benchmarkRows(size), WithArrowSchema(benchmarkArrowSchema()))
 		if err != nil {
@@ -222,7 +305,7 @@ func BenchmarkToStructs(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				rows, err := ToStructs[benchRow](df)
+				rows, err := ToStructs[benchmarkStructRow](df)
 				if err != nil {
 					b.Fatalf("ToStructs failed: %v", err)
 				}
@@ -240,14 +323,6 @@ func BenchmarkToStructPointers(b *testing.B) {
 		b.Skip("struct pointer export requires cgo")
 	}
 
-	type benchRow struct {
-		ID         int64   `polars:"id"`
-		Name       string  `polars:"name"`
-		Age        int64   `polars:"age"`
-		Salary     float64 `polars:"salary"`
-		Department string  `polars:"department"`
-	}
-
 	for _, size := range []int{1000, 4000, 16000} {
 		df, err := NewDataFrame(benchmarkRows(size), WithArrowSchema(benchmarkArrowSchema()))
 		if err != nil {
@@ -259,7 +334,7 @@ func BenchmarkToStructPointers(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				rows, err := ToStructPointers[benchRow](df)
+				rows, err := ToStructPointers[benchmarkStructRow](df)
 				if err != nil {
 					b.Fatalf("ToStructPointers failed: %v", err)
 				}
@@ -267,6 +342,257 @@ func BenchmarkToStructPointers(b *testing.B) {
 					b.Fatal("expected non-empty ToStructPointers result")
 				}
 			}
+		})
+	}
+}
+
+func BenchmarkStructImport(b *testing.B) {
+	requireBenchmarkBridge(b)
+	for _, size := range []int{1000, 4000, 16000} {
+		rows := benchmarkStructRows(size)
+
+		b.Run(benchmarkSizeLabel(size), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				df, err := NewDataFrame(rows)
+				if err != nil {
+					b.Fatalf("struct import failed: %v", err)
+				}
+				df.Close()
+			}
+		})
+	}
+}
+
+func BenchmarkJoin(b *testing.B) {
+	requireBenchmarkBridge(b)
+	if !zeroCopySupported() {
+		b.Skip("join benchmark requires cgo-backed frames")
+	}
+	for _, size := range []int{1000, 4000, 16000} {
+		left, right := benchmarkJoinFrames(b, size)
+		defer left.Close()
+		defer right.Close()
+
+		b.Run(benchmarkSizeLabel(size), func(b *testing.B) {
+			b.Run("Inner", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					rows, err := collectToMapsBenchmark(left.Join(right, JoinOptions{
+						On:  []string{"id"},
+						How: JoinInner,
+					}).Select(Col("id"), Col("salary"), Col("bonus")))
+					if err != nil {
+						b.Fatalf("inner join failed: %v", err)
+					}
+					if len(rows) == 0 {
+						b.Fatal("expected non-empty inner join result")
+					}
+				}
+			})
+
+			b.Run("Left", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					rows, err := collectToMapsBenchmark(left.Join(right, JoinOptions{
+						On:  []string{"id"},
+						How: JoinLeft,
+					}).Select(Col("id"), Col("salary"), Col("bonus")))
+					if err != nil {
+						b.Fatalf("left join failed: %v", err)
+					}
+					if len(rows) == 0 {
+						b.Fatal("expected non-empty left join result")
+					}
+				}
+			})
+		})
+	}
+}
+
+func BenchmarkGroupBy(b *testing.B) {
+	requireBenchmarkBridge(b)
+	for _, size := range []int{1000, 4000, 16000} {
+		df, err := NewDataFrame(benchmarkRows(size), WithArrowSchema(benchmarkArrowSchema()))
+		if err != nil {
+			b.Fatalf("failed to create dataframe: %v", err)
+		}
+		defer df.Close()
+
+		b.Run(benchmarkSizeLabel(size), func(b *testing.B) {
+			b.Run("DepartmentAgg", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					rows, err := collectToMapsBenchmark(df.GroupBy("department").Agg(
+						Col("salary").Sum().Alias("salary_sum"),
+						Col("id").Count().Alias("employee_count"),
+						Col("age").Mean().Alias("avg_age"),
+					))
+					if err != nil {
+						b.Fatalf("groupby agg failed: %v", err)
+					}
+					if len(rows) == 0 {
+						b.Fatal("expected non-empty groupby result")
+					}
+				}
+			})
+
+			b.Run("DepartmentValueCounts", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					rows, err := collectToMapsBenchmark(df.GroupBy("department").Agg(
+						Col("name").NUnique().Alias("unique_names"),
+						Col("salary").Max().Alias("max_salary"),
+					))
+					if err != nil {
+						b.Fatalf("groupby n_unique failed: %v", err)
+					}
+					if len(rows) == 0 {
+						b.Fatal("expected non-empty groupby n_unique result")
+					}
+				}
+			})
+		})
+	}
+}
+
+func BenchmarkNDJSON(b *testing.B) {
+	requireBenchmarkBridge(b)
+	for _, size := range []int{1000, 4000, 16000} {
+		df, err := NewDataFrame(benchmarkRows(size), WithArrowSchema(benchmarkArrowSchema()))
+		if err != nil {
+			b.Fatalf("failed to create dataframe: %v", err)
+		}
+		defer df.Close()
+		lf := df.Filter(Col("age").Gt(Lit(30))).Select(Col("id"), Col("name"), Col("department"))
+		sinkPath := filepath.Join(b.TempDir(), fmt.Sprintf("bench-%d.jsonl", size))
+		sinkGzipPath := filepath.Join(b.TempDir(), fmt.Sprintf("bench-%d.jsonl.gz", size))
+
+		b.Run(benchmarkSizeLabel(size), func(b *testing.B) {
+			b.Run("WriteNDJSON", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					var buf bytes.Buffer
+					if err := df.WriteNDJSON(&buf); err != nil {
+						b.Fatalf("WriteNDJSON failed: %v", err)
+					}
+					if buf.Len() == 0 {
+						b.Fatal("expected non-empty WriteNDJSON output")
+					}
+				}
+			})
+
+			b.Run("WriteNDJSONGzip", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					var buf bytes.Buffer
+					if err := df.WriteNDJSON(&buf, WriteNDJSONOptions{Compression: NDJSONCompressionGzip}); err != nil {
+						b.Fatalf("WriteNDJSON gzip failed: %v", err)
+					}
+					zr, err := gzip.NewReader(bytes.NewReader(buf.Bytes()))
+					if err != nil {
+						b.Fatalf("gzip reader failed: %v", err)
+					}
+					plain, err := io.ReadAll(zr)
+					_ = zr.Close()
+					if err != nil {
+						b.Fatalf("read gzip payload failed: %v", err)
+					}
+					if len(plain) == 0 {
+						b.Fatal("expected non-empty gzip ndjson output")
+					}
+				}
+			})
+
+			b.Run("SinkNDJSONFile", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if err := lf.SinkNDJSONFile(sinkPath); err != nil {
+						b.Fatalf("SinkNDJSONFile failed: %v", err)
+					}
+					info, err := os.Stat(sinkPath)
+					if err != nil {
+						b.Fatalf("stat SinkNDJSONFile output failed: %v", err)
+					}
+					if info.Size() == 0 {
+						b.Fatal("expected non-empty SinkNDJSONFile output")
+					}
+				}
+			})
+
+			b.Run("SinkNDJSONFileGzip", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if err := lf.SinkNDJSONFile(sinkGzipPath, SinkNDJSONOptions{Compression: NDJSONCompressionGzip}); err != nil {
+						b.Fatalf("SinkNDJSONFile gzip failed: %v", err)
+					}
+					info, err := os.Stat(sinkGzipPath)
+					if err != nil {
+						b.Fatalf("stat gzip SinkNDJSONFile output failed: %v", err)
+					}
+					if info.Size() == 0 {
+						b.Fatal("expected non-empty gzip SinkNDJSONFile output")
+					}
+				}
+			})
+		})
+	}
+}
+
+func BenchmarkExcel(b *testing.B) {
+	requireBenchmarkBridge(b)
+	for _, size := range []int{200, 1000, 4000} {
+		path := benchmarkExcelFixture(b, benchmarkRows(size))
+
+		b.Run(benchmarkSizeLabel(size), func(b *testing.B) {
+			b.Run("ReadExcel", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					df, err := ReadExcel(path)
+					if err != nil {
+						b.Fatalf("ReadExcel failed: %v", err)
+					}
+					rows, err := df.ToMaps()
+					df.Close()
+					if err != nil {
+						b.Fatalf("ReadExcel ToMaps failed: %v", err)
+					}
+					if len(rows) == 0 {
+						b.Fatal("expected non-empty ReadExcel result")
+					}
+				}
+			})
+
+			b.Run("ReadExcelWithSchema", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					df, err := ReadExcel(path, ExcelReadOptions{
+						Schema: benchmarkPrimitiveSchema(),
+					})
+					if err != nil {
+						b.Fatalf("ReadExcel with schema failed: %v", err)
+					}
+					rows, err := df.ToMaps()
+					df.Close()
+					if err != nil {
+						b.Fatalf("ReadExcel with schema ToMaps failed: %v", err)
+					}
+					if len(rows) == 0 {
+						b.Fatal("expected non-empty ReadExcel with schema result")
+					}
+				}
+			})
 		})
 	}
 }

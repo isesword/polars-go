@@ -167,12 +167,14 @@ tag 规则：
 - lazy:
   - `(*LazyFrame).SinkJSON(w io.Writer)`
   - `(*LazyFrame).SinkNDJSON(w io.Writer, opts ...pl.SinkNDJSONOptions)`
+  - `(*LazyFrame).SinkNDJSONFile(path string, opts ...pl.SinkNDJSONOptions)`
 
 实现说明：
 
 - JSON 序列化由 Rust / Polars `JsonWriter` 完成，不再由 Go 侧逐行编码
 - eager 路径更接近 Python Polars 的 `write_json()` / `write_ndjson()`
 - lazy 路径使用 `sink_*` 命名，对齐 Python Polars 的 `sink_ndjson()` 心智
+- `SinkNDJSONFile(...)` 直接走 Rust / Polars lazy sink，适合大文件输出
 - `NDJSON` 当前提供对 `io.Writer` 真正有意义的附加选项：
   - `Compression: none | gzip`
   - `CompressionLevel`
@@ -203,12 +205,19 @@ var sinkNDJSONBuf bytes.Buffer
 _ = lf.SinkNDJSON(&sinkNDJSONBuf, pl.SinkNDJSONOptions{
     Compression: pl.NDJSONCompressionNone,
 })
+
+_ = lf.SinkNDJSONFile("out.jsonl")
+_ = lf.SinkNDJSONFile("out.jsonl.gz", pl.SinkNDJSONOptions{
+    Compression: pl.NDJSONCompressionGzip,
+})
 ```
 
 注意：
 
 - 当前顶层 binary 列会先在 Rust 侧归一化后再写 JSON，避免 Polars 0.52 对 binary JSON writer 的未实现分支
-- `SinkJSON(...)` / `SinkNDJSON(...)` 当前会先 collect 结果，再写出 JSON；接口先对齐，后续如果需要可以再下沉成真正的 plan-to-sink
+- `SinkNDJSONFile(...)` 是推荐的大文件 NDJSON 输出方式，直接走 lazy sink，不会先 collect 成 DataFrame
+- `SinkNDJSON(...)` 为了兼容 `io.Writer`，内部会走临时文件再拷贝到 writer，但同样不再先 collect 成 DataFrame
+- `SinkJSON(...)` 目前仍然会先 collect 后写出 JSON
 - Python Polars 里 `write_ndjson` / `sink_ndjson` 还包含更偏文件路径语义的参数；当前 Go 版本面向 `io.Writer`，所以只保留与 writer 直接相关的压缩选项
 
 ### Excel 读取
@@ -526,21 +535,56 @@ go test ./polars -run '^$' -bench Benchmark -benchmem
 go test ./polars -run '^$' -bench 'BenchmarkImportRows/Rows2000|BenchmarkQueryCollect/Rows4000|BenchmarkToMaps/Rows4000|BenchmarkExprVsMapBatches/Rows4000' -benchtime=3x -benchmem
 ```
 
-当前基线（Apple M4 Pro, `go test ./polars -run '^$' -bench 'BenchmarkImportRows/Rows2000|BenchmarkQueryCollect/Rows4000|BenchmarkToMaps/Rows4000|BenchmarkExprVsMapBatches/Rows4000' -benchtime=3x -benchmem`）：
+按场景跑新增的专项基准：
+
+```bash
+# Join / GroupBy
+go test ./polars -run '^$' -bench 'Benchmark(Join|GroupBy)' -benchmem
+
+# Struct 导入导出
+go test ./polars -run '^$' -bench 'Benchmark(StructImport|ToStructs|ToStructPointers)' -benchmem
+
+# NDJSON 导出 / sink
+go test ./polars -run '^$' -bench 'BenchmarkNDJSON' -benchmem
+
+# Excel 读取
+go test ./polars -run '^$' -bench 'BenchmarkExcel' -benchmem
+```
+
+当前 benchmark 套件覆盖：
+
+- 导入：`BenchmarkImportRows`
+- 查询：`BenchmarkQueryCollect`
+- 导出：`BenchmarkToMaps` / `BenchmarkToStructs` / `BenchmarkToStructPointers`
+- Struct 导入：`BenchmarkStructImport`
+- Join：`BenchmarkJoin`
+- GroupBy：`BenchmarkGroupBy`
+- NDJSON：`BenchmarkNDJSON`
+- Excel：`BenchmarkExcel`
+- 表达式回调：`BenchmarkExprMapBatches` / `BenchmarkExprVsMapBatches`
+
+当前基线（Apple M4 Pro, `go test ./polars -run '^$' -bench 'Benchmark(ImportRows|QueryCollect|ToMaps|ToStructs|ToStructPointers|StructImport|Join|GroupBy|NDJSON|Excel|ExprVsMapBatches)' -benchtime=3x -benchmem`）：
 
 | Benchmark | ns/op | B/op | allocs/op |
 |---|---:|---:|---:|
-| `BenchmarkImportRows/Rows2000/JSONWithSchema` | 9,068,083 | 777,936 | 7,935 |
-| `BenchmarkImportRows/Rows2000/ArrowSchema` | 4,936,000 | 69,480 | 4,368 |
-| `BenchmarkQueryCollect/Rows4000/InMemoryArrowBacked` | 17,183,750 | 1,405,000 | 20,013 |
-| `BenchmarkQueryCollect/Rows4000/CSVScan` | 20,517,500 | 1,075,976 | 18,028 |
-| `BenchmarkToMaps/Rows4000` | 676,434 | 1,689,452 | 31,846 |
-| `BenchmarkToStructs/Rows4000` | 382,076 | 781,858 | 12,102 |
-| `BenchmarkToStructPointers/Rows4000` | 453,279 | 1,070,625 | 16,103 |
-| `BenchmarkExprVsMapBatches/Rows4000/NativeSingle` | 580,681 | 1,381,933 | 8,079 |
-| `BenchmarkExprVsMapBatches/Rows4000/MapBatchesSingle` | 543,986 | 1,467,624 | 8,171 |
-| `BenchmarkExprVsMapBatches/Rows4000/NativeMulti` | 648,181 | 1,413,965 | 12,079 |
-| `BenchmarkExprVsMapBatches/Rows4000/MapBatchesMulti` | 769,208 | 1,500,549 | 12,182 |
+| `BenchmarkImportRows/Rows2000/JSONWithSchema` | 1,459,361 | 593,762 | 7,791 |
+| `BenchmarkImportRows/Rows2000/ArrowSchema` | 601,222 | 67,813 | 4,353 |
+| `BenchmarkQueryCollect/Rows4000/InMemoryArrowBacked` | 591,208 | 1,051,818 | 17,813 |
+| `BenchmarkQueryCollect/Rows4000/CSVScan` | 1,022,778 | 1,052,562 | 17,811 |
+| `BenchmarkToMaps/Rows4000` | 713,514 | 1,691,941 | 31,845 |
+| `BenchmarkToStructs/Rows4000` | 386,472 | 750,421 | 8,097 |
+| `BenchmarkToStructPointers/Rows4000` | 420,653 | 1,039,109 | 12,097 |
+| `BenchmarkStructImport/Rows4000` | 2,651,903 | 2,437,602 | 28,043 |
+| `BenchmarkJoin/Rows4000/Inner` | 759,375 | 1,482,589 | 19,881 |
+| `BenchmarkGroupBy/Rows4000/DepartmentAgg` | 285,014 | 12,680 | 171 |
+| `BenchmarkNDJSON/Rows4000/WriteNDJSON` | 431,458 | 639,816 | 11 |
+| `BenchmarkNDJSON/Rows4000/SinkNDJSONFile` | 552,431 | 1,573 | 20 |
+| `BenchmarkNDJSON/Rows4000/SinkNDJSONFileGzip` | 8,701,458 | 1,605 | 20 |
+| `BenchmarkExcel/Rows4000/ReadExcel` | 29,699,222 | 29,862,880 | 546,072 |
+| `BenchmarkExprVsMapBatches/Rows4000/NativeSingle` | 430,305 | 1,384,898 | 8,079 |
+| `BenchmarkExprVsMapBatches/Rows4000/MapBatchesSingle` | 442,611 | 1,472,504 | 8,172 |
+| `BenchmarkExprVsMapBatches/Rows4000/NativeMulti` | 438,569 | 1,416,824 | 12,078 |
+| `BenchmarkExprVsMapBatches/Rows4000/MapBatchesMulti` | 507,847 | 1,505,626 | 12,184 |
 
 当前 smoke 基线说明：
 
@@ -549,22 +593,27 @@ go test ./polars -run '^$' -bench 'BenchmarkImportRows/Rows2000|BenchmarkQueryCo
 - `ToMaps()` 目前仍然有比较明显的分配成本，后续值得继续优化
 - `ToStructs()` 现在优先走 Arrow 直转并带有常见标量列的直赋值快路径；在当前基线下，已经同时优于 `ToMaps()` 的延迟、内存和分配次数
 - `ToStructPointers()` 会比 `ToStructs()` 多一层对象分配，但在当前基线下仍明显优于 `ToMaps()`
+- `Struct` 导入目前比 `ArrowSchema` / `JSONWithSchema` 行式导入更重，4k 行样本下已经到 `2.65ms / 2.4MB / 28k allocs`
+- `Join` 在 4k 行样本下仍处在可接受范围，但明显比同规模 `GroupBy` 重
+- `GroupBy` 的常见聚合当前很轻，4k 行样本下只有 `~0.28ms`，而且分配很低
+- `SinkNDJSONFile` 在非 gzip 模式下非常省内存，但 gzip sink 的 CPU 成本明显高于非压缩输出
+- `Excel` 读取是当前这批 benchmark 里最重的一类，4k 行样本已经接近 `30ms / 30MB / 54万 allocs`
 - `Expr.MapBatches(...)` 单输入在当前实现下已经和原生表达式非常接近
 - 多输入 `pl.MapBatches(...)` 会有额外的 Arrow batch 回调成本，但仍保持在同一量级
 
-`ToMaps()` / `ToStructs()` / `ToStructPointers()` 对照（Apple M4 Pro, `go test ./polars -run '^$' -bench 'Benchmark(ToMaps|ToStructs|ToStructPointers)' -benchmem`）：
+`ToMaps()` / `ToStructs()` / `ToStructPointers()` 对照（Apple M4 Pro, `go test ./polars -run '^$' -bench 'Benchmark(ToMaps|ToStructs|ToStructPointers)' -benchtime=3x -benchmem`）：
 
 | Benchmark | ns/op | B/op | allocs/op |
 |---|---:|---:|---:|
-| `BenchmarkToMaps/Rows1000` | 174,895 | 426,788 | 7,843 |
-| `BenchmarkToStructs/Rows1000` | 100,829 | 201,819 | 3,102 |
-| `BenchmarkToStructPointers/Rows1000` | 113,734 | 274,012 | 4,103 |
-| `BenchmarkToMaps/Rows4000` | 747,331 | 1,689,469 | 31,847 |
-| `BenchmarkToStructs/Rows4000` | 382,076 | 781,858 | 12,102 |
-| `BenchmarkToStructPointers/Rows4000` | 453,279 | 1,070,625 | 16,103 |
-| `BenchmarkToMaps/Rows16000` | 2,991,847 | 6,734,175 | 127,849 |
-| `BenchmarkToStructs/Rows16000` | 1,501,154 | 3,085,616 | 48,102 |
-| `BenchmarkToStructPointers/Rows16000` | 2,075,547 | 4,240,708 | 64,103 |
+| `BenchmarkToMaps/Rows1000` | 160,931 | 428,160 | 7,840 |
+| `BenchmarkToStructs/Rows1000` | 91,000 | 194,325 | 2,096 |
+| `BenchmarkToStructPointers/Rows1000` | 93,889 | 266,501 | 3,097 |
+| `BenchmarkToMaps/Rows4000` | 713,514 | 1,691,941 | 31,845 |
+| `BenchmarkToStructs/Rows4000` | 386,472 | 750,421 | 8,097 |
+| `BenchmarkToStructPointers/Rows4000` | 420,653 | 1,039,109 | 12,097 |
+| `BenchmarkToMaps/Rows16000` | 2,848,986 | 6,735,896 | 127,845 |
+| `BenchmarkToStructs/Rows16000` | 1,493,639 | 2,959,354 | 32,097 |
+| `BenchmarkToStructPointers/Rows16000` | 1,778,125 | 4,114,496 | 48,099 |
 
 Struct 导出选型建议：
 
@@ -847,7 +896,7 @@ exprMappedMany, _ := df.Select(
     }).Alias("age_bonus"),
 ).Collect()
 
-// Pivot (eager-only, aligned with Polars eager pivot semantics)
+// Pivot (eager)
 pivoted, _ := df.Pivot(pl.PivotOptions{
     On:            []string{"subject"},
     Index:         []string{"name"},
@@ -856,6 +905,17 @@ pivoted, _ := df.Pivot(pl.PivotOptions{
     MaintainOrder: true,
 })
 defer pivoted.Close()
+
+// Pivot (lazy, requires explicit on_columns)
+lazyPivoted, _ := df.PivotLazy(pl.LazyPivotOptions{
+    On:            []string{"subject"},
+    OnColumns:     []any{"math", "english"},
+    Index:         []string{"name"},
+    Values:        []string{"score"},
+    Aggregate:     "first",
+    MaintainOrder: true,
+}).Collect()
+defer lazyPivoted.Close()
 
 // 避免示例里未使用变量
 _ = summary
@@ -879,6 +939,7 @@ _ = mappedDF
 _ = batchMappedDF
 _ = exprMapped
 _ = exprMappedMany
+_ = lazyPivoted
 
 // Window functions
 windowed := lf.Select(
@@ -907,8 +968,59 @@ orderedWindow := lf.Select(
     }).Alias("department_running_salary"),
 )
 
+rankedWindow := lf.Select(
+    pl.Col("name"),
+    pl.Col("department"),
+    pl.Col("salary"),
+    pl.Col("salary").Rank(pl.RankOptions{
+        Method:     pl.RankDense,
+        Descending: true,
+    }).OverWithOptions(pl.OverOptions{
+        PartitionBy: []pl.Expr{pl.Col("department")},
+        OrderBy:     []pl.Expr{pl.Col("salary")},
+        Descending:  true,
+    }).Alias("department_salary_rank"),
+)
+
+joinedWindow := lf.Select(
+    pl.Col("name"),
+    pl.Col("department"),
+    pl.Col("salary").SortBy([]pl.Expr{pl.Col("salary")}).OverWithOptions(pl.OverOptions{
+        PartitionBy:     []pl.Expr{pl.Col("department")},
+        MappingStrategy: pl.WindowMappingJoin,
+    }).Alias("salary_sorted_in_department"),
+)
+
+explodedWindow := lf.Select(
+    pl.All().SortBy([]pl.Expr{pl.Col("salary")}).OverWithOptions(pl.OverOptions{
+        PartitionBy:     []pl.Expr{pl.Col("department")},
+        MappingStrategy: pl.WindowMappingExplode,
+    }),
+)
+
+topPerGroup := lf.Select(
+    pl.Col("department").Head(2).OverWithOptions(pl.OverOptions{
+        PartitionBy:     []pl.Expr{pl.Col("department")},
+        MappingStrategy: pl.WindowMappingExplode,
+    }),
+    pl.Col("name").
+        SortBy([]pl.Expr{pl.Col("salary")}, pl.SortByOptions{
+            Descending: []bool{true},
+        }).
+        Head(int64(2)).
+        OverWithOptions(pl.OverOptions{
+            PartitionBy:     []pl.Expr{pl.Col("department")},
+            MappingStrategy: pl.WindowMappingExplode,
+        }).
+        Alias("top2_salary_by_department"),
+)
+
 _ = windowed
 _ = orderedWindow
+_ = rankedWindow
+_ = joinedWindow
+_ = explodedWindow
+_ = topPerGroup
 
 numericHelpers := lf.Select(
     pl.Col("value").IsNotNull().Alias("value_not_null"),
@@ -973,6 +1085,14 @@ result, _ := eagerDF.Filter(pl.Col("age").Gt(pl.Lit(30))).
     Collect()
 defer result.Free()
 ```
+
+窗口函数使用建议：
+
+- `Over(...)`：默认 `group_to_rows`，适合结果长度和组长度一致的窗口表达式
+- `OverWithOptions(... OrderBy ...)`：适合组内排序后的累计值、排名和重排
+- `WindowMappingJoin`：把组结果保留成 list，并回填到组内每一行
+- `WindowMappingExplode`：按组输出连续结果，通常更高效，但会改变原始行顺序
+- `SortBy(...).Head(...).OverWithOptions(... WindowMappingExplode)`：适合 top-N per group 这类窗口模式
 
 #### Join 示例
 
@@ -1120,6 +1240,116 @@ pl.Col("salary").Mul(pl.Lit(1.1)).Alias("new_salary")
 // 空值检查
 pl.Col("phone").IsNull()
 ```
+
+#### Aggregation / Expression 对照示例
+
+```go
+lf := pl.ScanCSV("testdata/sample.csv")
+
+// 1. 基础分组聚合
+summary := lf.GroupBy("department").Agg(
+    pl.Col("salary").Sum().Alias("total_salary"),
+    pl.Col("name").Count().Alias("employee_count"),
+    pl.Col("age").Max().Alias("max_age"),
+)
+
+// 2. 条件聚合：只聚合满足条件的组内值
+filteredAgg := lf.GroupBy("department").Agg(
+    pl.Col("name").
+        Filter(pl.Col("age").Gt(pl.Lit(30))).
+        Alias("older_names"),
+    pl.Col("salary").
+        Filter(pl.Col("salary").Gt(pl.Lit(60000))).
+        Mean().
+        Alias("high_salary_mean"),
+)
+
+// 3. 组内排序后再聚合
+sortedAgg := lf.GroupBy("department").Agg(
+    pl.Col("name").
+        SortBy([]pl.Expr{pl.Col("salary")}, pl.SortByOptions{
+            Descending: []bool{true},
+        }).
+        Alias("names_by_salary_desc"),
+    pl.Col("salary").
+        SortBy([]pl.Expr{pl.Col("age")}).
+        First().
+        Alias("salary_of_youngest"),
+)
+
+// 4. 标量窗口聚合：结果广播回原行数
+windowed := lf.Select(
+    pl.Col("name"),
+    pl.Col("department"),
+    pl.Col("salary"),
+    pl.Col("salary").
+        Mean().
+        Over(pl.Col("department")).
+        Alias("department_salary_mean"),
+)
+
+// 5. 排名窗口
+ranked := lf.Select(
+    pl.Col("name"),
+    pl.Col("department"),
+    pl.Col("salary"),
+    pl.Col("salary").
+        Rank(pl.RankOptions{
+            Method:     pl.RankDense,
+            Descending: true,
+        }).
+        Over(pl.Col("department")).
+        Alias("department_salary_rank"),
+)
+
+// 6. 带排序和 mapping_strategy 的窗口
+joinedWindow := lf.Select(
+    pl.Col("name"),
+    pl.Col("department"),
+    pl.Col("salary").
+        SortBy([]pl.Expr{pl.Col("salary")}).
+        OverWithOptions(pl.OverOptions{
+            PartitionBy:     []pl.Expr{pl.Col("department")},
+            MappingStrategy: pl.WindowMappingJoin,
+        }).
+        Alias("salary_sorted_in_department"),
+)
+
+explodedWindow := lf.Select(
+    pl.All().
+        SortBy([]pl.Expr{pl.Col("salary")}).
+        OverWithOptions(pl.OverOptions{
+            PartitionBy:     []pl.Expr{pl.Col("department")},
+            MappingStrategy: pl.WindowMappingExplode,
+        }),
+)
+
+// 7. struct 风格聚合结果
+valueCounts := lf.Select(
+    pl.Col("department").
+        ValueCounts(pl.ValueCountsOptions{Name: "n"}).
+        Alias("department_counts"),
+).Unnest("department_counts")
+
+_ = summary
+_ = filteredAgg
+_ = sortedAgg
+_ = windowed
+_ = ranked
+_ = joinedWindow
+_ = explodedWindow
+_ = valueCounts
+```
+
+常见对应关系：
+
+- 普通 `GroupBy(...).Agg(...)`：适合“每组输出 1 行”或“每组输出 list 列”
+- `expr.Filter(...)`：适合组内条件聚合
+- `expr.SortBy(...)`：适合组内排序后再取 `First/Last/Head/...`
+- `expr.Over(...)`：适合把聚合结果映射回原始行数
+- `OverWithOptions(... MappingStrategy: pl.WindowMappingJoin)`：适合把组结果保留为 list 并回填到组内每一行
+- `OverWithOptions(... MappingStrategy: pl.WindowMappingExplode)`：适合按组重排结果，性能更好，但会改变行顺序
+- `ValueCounts(...).Alias(...).Unnest(...)`：适合把 struct-like 聚合结果直接展开成普通列
 
 ## 📚 完整示例
 
@@ -1766,49 +1996,132 @@ EagerFrame（新的结果）
 - [x] CSV / Parquet 扫描参数：HasHeader / Separator / SkipRows / InferSchemaLength / NullValue / TryParseDates / QuoteChar / CommentPrefix / Schema / Encoding / IgnoreErrors / Rechunk
 - [x] Filter / Select / WithColumns / Limit 操作
 - [x] Drop / Rename / Slice / Head / Tail 操作
-- [x] FillNull / FillNan / FFill / BFill / DropNulls / DropNans / Reverse / Sample / Explode / Unpivot(Melt) 操作
-- [x] 完整的表达式系统：
-  - 算术操作：Add, Sub, Mul, Div, **Mod, Pow**
-  - 比较操作：Eq, Ne, Gt, Ge, Lt, Le
-  - 逻辑操作：And, Or, **Not, Xor**
-  - 类型转换：Cast, StrictCast
-  - 其他：Alias, IsNull, IsNotNull, IsNan, IsFinite, Cols, All, Exclude, FillNull, FillNan, FFill, BFill, Reverse
-  - 数值辅助：Abs, Round, Clip, Sqrt, Log, NullCount, ValueCounts
-- [x] 字符串表达式：
-  - StrLenBytes, StrLenChars
-  - StrContains, StrStartsWith, StrEndsWith
-  - StrExtract, StrReplace, StrReplaceAll
-  - StrToLowercase, StrToUppercase
-  - StrStripChars, StrSlice, StrSplit
-  - StrPadStart, StrPadEnd
+- [x] FillNull / FillNan / FFill / BFill / DropNulls / DropNans / Reverse / Sample / Explode / Unpivot(Melt) / Unnest 操作
 - [x] Arrow C Data Interface 导入/导出
 - [x] Arrow 优先的内存数据导入（显式 Arrow / `WithArrowSchema(...)` / 自动回退路径）
 - [x] Arrow 嵌套类型导出到 Go 值（List / LargeList / Struct -> `[]any` / `map[string]any`）
 - [x] Arrow 导入导出边界测试与 schema mismatch 错误信息补强
 - [x] 托管 `DataFrame` 与低层 `EagerFrame` 双层 API
-- [x] GroupBy / Aggregation 操作
-- [x] 更完整的聚合函数：Len / NUnique / Median / Std / Var
-- [x] Quantile 聚合
-- [x] 窗口函数：Over / Rank / CumSum / CumCount / CumMin / CumMax / CumProd
-- [x] 分析表达式：Shift / Diff
-- [x] 时间表达式：DtYear / DtMonth / DtDay / DtWeekday / DtHour / DtMinute / DtSecond / DtMonthStart / DtMonthEnd / StrToDate / StrToDatetime / StrToTime
+- [x] JSON / NDJSON 导出（`WriteJSON` / `WriteNDJSON` / `SinkJSON` / `SinkNDJSON` / `SinkNDJSONFile`）
+- [x] 真正的流式大文件 NDJSON 输出（`SinkNDJSONFile` 直接走 lazy sink，`SinkNDJSON` 不再先 collect）
 - [x] Join 操作
 - [x] Semi / Anti Join 操作
 - [x] Cross Join 操作
 - [x] Sort / Unique 操作
-- [x] Pivot 操作（eager）
+- [x] Pivot 操作（eager / lazy with explicit `OnColumns`）
 - [x] Forward fill (`FFill`)
 - [x] Concat / Union 风格的数据联合操作
 - [x] 基础 benchmark 套件（JSON vs Arrow 导入 / 内存输入 vs CSV 扫描 / ToMaps）
 - [x] 完善错误处理和错误信息（`ValidationError` / 关闭态错误 / schema mismatch / Excel 导入错误等）
 - [x] 完善的测试用例
 
+#### Expressions
+
+##### Basic operations
+- [x] 算术操作：Add, Sub, Mul, Div, Mod, Pow
+- [x] 比较操作：Eq, Ne, Gt, Ge, Lt, Le
+- [x] 逻辑操作：And, Or, Not, Xor
+- [x] 其他：Alias, IsNull, IsNotNull, IsNan, IsFinite, FillNull, FillNan, FFill, BFill, Reverse
+- [x] 数值辅助：Abs, Round, Clip, Sqrt, Log, NullCount, ValueCounts
+
+##### Expression expansion
+- [x] `Cols()` / `All()` / `Exclude()`
+
+##### Casting
+- [x] `Cast` / `StrictCast`
+
+##### Strings
+- [x] `StrLenBytes` / `StrLenChars`
+- [x] `StrContains` / `StrStartsWith` / `StrEndsWith`
+- [x] `StrExtract` / `StrReplace` / `StrReplaceAll`
+- [x] `StrToLowercase` / `StrToUppercase`
+- [x] `StrStripChars` / `StrSlice` / `StrSplit`
+- [x] `StrPadStart` / `StrPadEnd`
+
+##### Lists and arrays
+- [x] `ConcatList` / `Element` / `Eval` / `Agg`
+- [x] `Len` / `Sum` / `Mean` / `Median` / `Max` / `Min` / `Std` / `Var` / `NUnique` / `CountMatches`
+- [x] `Sort` / `Reverse` / `Unique` / `UniqueStable` / `Get` / `First` / `Last` / `Slice` / `Head` / `Tail`
+- [x] `Gather` / `GatherEvery`
+- [x] `Contains` / `Any` / `All` / `DropNulls` / `Shift` / `Diff` / `Join`
+- [x] `Union` / `SetDifference` / `SetIntersection` / `SetSymmetricDifference`
+- [x] `ArgMin` / `ArgMax` / `SampleN` / `SampleFraction`
+
+##### Structs
+- [x] `AsStruct`
+- [x] `Unnest`
+- [x] Arrow `Struct` 导入/导出
+- [x] `ToMaps()` / `ToStructs[T]` / `ToStructPointers[T]` 的 struct 列导出
+
+##### Missing data
+- [x] `IsNull` / `IsNotNull` / `FillNull` / `FillNan` / `DropNulls` / `DropNans`
+- [x] `FFill` / `BFill`
+
+##### Aggregation
+- [x] `GroupBy(...).Agg(...)`
+- [x] `Len` / `Count` / `Sum` / `Mean` / `Min` / `Max` / `First` / `Last`
+- [x] `NUnique` / `Median` / `Std` / `Var` / `Quantile`
+- [x] 聚合表达式辅助：`Filter(...)` / `SortBy(...)`
+- [x] 为公开 API 增加 aggregation / expression 对照示例
+
+##### Window functions
+- [x] `Over(...)` / `OverWithOptions(...)`
+- [x] `Rank(...).Over(...)`
+- [x] `CumSum` / `CumCount` / `CumMin` / `CumMax` / `CumProd`
+- [x] `mapping_strategy`: `group_to_rows` / `explode` / `join`
+- [x] 窗口排序：`OrderBy` / `Descending` / `NullsLast`
+- [x] `mapping_strategy`、`rank/over`、窗口排序场景示例
+
+#### DataFrame Operations
+- [x] `Filter` / `Select` / `WithColumns` / `Limit`
+- [x] `Drop` / `Rename` / `Slice` / `Head` / `Tail`
+- [x] `Explode` / `Unpivot(Melt)` / `Unnest`
+- [x] `Join` / `Semi Join` / `Anti Join` / `Cross Join`
+- [x] `Sort` / `Unique` / `Concat`
+- [x] `Pivot`（eager） / `PivotLazy`（lazy, explicit `OnColumns`）
+
+#### IO and Data Exchange
+- [x] CSV 文件懒加载扫描
+- [x] Parquet 文件懒加载扫描
+- [x] CSV / Parquet 扫描参数：HasHeader / Separator / SkipRows / InferSchemaLength / NullValue / TryParseDates / QuoteChar / CommentPrefix / Schema / Encoding / IgnoreErrors / Rechunk
+- [x] Arrow C Data Interface 导入/导出
+- [x] Arrow 优先的内存数据导入（显式 Arrow / `WithArrowSchema(...)` / 自动回退路径）
+- [x] Arrow 嵌套类型导出到 Go 值（List / LargeList / Struct -> `[]any` / `map[string]any`）
+- [x] Arrow 导入导出边界测试与 schema mismatch 错误信息补强
+
+#### Go Struct Interop
+- [x] `struct` / `*struct` slice 导入
+- [x] 嵌套 struct、常见 list、`[]byte`、数值类型、`time.Time` 绑定
+- [x] `ToStructs[T]` / `ToStructPointers[T]`
+
+#### Benchmark
+- [x] benchmark 套件（JSON vs Arrow 导入 / 内存输入 vs CSV 扫描 / ToMaps / Join / GroupBy / Struct 导入导出 / NDJSON / Excel）
+
+#### Engineering
+- [x] 托管 `DataFrame` 与低层 `EagerFrame` 双层 API
+- [x] 完善错误处理和错误信息（`ValidationError` / 关闭态错误 / schema mismatch / Excel 导入错误等）
+- [x] 完善的测试用例
+
 ### 计划中 📋
-- [ ] 支持更多表达式（继续补齐剩余日期/窗口/字符串/数值辅助表达式）
-- [ ] 为公开 API 增加更系统的表达式覆盖清单与对照示例
-- [ ] 扩展 benchmark 套件（Join / GroupBy / Struct 导入导出 / NDJSON / Excel）
-- [ ] 继续补强错误信息的可读性（更多字段上下文、类型上下文、建议性提示）
-- [ ] 支持真正的流式大文件输出（避免 `SinkNDJSON` 先 collect）
+#### Expressions
+
+##### Strings
+- [ ] 补齐 `StrToTitlecase`（受当前稳定版 Polars 限制，暂未接入）
+
+##### Lists and arrays
+- [ ] 支持 `list.to_array(...)`
+- [ ] 支持 `list.to_struct(...)`
+
+##### Structs
+- [ ] 补齐 `struct.field(...)`
+- [ ] 补齐 `rename_fields(...)`
+- [ ] 继续完善 struct namespace 的公开 API
+
+##### Aggregation
+
+##### Window functions
+
+#### IO and Execution
 - [ ] 支持更适合大文件场景的扫描/分批处理能力
 
 ## 🤝 贡献
@@ -1824,4 +2137,4 @@ MIT License
 - [Polars](https://github.com/pola-rs/polars) - 高性能 DataFrame 库
 - [Apache Arrow](https://arrow.apache.org/) - 列式内存格式
 - [prost](https://github.com/tokio-rs/prost) - Rust Protobuf 实现
-- [purgo](https://github.com/guonaihong/purgo) - Go 调用 Rust 的工具链支持
+- [purgo](https://github.com/ebitengine/purego) - Go 调用 Rust 的工具链支持

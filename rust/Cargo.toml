@@ -7,9 +7,11 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-polars = { version = "0.53.0", features = ["lazy", "json", "timezones", "csv", "parquet", "ipc", "strings", "regex", "string_pad", "semi_anti_join", "cross_join", "rank", "cum_agg", "dtype-struct", "diff", "abs", "temporal", "dtype-date", "dtype-datetime", "dtype-time", "month_start", "month_end", "sql", "pivot", "random", "log", "round_series", "is_unique", "rolling_window"] }
+polars = { version = "0.53.0", features = ["lazy", "json", "timezones", "csv", "parquet", "ipc", "strings", "regex", "string_pad", "semi_anti_join", "cross_join", "rank", "cum_agg", "dtype-struct", "diff", "abs", "temporal", "dtype-date", "dtype-datetime", "dtype-time", "month_start", "month_end", "sql", "pivot", "random", "log", "round_series", "is_unique", "rolling_window", "list_eval", "is_in", "list_any_all", "list_drop_nulls", "list_count", "list_gather", "list_sample", "list_sets", "decompress"] }
 polars-arrow = { package = "polars-arrow", version = "0.53.0" }
 polars-ops = { package = "polars-ops", version = "0.53.0", features = ["pivot"] }
+polars-plan = { package = "polars-plan", version = "0.53.0", features = ["json"] }
+polars-utils = { package = "polars-utils", version = "0.53.0" }
 prost = "0.13"
 arrow = { version = "53", features = ["ffi"] }
 libc = "0.2"

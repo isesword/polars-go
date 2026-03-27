@@ -46,7 +46,11 @@ impl std::fmt::Display for BridgeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             BridgeError::InvalidArgument(s) => write!(f, "Invalid argument: {}", s),
-            BridgeError::PlanVersionUnsupported(v) => write!(f, "Plan version {} unsupported", v),
+            BridgeError::PlanVersionUnsupported(v) => write!(
+                f,
+                "Plan version {} unsupported; hint: regenerate the plan with the current Go bindings/library pair",
+                v
+            ),
             BridgeError::PlanDecode(s) => write!(f, "Plan decode error: {}", s),
             BridgeError::PlanSemantic(s) => write!(f, "Plan semantic error: {}", s),
             BridgeError::ArrowImport(s) => write!(f, "Arrow import error: {}", s),

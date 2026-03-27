@@ -434,33 +434,37 @@ func normalizeValueForSchema(value any, dataType DataType) (any, error) {
 	case DataTypeInt64, DataTypeInt32, DataTypeInt16, DataTypeInt8:
 		v, err := toInt64(value)
 		if err != nil {
-			return nil, err
+			return nil, enrichSchemaValueError(dataType, value, err)
 		}
 		return v, nil
 	case DataTypeUInt64, DataTypeUInt32, DataTypeUInt16, DataTypeUInt8:
 		v, err := toUint64(value)
 		if err != nil {
-			return nil, err
+			return nil, enrichSchemaValueError(dataType, value, err)
 		}
 		return v, nil
 	case DataTypeFloat64, DataTypeFloat32:
 		v, err := toFloat64(value)
 		if err != nil {
-			return nil, err
+			return nil, enrichSchemaValueError(dataType, value, err)
 		}
 		return v, nil
 	case DataTypeBool:
 		if b, ok := value.(bool); ok {
 			return b, nil
 		}
-		return nil, fmt.Errorf("expected bool, got %T", value)
+		return nil, enrichSchemaValueError(dataType, value, fmt.Errorf("expected bool, got %T", value))
 	case DataTypeUTF8:
 		if s, ok := value.(string); ok {
 			return s, nil
 		}
 		return fmt.Sprintf("%v", value), nil
 	case DataTypeDate, DataTypeDatetime, DataTypeTime:
-		return normalizeTemporalValueForJSON(value, dataType)
+		normalized, err := normalizeTemporalValueForJSON(value, dataType)
+		if err != nil {
+			return nil, enrichSchemaValueError(dataType, value, err)
+		}
+		return normalized, nil
 	default:
 		return value, nil
 	}

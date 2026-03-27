@@ -80,7 +80,7 @@ func toArrowTime64Micro(value any) (arrow.Time64, error) {
 
 func toDateTime(value any) (time.Time, error) {
 	if value == nil {
-		return time.Time{}, fmt.Errorf("temporal value is nil")
+		return time.Time{}, fmt.Errorf("datetime value is nil; hint: %s", temporalValueHint("datetime", temporalLayouts))
 	}
 
 	switch v := value.(type) {
@@ -88,21 +88,26 @@ func toDateTime(value any) (time.Time, error) {
 		return v, nil
 	case *time.Time:
 		if v == nil {
-			return time.Time{}, fmt.Errorf("temporal value is nil")
+			return time.Time{}, fmt.Errorf("datetime value is nil; hint: %s", temporalValueHint("datetime", temporalLayouts))
 		}
 		return *v, nil
 	case string:
-		return parseTemporalString(v, temporalLayouts)
+		return parseTemporalString(v, temporalLayouts, "datetime")
 	case []byte:
-		return parseTemporalString(string(v), temporalLayouts)
+		return parseTemporalString(string(v), temporalLayouts, "datetime")
 	default:
-		return time.Time{}, fmt.Errorf("cannot convert %T to datetime", value)
+		return time.Time{}, fmt.Errorf(
+			"cannot convert %s to datetime (value=%s); hint: %s",
+			describeValueType(value),
+			describeValue(value),
+			temporalValueHint("datetime", temporalLayouts),
+		)
 	}
 }
 
 func toTimeOfDay(value any) (time.Time, error) {
 	if value == nil {
-		return time.Time{}, fmt.Errorf("temporal value is nil")
+		return time.Time{}, fmt.Errorf("time value is nil; hint: %s", temporalValueHint("time", timeOnlyLayouts))
 	}
 
 	switch v := value.(type) {
@@ -110,24 +115,34 @@ func toTimeOfDay(value any) (time.Time, error) {
 		return v, nil
 	case *time.Time:
 		if v == nil {
-			return time.Time{}, fmt.Errorf("temporal value is nil")
+			return time.Time{}, fmt.Errorf("time value is nil; hint: %s", temporalValueHint("time", timeOnlyLayouts))
 		}
 		return *v, nil
 	case string:
-		return parseTemporalString(v, timeOnlyLayouts)
+		return parseTemporalString(v, timeOnlyLayouts, "time")
 	case []byte:
-		return parseTemporalString(string(v), timeOnlyLayouts)
+		return parseTemporalString(string(v), timeOnlyLayouts, "time")
 	default:
-		return time.Time{}, fmt.Errorf("cannot convert %T to time", value)
+		return time.Time{}, fmt.Errorf(
+			"cannot convert %s to time (value=%s); hint: %s",
+			describeValueType(value),
+			describeValue(value),
+			temporalValueHint("time", timeOnlyLayouts),
+		)
 	}
 }
 
-func parseTemporalString(value string, layouts []string) (time.Time, error) {
+func parseTemporalString(value string, layouts []string, kind string) (time.Time, error) {
 	value = strings.TrimSpace(value)
 	for _, layout := range layouts {
 		if t, err := time.Parse(layout, value); err == nil {
 			return t, nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("cannot parse temporal value %q", value)
+	return time.Time{}, fmt.Errorf(
+		"cannot parse %s value %q; hint: %s",
+		kind,
+		value,
+		temporalValueHint(kind, layouts),
+	)
 }

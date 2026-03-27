@@ -567,6 +567,14 @@ func (f *DataFrame) Explode(columns ...string) *LazyFrame {
 	return f.df.Explode(columns...)
 }
 
+// Unnest unnests struct columns into their fields.
+func (f *DataFrame) Unnest(columns ...string) *LazyFrame {
+	if f == nil || f.df == nil {
+		return nil
+	}
+	return f.df.Unnest(columns...)
+}
+
 // Reverse reverses row order.
 func (f *DataFrame) Reverse() *LazyFrame {
 	if f == nil || f.df == nil {
@@ -670,9 +678,18 @@ func (f *DataFrame) Pivot(opts PivotOptions) (*DataFrame, error) {
 	return newDataFrameWrapper(df), nil
 }
 
+// PivotLazy performs a lazy pivot that requires explicit OnColumns, aligned
+// with Python Polars LazyFrame.pivot semantics.
+func (f *DataFrame) PivotLazy(opts LazyPivotOptions) *LazyFrame {
+	if err := invalidDataFrameError(f); err != nil {
+		return (&LazyFrame{}).withErr(wrapOp("DataFrame.PivotLazy", err))
+	}
+	return f.df.PivotLazy(opts)
+}
+
 func pivotEagerFrame(brg *bridge.Bridge, handle uint64, opts PivotOptions) (*EagerFrame, error) {
 	if len(opts.On) == 0 {
-		return nil, fmt.Errorf("pivot options require at least one column in On")
+		return nil, fmt.Errorf("pivot options require at least one column in On; hint: set PivotOptions.On to one or more column names")
 	}
 	payload, err := json.Marshal(opts)
 	if err != nil {
@@ -680,7 +697,14 @@ func pivotEagerFrame(brg *bridge.Bridge, handle uint64, opts PivotOptions) (*Eag
 	}
 	dfHandle, err := brg.PivotDataFrame(handle, payload)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(
+			"pivot failed (on=%v, index=%v, values=%v, aggregate=%q): %w",
+			opts.On,
+			opts.Index,
+			opts.Values,
+			opts.Aggregate,
+			err,
+		)
 	}
 	return newDataFrame(dfHandle, brg), nil
 }

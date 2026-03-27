@@ -538,6 +538,61 @@ func TestGroupByJoinSortUnique(t *testing.T) {
 		}
 	})
 
+	t.Run("AggregationExprFilterAndSortBy", func(t *testing.T) {
+		rows, err := collectToMaps(t, ScanCSV("../testdata/sample.csv").
+			GroupBy("department").
+			Agg(
+				Col("name").Filter(Col("age").Gt(Lit(30))).Alias("older_names"),
+				Col("name").SortBy([]Expr{Col("age")}, SortByOptions{
+					Descending: []bool{true},
+				}).Alias("names_by_age_desc"),
+			).
+			Sort(SortOptions{By: []Expr{Col("department")}}))
+		if err != nil {
+			t.Fatalf("aggregation expr filter/sort_by failed: %v", err)
+		}
+
+		expectedOlder := map[string][]string{
+			"Engineering": {"Charlie", "Eve"},
+			"Marketing":   {},
+			"Sales":       {},
+		}
+		expectedSorted := map[string][]string{
+			"Engineering": {"Charlie", "Eve", "Alice"},
+			"Marketing":   {"Bob", "Frank"},
+			"Sales":       {"Diana", "Grace"},
+		}
+
+		for _, row := range rows {
+			dept := row["department"].(string)
+			gotOlder, ok := row["older_names"].([]any)
+			if !ok {
+				t.Fatalf("%s older_names unexpected type %T", dept, row["older_names"])
+			}
+			if len(gotOlder) != len(expectedOlder[dept]) {
+				t.Fatalf("%s older_names length mismatch: got %v want %v", dept, gotOlder, expectedOlder[dept])
+			}
+			for i, want := range expectedOlder[dept] {
+				if gotOlder[i] != want {
+					t.Fatalf("%s older_names[%d] mismatch: got %#v want %#v", dept, i, gotOlder[i], want)
+				}
+			}
+
+			gotSorted, ok := row["names_by_age_desc"].([]any)
+			if !ok {
+				t.Fatalf("%s names_by_age_desc unexpected type %T", dept, row["names_by_age_desc"])
+			}
+			if len(gotSorted) != len(expectedSorted[dept]) {
+				t.Fatalf("%s names_by_age_desc length mismatch: got %v want %v", dept, gotSorted, expectedSorted[dept])
+			}
+			for i, want := range expectedSorted[dept] {
+				if gotSorted[i] != want {
+					t.Fatalf("%s names_by_age_desc[%d] mismatch: got %#v want %#v", dept, i, gotSorted[i], want)
+				}
+			}
+		}
+	})
+
 	t.Run("Join", func(t *testing.T) {
 		left := ScanCSV("../testdata/sample.csv").
 			Select(Col("name"), Col("department"), Col("salary"))
@@ -894,6 +949,99 @@ func TestWindowFunctions(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("OverWithJoinMapping", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"athlete": "A", "country": "PT", "rank": int64(6)},
+			{"athlete": "B", "country": "NL", "rank": int64(1)},
+			{"athlete": "C", "country": "NL", "rank": int64(5)},
+			{"athlete": "D", "country": "PT", "rank": int64(4)},
+			{"athlete": "E", "country": "PT", "rank": int64(2)},
+			{"athlete": "F", "country": "NL", "rank": int64(3)},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		rows, err := collectToMaps(t, df.Select(
+			Col("athlete"),
+			Col("country"),
+			Col("rank").SortBy([]Expr{Col("rank")}).OverWithOptions(OverOptions{
+				PartitionBy:     []Expr{Col("country")},
+				MappingStrategy: WindowMappingJoin,
+			}).Alias("rank_in_country"),
+		))
+		if err != nil {
+			t.Fatalf("window join mapping failed: %v", err)
+		}
+
+		expected := map[string][]int64{
+			"PT": {2, 4, 6},
+			"NL": {1, 3, 5},
+		}
+		for _, row := range rows {
+			country := row["country"].(string)
+			got, ok := row["rank_in_country"].([]any)
+			if !ok {
+				t.Fatalf("%s expected list result, got %T", country, row["rank_in_country"])
+			}
+			want := expected[country]
+			if len(got) != len(want) {
+				t.Fatalf("%s expected %v, got %#v", country, want, got)
+			}
+			for i, v := range want {
+				gotV, err := toInt64(got[i])
+				if err != nil || gotV != v {
+					t.Fatalf("%s expected rank_in_country[%d]=%d, got %#v", country, i, v, got[i])
+				}
+			}
+		}
+	})
+
+	t.Run("OverWithExplodeMapping", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"athlete": "A", "country": "PT", "rank": int64(6)},
+			{"athlete": "B", "country": "NL", "rank": int64(1)},
+			{"athlete": "C", "country": "NL", "rank": int64(5)},
+			{"athlete": "D", "country": "PT", "rank": int64(4)},
+			{"athlete": "E", "country": "PT", "rank": int64(2)},
+			{"athlete": "F", "country": "NL", "rank": int64(3)},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		rows, err := collectToMaps(t, df.Select(
+			All().SortBy([]Expr{Col("rank")}).OverWithOptions(OverOptions{
+				PartitionBy:     []Expr{Col("country")},
+				MappingStrategy: WindowMappingExplode,
+			}),
+		))
+		if err != nil {
+			t.Fatalf("window explode mapping failed: %v", err)
+		}
+
+		expectedAthletes := []string{"E", "D", "A", "B", "F", "C"}
+		expectedCountries := []string{"PT", "PT", "PT", "NL", "NL", "NL"}
+		expectedRanks := []int64{2, 4, 6, 1, 3, 5}
+		if len(rows) != len(expectedAthletes) {
+			t.Fatalf("expected %d rows, got %d", len(expectedAthletes), len(rows))
+		}
+		for i := range rows {
+			if rows[i]["athlete"] != expectedAthletes[i] {
+				t.Fatalf("row %d expected athlete=%s, got %#v", i, expectedAthletes[i], rows[i]["athlete"])
+			}
+			if rows[i]["country"] != expectedCountries[i] {
+				t.Fatalf("row %d expected country=%s, got %#v", i, expectedCountries[i], rows[i]["country"])
+			}
+			gotRank, err := toInt64(rows[i]["rank"])
+			if err != nil || gotRank != expectedRanks[i] {
+				t.Fatalf("row %d expected rank=%d, got %#v", i, expectedRanks[i], rows[i]["rank"])
+			}
+		}
+	})
 }
 
 func TestAnalyticExpressions(t *testing.T) {
@@ -1094,6 +1242,101 @@ func TestDataFramePivot(t *testing.T) {
 	if rows[0]["name"] != "Alice" || rows[0]["math"] != int64(90) || rows[0]["english"] != int64(85) {
 		t.Fatalf("unexpected pivot rows: %#v", rows)
 	}
+
+	_, err = df.Pivot(PivotOptions{
+		On:        []string{"subject"},
+		Index:     []string{"name"},
+		Values:    []string{"score"},
+		Aggregate: "bogus",
+	})
+	if err == nil {
+		t.Fatal("expected pivot with invalid aggregate to fail")
+	}
+	if !strings.Contains(err.Error(), `aggregate="bogus"`) {
+		t.Fatalf("expected pivot error to include aggregate context, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "unsupported pivot aggregate") {
+		t.Fatalf("expected pivot error to include aggregate hint, got %v", err)
+	}
+}
+
+func TestLazyFramePivot(t *testing.T) {
+	df, err := NewDataFrame([]map[string]any{
+		{"name": "Alice", "subject": "math", "score": int64(90)},
+		{"name": "Alice", "subject": "english", "score": int64(85)},
+		{"name": "Bob", "subject": "math", "score": int64(70)},
+		{"name": "Bob", "subject": "english", "score": int64(80)},
+	})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer df.Close()
+
+	rows, err := collectToMaps(t, df.Filter(Col("name").IsNotNull()).Pivot(LazyPivotOptions{
+		On:            []string{"subject"},
+		OnColumns:     []any{"math", "english"},
+		Index:         []string{"name"},
+		Values:        []string{"score"},
+		Aggregate:     "first",
+		MaintainOrder: true,
+	}))
+	if err != nil {
+		t.Fatalf("lazy pivot collect failed: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 lazy pivot rows, got %d", len(rows))
+	}
+	if rows[0]["name"] != "Alice" || rows[0]["math"] != int64(90) || rows[0]["english"] != int64(85) {
+		t.Fatalf("unexpected lazy pivot rows: %#v", rows)
+	}
+
+	t.Run("PivotLazyFromDataFrame", func(t *testing.T) {
+		rows, err := collectToMaps(t, df.PivotLazy(LazyPivotOptions{
+			On:            []string{"subject"},
+			OnColumns:     []any{"math", "english"},
+			Index:         []string{"name"},
+			Values:        []string{"score"},
+			Aggregate:     "first",
+			MaintainOrder: true,
+		}))
+		if err != nil {
+			t.Fatalf("DataFrame.PivotLazy collect failed: %v", err)
+		}
+		if len(rows) != 2 || rows[1]["name"] != "Bob" {
+			t.Fatalf("unexpected DataFrame.PivotLazy rows: %#v", rows)
+		}
+	})
+
+	t.Run("MissingOnColumns", func(t *testing.T) {
+		_, err := collectToMaps(t, df.PivotLazy(LazyPivotOptions{
+			On:        []string{"subject"},
+			Index:     []string{"name"},
+			Values:    []string{"score"},
+			Aggregate: "first",
+		}))
+		if err == nil {
+			t.Fatal("expected missing OnColumns to fail")
+		}
+		if !strings.Contains(err.Error(), "explicit OnColumns") {
+			t.Fatalf("expected missing OnColumns hint, got %v", err)
+		}
+	})
+
+	t.Run("InvalidAggregate", func(t *testing.T) {
+		_, err := collectToMaps(t, df.PivotLazy(LazyPivotOptions{
+			On:        []string{"subject"},
+			OnColumns: []any{"math", "english"},
+			Index:     []string{"name"},
+			Values:    []string{"score"},
+			Aggregate: "bogus",
+		}))
+		if err == nil {
+			t.Fatal("expected lazy pivot with invalid aggregate to fail")
+		}
+		if !strings.Contains(err.Error(), "unsupported pivot aggregate") {
+			t.Fatalf("expected aggregate hint, got %v", err)
+		}
+	})
 }
 
 func TestBasicFrameOperations(t *testing.T) {
@@ -1200,6 +1443,333 @@ func TestExplodeAndUnpivot(t *testing.T) {
 		if len(rows) != 3 || rows[0]["tags"] != "go" || rows[2]["tags"] != "arrow" {
 			t.Fatalf("unexpected explode rows: %#v", rows)
 		}
+	})
+
+	t.Run("ConcatListAndListExprs", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"station": "A", "day_1": int64(17), "day_2": int64(15), "day_3": int64(16)},
+			{"station": "B", "day_1": int64(11), "day_2": int64(11), "day_3": int64(15)},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		temps := ConcatList(Col("day_1"), Col("day_2"), Col("day_3"))
+		rows, err := collectToMaps(t, df.Select(
+			Col("station"),
+			temps.Alias("temps"),
+			temps.List().Len().Alias("temps_len"),
+			temps.List().Sum().Alias("temps_sum"),
+			temps.List().Mean().Alias("temps_mean"),
+			temps.List().Median().Alias("temps_median"),
+			temps.List().Max().Alias("temps_max"),
+			temps.List().Min().Alias("temps_min"),
+			temps.List().Std().Alias("temps_std"),
+			temps.List().Var().Alias("temps_var"),
+			temps.List().Contains(int64(15)).Alias("has_15"),
+			temps.List().Sort().Alias("temps_sorted"),
+			temps.List().Sort(ListSortOptions{Descending: true}).Alias("temps_sorted_desc"),
+			temps.List().Reverse().Alias("temps_reversed"),
+			temps.List().Unique().Alias("temps_unique"),
+			temps.List().NUnique().Alias("temps_n_unique"),
+			temps.List().ArgMin().Alias("temps_arg_min"),
+			temps.List().ArgMax().Alias("temps_arg_max"),
+			temps.List().Get(int64(1)).Alias("temps_get_1"),
+			temps.List().Slice(int64(1), int64(2)).Alias("temps_slice"),
+			temps.List().First().Alias("temps_first"),
+			temps.List().Last().Alias("temps_last"),
+			temps.List().Head(int64(2)).Alias("temps_head"),
+			temps.List().Tail(int64(2)).Alias("temps_tail"),
+			temps.List().Eval(Element().Add(Lit(int64(1)))).Alias("temps_plus_one"),
+			temps.List().Agg(Element().Sum()).Alias("temps_agg_sum"),
+		))
+		if err != nil {
+			t.Fatalf("list expression collect failed: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("expected 2 rows, got %d", len(rows))
+		}
+
+		firstTemps, ok := rows[0]["temps"].([]any)
+		if !ok || len(firstTemps) != 3 || firstTemps[0] != int64(17) || firstTemps[2] != int64(16) {
+			t.Fatalf("unexpected concat_list result: %#v", rows[0]["temps"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_len"]); !ok || got != 3 {
+			t.Fatalf("unexpected list.len result: %#v", rows[0]["temps_len"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_sum"]); !ok || got != 48 {
+			t.Fatalf("unexpected list.sum result: %#v", rows[0]["temps_sum"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_mean"]); !ok || math.Abs(got-16) > 1e-9 {
+			t.Fatalf("unexpected list.mean result: %#v", rows[0]["temps_mean"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_median"]); !ok || math.Abs(got-16) > 1e-9 {
+			t.Fatalf("unexpected list.median result: %#v", rows[0]["temps_median"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_max"]); !ok || got != 17 {
+			t.Fatalf("unexpected list.max result: %#v", rows[0]["temps_max"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_min"]); !ok || got != 15 {
+			t.Fatalf("unexpected list aggregate results: %#v", rows[0])
+		}
+		if got, ok := asFloat64(rows[0]["temps_std"]); !ok || math.Abs(got-1) > 1e-9 {
+			t.Fatalf("unexpected list.std result: %#v", rows[0]["temps_std"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_var"]); !ok || math.Abs(got-1) > 1e-9 {
+			t.Fatalf("unexpected list.var result: %#v", rows[0]["temps_var"])
+		}
+		if rows[0]["has_15"] != true || rows[1]["has_15"] != true {
+			t.Fatalf("unexpected list.contains results: %#v", rows)
+		}
+		firstSorted, ok := rows[0]["temps_sorted"].([]any)
+		if !ok || len(firstSorted) != 3 || firstSorted[0] != int64(15) || firstSorted[2] != int64(17) {
+			t.Fatalf("unexpected list.sort result: %#v", rows[0]["temps_sorted"])
+		}
+		firstSortedDesc, ok := rows[0]["temps_sorted_desc"].([]any)
+		if !ok || len(firstSortedDesc) != 3 || firstSortedDesc[0] != int64(17) || firstSortedDesc[2] != int64(15) {
+			t.Fatalf("unexpected descending list.sort result: %#v", rows[0]["temps_sorted_desc"])
+		}
+		firstReversed, ok := rows[0]["temps_reversed"].([]any)
+		if !ok || len(firstReversed) != 3 || firstReversed[0] != int64(16) || firstReversed[2] != int64(17) {
+			t.Fatalf("unexpected list.reverse result: %#v", rows[0]["temps_reversed"])
+		}
+		secondUnique, ok := rows[1]["temps_unique"].([]any)
+		if !ok || len(secondUnique) != 2 || secondUnique[0] != int64(11) || secondUnique[1] != int64(15) {
+			t.Fatalf("unexpected list.unique result: %#v", rows[1]["temps_unique"])
+		}
+		if got, ok := asFloat64(rows[1]["temps_n_unique"]); !ok || got != 2 {
+			t.Fatalf("unexpected list.n_unique result: %#v", rows[1]["temps_n_unique"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_arg_min"]); !ok || got != 1 {
+			t.Fatalf("unexpected list.arg_min result: %#v", rows[0]["temps_arg_min"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_arg_max"]); !ok || got != 0 {
+			t.Fatalf("unexpected list.arg_max result: %#v", rows[0]["temps_arg_max"])
+		}
+		if rows[0]["temps_get_1"] != int64(15) || rows[1]["temps_get_1"] != int64(11) {
+			t.Fatalf("unexpected list.get results: %#v", rows)
+		}
+		firstSlice, ok := rows[0]["temps_slice"].([]any)
+		if !ok || len(firstSlice) != 2 || firstSlice[0] != int64(15) || firstSlice[1] != int64(16) {
+			t.Fatalf("unexpected list.slice result: %#v", rows[0]["temps_slice"])
+		}
+		if rows[0]["temps_first"] != int64(17) || rows[1]["temps_first"] != int64(11) {
+			t.Fatalf("unexpected list.first results: %#v", rows)
+		}
+		if rows[0]["temps_last"] != int64(16) || rows[1]["temps_last"] != int64(15) {
+			t.Fatalf("unexpected list.last results: %#v", rows)
+		}
+		firstHead, ok := rows[0]["temps_head"].([]any)
+		if !ok || len(firstHead) != 2 || firstHead[0] != int64(17) || firstHead[1] != int64(15) {
+			t.Fatalf("unexpected list.head result: %#v", rows[0]["temps_head"])
+		}
+		firstTail, ok := rows[0]["temps_tail"].([]any)
+		if !ok || len(firstTail) != 2 || firstTail[0] != int64(15) || firstTail[1] != int64(16) {
+			t.Fatalf("unexpected list.tail result: %#v", rows[0]["temps_tail"])
+		}
+
+		firstTempsPlusOne, ok := rows[0]["temps_plus_one"].([]any)
+		if !ok || len(firstTempsPlusOne) != 3 || firstTempsPlusOne[0] != int64(18) || firstTempsPlusOne[2] != int64(17) {
+			t.Fatalf("unexpected list.eval result: %#v", rows[0]["temps_plus_one"])
+		}
+		if got, ok := asFloat64(rows[0]["temps_agg_sum"]); !ok || got != 48 {
+			t.Fatalf("unexpected list.agg result: %#v", rows[0]["temps_agg_sum"])
+		}
+	})
+
+	t.Run("ListJoin", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"name": "A", "tag_1": "go", "tag_2": "polars", "tag_3": "bridge"},
+			{"name": "B", "tag_1": "rust", "tag_2": "ffi", "tag_3": "bridge"},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		tags := ConcatList(Col("tag_1"), Col("tag_2"), Col("tag_3"))
+		rows, err := collectToMaps(t, df.Select(
+			Col("name"),
+			tags.List().Join("-").Alias("tags_joined"),
+		))
+		if err != nil {
+			t.Fatalf("list join collect failed: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("expected 2 rows, got %d", len(rows))
+		}
+		if rows[0]["tags_joined"] != "go-polars-bridge" || rows[1]["tags_joined"] != "rust-ffi-bridge" {
+			t.Fatalf("unexpected list.join results: %#v", rows)
+		}
+	})
+
+	t.Run("ListJoinIgnoreNulls", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"name": "A", "tag_1": "go", "tag_2": nil, "tag_3": "bridge"},
+			{"name": "B", "tag_1": "rust", "tag_2": "ffi", "tag_3": nil},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		tags := ConcatList(Col("tag_1"), Col("tag_2"), Col("tag_3"))
+		rows, err := collectToMaps(t, df.Select(
+			Col("name"),
+			tags.List().Join("-", true).Alias("tags_joined"),
+		))
+		if err != nil {
+			t.Fatalf("list join ignore_nulls collect failed: %v", err)
+		}
+		if rows[0]["tags_joined"] != "go-bridge" || rows[1]["tags_joined"] != "rust-ffi" {
+			t.Fatalf("unexpected list.join(ignore_nulls=true) results: %#v", rows)
+		}
+	})
+
+	t.Run("ListAnyAllDropNullsAndShift", func(t *testing.T) {
+		df, err := NewDataFrame([]map[string]any{
+			{"name": "A", "b1": true, "b2": false, "b3": true, "n1": int64(10), "n2": nil, "n3": int64(30), "x1": int64(10), "x2": int64(15), "x3": int64(21)},
+			{"name": "B", "b1": true, "b2": true, "b3": true, "n1": nil, "n2": int64(20), "n3": int64(40), "x1": int64(5), "x2": int64(8), "x3": int64(8)},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		bools := ConcatList(Col("b1"), Col("b2"), Col("b3"))
+		nums := ConcatList(Col("n1"), Col("n2"), Col("n3"))
+		rows, err := collectToMaps(t, df.Select(
+			Col("name"),
+			bools.List().Any().Alias("bool_any"),
+			bools.List().All().Alias("bool_all"),
+			nums.List().DropNulls().Alias("nums_drop_nulls"),
+			nums.List().Shift(int64(1)).Alias("nums_shift_1"),
+			ConcatList(Col("x1"), Col("x2"), Col("x3")).List().Diff(1, DiffNullIgnore).Alias("nums_diff"),
+		))
+		if err != nil {
+			t.Fatalf("list any/all/drop_nulls/shift collect failed: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("expected 2 rows, got %d", len(rows))
+		}
+		if rows[0]["bool_any"] != true || rows[1]["bool_any"] != true {
+			t.Fatalf("unexpected list.any results: %#v", rows)
+		}
+		if rows[0]["bool_all"] != false || rows[1]["bool_all"] != true {
+			t.Fatalf("unexpected list.all results: %#v", rows)
+		}
+		firstDropNulls, ok := rows[0]["nums_drop_nulls"].([]any)
+		if !ok || len(firstDropNulls) != 2 || firstDropNulls[0] != int64(10) || firstDropNulls[1] != int64(30) {
+			t.Fatalf("unexpected list.drop_nulls result: %#v", rows[0]["nums_drop_nulls"])
+		}
+		firstShifted, ok := rows[0]["nums_shift_1"].([]any)
+		if !ok || len(firstShifted) != 3 || firstShifted[0] != nil || firstShifted[1] != int64(10) || firstShifted[2] != nil {
+			t.Fatalf("unexpected list.shift result: %#v", rows[0]["nums_shift_1"])
+		}
+		firstDiff, ok := rows[0]["nums_diff"].([]any)
+		if !ok || len(firstDiff) != 3 || firstDiff[0] != nil || firstDiff[1] != int64(5) || firstDiff[2] != int64(6) {
+			t.Fatalf("unexpected list.diff result: %#v", rows[0]["nums_diff"])
+		}
+	})
+
+	t.Run("ListCountMatchesGatherSampleAndSets", func(t *testing.T) {
+		seed := uint64(7)
+		df, err := NewDataFrame([]map[string]any{
+			{
+				"name": "A",
+				"a1":   int64(1), "a2": int64(2), "a3": int64(2), "a4": int64(4),
+				"b1": int64(2), "b2": int64(4), "b3": int64(5), "b4": int64(5),
+			},
+			{
+				"name": "B",
+				"a1":   int64(3), "a2": int64(3), "a3": int64(5), "a4": int64(7),
+				"b1": int64(3), "b2": int64(6), "b3": int64(7), "b4": int64(8),
+			},
+		})
+		if err != nil {
+			t.Fatalf("NewDataFrame failed: %v", err)
+		}
+		defer df.Close()
+
+		left := ConcatList(Col("a1"), Col("a2"), Col("a3"), Col("a4"))
+		right := ConcatList(Col("b1"), Col("b2"), Col("b3"), Col("b4"))
+		indexes := ConcatList(Lit(int64(0)), Lit(int64(2)))
+		rows, err := collectToMaps(t, df.Select(
+			Col("name"),
+			left.List().UniqueStable().Alias("left_unique_stable"),
+			left.List().CountMatches(int64(2)).Alias("left_count_2"),
+			left.List().Gather(indexes, true).Alias("left_gather"),
+			left.List().GatherEvery(int64(2), int64(1)).Alias("left_gather_every"),
+			left.List().SampleN(int64(2), ListSampleOptions{Seed: &seed}).Alias("left_sample_n"),
+			left.List().SampleFraction(0.5, ListSampleOptions{Seed: &seed}).Alias("left_sample_fraction"),
+			left.List().Union(right).Alias("set_union"),
+			left.List().SetDifference(right).Alias("set_difference"),
+			left.List().SetIntersection(right).Alias("set_intersection"),
+			left.List().SetSymmetricDifference(right).Alias("set_symmetric_difference"),
+		))
+		if err != nil {
+			t.Fatalf("list count/gather/sample/sets collect failed: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("expected 2 rows, got %d", len(rows))
+		}
+
+		leftUniqueStable, ok := rows[0]["left_unique_stable"].([]any)
+		if !ok || len(leftUniqueStable) != 3 || leftUniqueStable[0] != int64(1) || leftUniqueStable[1] != int64(2) || leftUniqueStable[2] != int64(4) {
+			t.Fatalf("unexpected list.unique_stable result: %#v", rows[0]["left_unique_stable"])
+		}
+		if got, ok := asFloat64(rows[0]["left_count_2"]); !ok || got != 2 {
+			t.Fatalf("unexpected list.count_matches result: %#v", rows[0]["left_count_2"])
+		}
+		leftGather, ok := rows[0]["left_gather"].([]any)
+		if !ok || len(leftGather) != 2 || leftGather[0] != int64(1) || leftGather[1] != int64(2) {
+			t.Fatalf("unexpected list.gather result: %#v", rows[0]["left_gather"])
+		}
+		leftGatherEvery, ok := rows[0]["left_gather_every"].([]any)
+		if !ok || len(leftGatherEvery) != 2 || leftGatherEvery[0] != int64(2) || leftGatherEvery[1] != int64(4) {
+			t.Fatalf("unexpected list.gather_every result: %#v", rows[0]["left_gather_every"])
+		}
+		leftSampleN, ok := rows[0]["left_sample_n"].([]any)
+		if !ok || len(leftSampleN) != 2 {
+			t.Fatalf("unexpected list.sample_n result: %#v", rows[0]["left_sample_n"])
+		}
+		leftSampleFraction, ok := rows[0]["left_sample_fraction"].([]any)
+		if !ok || len(leftSampleFraction) != 2 {
+			t.Fatalf("unexpected list.sample_fraction result: %#v", rows[0]["left_sample_fraction"])
+		}
+
+		assertIntSet := func(value any, expected []int64, label string) {
+			t.Helper()
+			items, ok := value.([]any)
+			if !ok {
+				t.Fatalf("%s is not []any: %#v", label, value)
+			}
+			if len(items) != len(expected) {
+				t.Fatalf("%s length mismatch: %#v", label, value)
+			}
+			got := make(map[int64]int, len(items))
+			for _, item := range items {
+				v, ok := item.(int64)
+				if !ok {
+					t.Fatalf("%s contains non-int64: %#v", label, value)
+				}
+				got[v]++
+			}
+			for _, want := range expected {
+				got[want]--
+			}
+			for key, count := range got {
+				if count != 0 {
+					t.Fatalf("%s mismatch for %d: %#v", label, key, value)
+				}
+			}
+		}
+
+		assertIntSet(rows[0]["set_union"], []int64{1, 2, 4, 5}, "list.union")
+		assertIntSet(rows[0]["set_difference"], []int64{1}, "list.set_difference")
+		assertIntSet(rows[0]["set_intersection"], []int64{2, 4}, "list.set_intersection")
+		assertIntSet(rows[0]["set_symmetric_difference"], []int64{1, 5}, "list.set_symmetric_difference")
 	})
 
 	t.Run("Unpivot", func(t *testing.T) {
@@ -1449,6 +2019,61 @@ func TestAdvancedConvenienceOperations(t *testing.T) {
 		}
 		if _, ok := countStruct["n"]; !ok {
 			t.Fatalf("value_counts missing count field: %#v", countStruct)
+		}
+
+		asStructRows, err := collectToMaps(t, ScanCSV("../testdata/sample.csv").
+			Select(AsStruct(Col("name"), Col("age")).Alias("person")).
+			Unnest("person").
+			Limit(2))
+		if err != nil {
+			t.Fatalf("AsStruct/Unnest failed: %v", err)
+		}
+		if len(asStructRows) != 2 {
+			t.Fatalf("expected 2 AsStruct/Unnest rows, got %d", len(asStructRows))
+		}
+		if asStructRows[0]["name"] != "Alice" || asStructRows[0]["age"] != int64(25) {
+			t.Fatalf("unexpected first AsStruct/Unnest row: %#v", asStructRows[0])
+		}
+		if asStructRows[1]["name"] != "Bob" || asStructRows[1]["age"] != int64(30) {
+			t.Fatalf("unexpected second AsStruct/Unnest row: %#v", asStructRows[1])
+		}
+
+		unnestedValueCountsRows, err := collectToMaps(t, df.Select(
+			Col("name").ValueCounts(ValueCountsOptions{
+				Sort: true,
+				Name: "n",
+			}).Alias("name_counts"),
+		).Unnest("name_counts"))
+		if err != nil {
+			t.Fatalf("ValueCounts Unnest failed: %v", err)
+		}
+		if len(unnestedValueCountsRows) != 4 {
+			t.Fatalf("expected 4 ValueCounts Unnest rows, got %d", len(unnestedValueCountsRows))
+		}
+		gotNames := make(map[string]struct{}, len(unnestedValueCountsRows))
+		for _, row := range unnestedValueCountsRows {
+			name, ok := row["name"].(string)
+			if !ok {
+				t.Fatalf("expected unnested name field to be string, got %#v", row["name"])
+			}
+			gotNames[name] = struct{}{}
+			switch n := row["n"].(type) {
+			case uint64:
+				if n != 1 {
+					t.Fatalf("expected unnested count to be 1, got %#v", n)
+				}
+			case int64:
+				if n != 1 {
+					t.Fatalf("expected unnested count to be 1, got %#v", n)
+				}
+			default:
+				t.Fatalf("expected unnested count field to be integer, got %T", row["n"])
+			}
+		}
+		for _, want := range []string{"Alice", "Bob", "Cara", "Drew"} {
+			if _, ok := gotNames[want]; !ok {
+				t.Fatalf("expected ValueCounts Unnest to contain %q, got %#v", want, unnestedValueCountsRows)
+			}
 		}
 	})
 
@@ -2993,6 +3618,31 @@ func TestArrowSchemaMismatchError(t *testing.T) {
 	}
 }
 
+func TestNewDataFrameSchemaErrorIncludesContext(t *testing.T) {
+	_, err := NewDataFrame(map[string]any{
+		"age": []any{"oops"},
+	}, WithSchema(map[string]DataType{
+		"age": DataTypeInt32,
+	}))
+	if err == nil {
+		t.Fatal("expected schema normalization error, got nil")
+	}
+
+	msg := err.Error()
+	if !strings.Contains(msg, "column age row 0") {
+		t.Fatalf("expected column/row context, got %v", err)
+	}
+	if !strings.Contains(msg, "schema expects INT32") {
+		t.Fatalf("expected target schema type in error, got %v", err)
+	}
+	if !strings.Contains(msg, "got string") {
+		t.Fatalf("expected source Go type in error, got %v", err)
+	}
+	if !strings.Contains(msg, "hint:") {
+		t.Fatalf("expected remediation hint in error, got %v", err)
+	}
+}
+
 func TestNewDataFrameFromRowsAuto(t *testing.T) {
 	rows := []map[string]any{
 		{"id": 1, "name": "Alice"},
@@ -4034,6 +4684,71 @@ func TestSQLContextExecute(t *testing.T) {
 	}
 }
 
+func TestSQLContextInputErrorsIncludeHints(t *testing.T) {
+	ctx := NewSQLContext().Register("", 123)
+	_, err := ctx.Execute("SELECT 1")
+	if err == nil {
+		t.Fatal("expected execute to fail for empty table name")
+	}
+	if !strings.Contains(err.Error(), "SQLContext.Register: table name is empty") {
+		t.Fatalf("expected table-name context, got %v", err)
+	}
+
+	_, err = NewSQLContext().Execute("")
+	if err == nil {
+		t.Fatal("expected execute to fail for empty query")
+	}
+	if !strings.Contains(err.Error(), "query is empty") || !strings.Contains(err.Error(), "hint:") {
+		t.Fatalf("expected empty-query hint, got %v", err)
+	}
+
+	_, err = NewSQLContext().Execute("SELECT 1")
+	if err == nil {
+		t.Fatal("expected execute to fail for missing tables")
+	}
+	if !strings.Contains(err.Error(), "no registered tables") || !strings.Contains(err.Error(), `SELECT 1`) {
+		t.Fatalf("expected no-table query context, got %v", err)
+	}
+
+	_, err = NewSQLContext(map[string]any{
+		"bad": 123,
+	}).Execute("SELECT * FROM bad")
+	if err == nil {
+		t.Fatal("expected execute to fail for unsupported table type")
+	}
+	if !strings.Contains(err.Error(), "unsupported SQL table type int") {
+		t.Fatalf("expected unsupported-type context, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "*DataFrame") {
+		t.Fatalf("expected supported-type hint, got %v", err)
+	}
+}
+
+func TestCreateDataFrameFromColumnsErrorsIncludeContext(t *testing.T) {
+	brg, err := resolveBridge(nil)
+	if err != nil {
+		t.Fatalf("resolveBridge failed: %v", err)
+	}
+
+	if _, err := brg.CreateDataFrameFromColumns(nil); err == nil {
+		t.Fatal("expected empty jsonData to fail")
+	} else if !strings.Contains(err.Error(), "Bridge.CreateDataFrameFromColumns: jsonData is empty") {
+		t.Fatalf("expected empty-payload context, got %v", err)
+	}
+
+	_, err = brg.CreateDataFrameFromColumns([]byte(`{"columns":[{"values":[1,2,3]}]}`))
+	if err == nil {
+		t.Fatal("expected missing column name to fail")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "bridge_df_from_columns") {
+		t.Fatalf("expected low-level import context, got %v", err)
+	}
+	if !strings.Contains(msg, "name") {
+		t.Fatalf("expected missing name field context, got %v", err)
+	}
+}
+
 func TestSQLContextChainRegisterMany(t *testing.T) {
 	left, err := NewDataFrame([]map[string]any{
 		{"id": int64(1), "name": "Alice"},
@@ -4135,6 +4850,12 @@ func TestSQLContextUnregisterAndShowTables(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(err.Error()), "right_tbl") {
 		t.Fatalf("unexpected unregistered table error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "SELECT * FROM right_tbl") {
+		t.Fatalf("expected SQL error to include query summary, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "left_tbl") {
+		t.Fatalf("expected SQL error to include registered table context, got %v", err)
 	}
 }
 
@@ -4282,6 +5003,19 @@ func TestExecutionOptionsMemoryLimitCollect(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "ERR_OOM") || !strings.Contains(err.Error(), "memory limit exceeded") {
 		t.Fatalf("unexpected memory limit error: %v", err)
+	}
+}
+
+func TestExecutionOptionsRejectNegativeLimitWithHint(t *testing.T) {
+	err := SetExecutionOptions(ExecutionOptions{MemoryLimitBytes: -1})
+	if err == nil {
+		t.Fatal("expected negative memory limit to fail")
+	}
+	if !strings.Contains(err.Error(), "MemoryLimitBytes must be >= 0") {
+		t.Fatalf("expected field context, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "use 0 to disable the limit") {
+		t.Fatalf("expected remediation hint, got %v", err)
 	}
 }
 
@@ -4506,6 +5240,30 @@ func TestNilAndClosedErrors(t *testing.T) {
 	if _, err := ToStructs[strictUser](badFrame); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("expected ErrInvalidInput from mismatched ToStructs field, got %v", err)
 	}
+
+	type event struct {
+		CreatedAt time.Time `polars:"created_at"`
+	}
+	timeFrame, err := NewDataFrame([]map[string]any{{"created_at": "not-a-date"}})
+	if err != nil {
+		t.Fatalf("NewDataFrame failed: %v", err)
+	}
+	defer timeFrame.Close()
+
+	_, err = ToStructs[event](timeFrame)
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput from invalid time conversion, got %v", err)
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "field created_at") {
+		t.Fatalf("expected field context in temporal ToStructs error, got %v", err)
+	}
+	if !strings.Contains(msg, "datetime") {
+		t.Fatalf("expected datetime context in temporal ToStructs error, got %v", err)
+	}
+	if !strings.Contains(msg, "RFC3339") && !strings.Contains(msg, "2006-01-02") {
+		t.Fatalf("expected supported layout hint in temporal ToStructs error, got %v", err)
+	}
 }
 
 func TestDataFrameJSONExport(t *testing.T) {
@@ -4616,6 +5374,20 @@ func TestDataFrameJSONExport(t *testing.T) {
 			t.Fatalf("expected 2 gzip ndjson lines, got %d", len(lines))
 		}
 	})
+
+	t.Run("WriteNDJSONInvalidCompression", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := df.WriteNDJSON(&buf, WriteNDJSONOptions{Compression: NDJSONCompression("zip")})
+		if err == nil {
+			t.Fatal("expected invalid NDJSON compression to fail")
+		}
+		if !strings.Contains(err.Error(), `unsupported NDJSON compression "zip"`) {
+			t.Fatalf("expected compression value in error, got %v", err)
+		}
+		if !strings.Contains(err.Error(), `"none"`) || !strings.Contains(err.Error(), `"gzip"`) {
+			t.Fatalf("expected supported compression hint, got %v", err)
+		}
+	})
 }
 
 func TestLazyFrameJSONExport(t *testing.T) {
@@ -4676,6 +5448,28 @@ func TestLazyFrameJSONExport(t *testing.T) {
 		}
 	})
 
+	t.Run("SinkNDJSONFile", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "lazy.jsonl")
+		if err := lf.SinkNDJSONFile(path); err != nil {
+			t.Fatalf("SinkNDJSONFile failed: %v", err)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read sink file failed: %v", err)
+		}
+		lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+		if len(lines) != 1 {
+			t.Fatalf("expected 1 ndjson line, got %d", len(lines))
+		}
+		var row map[string]any
+		if err := json.Unmarshal([]byte(lines[0]), &row); err != nil {
+			t.Fatalf("unmarshal ndjson file line failed: %v", err)
+		}
+		if row["name"] != "Bob" {
+			t.Fatalf("unexpected lazy ndjson file row: %#v", row)
+		}
+	})
+
 	t.Run("SinkNDJSONGzip", func(t *testing.T) {
 		var buf bytes.Buffer
 		if err := lf.SinkNDJSON(&buf, SinkNDJSONOptions{Compression: NDJSONCompressionGzip}); err != nil {
@@ -4692,6 +5486,30 @@ func TestLazyFrameJSONExport(t *testing.T) {
 		}
 		if !strings.Contains(string(plain), "\"Bob\"") {
 			t.Fatalf("unexpected lazy gzip ndjson payload: %q", string(plain))
+		}
+	})
+
+	t.Run("SinkNDJSONFileGzip", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "lazy.jsonl.gz")
+		if err := lf.SinkNDJSONFile(path, SinkNDJSONOptions{Compression: NDJSONCompressionGzip}); err != nil {
+			t.Fatalf("SinkNDJSONFile gzip failed: %v", err)
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			t.Fatalf("open gzip sink file failed: %v", err)
+		}
+		defer file.Close()
+		zr, err := gzip.NewReader(file)
+		if err != nil {
+			t.Fatalf("gzip reader failed: %v", err)
+		}
+		defer zr.Close()
+		plain, err := io.ReadAll(zr)
+		if err != nil {
+			t.Fatalf("read gzip sink payload failed: %v", err)
+		}
+		if !strings.Contains(string(plain), "\"Bob\"") {
+			t.Fatalf("unexpected lazy gzip sink payload: %q", string(plain))
 		}
 	})
 }
