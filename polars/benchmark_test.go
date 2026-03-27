@@ -11,7 +11,6 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	pb "github.com/isesword/polars-go-bridge/proto"
 )
 
 func benchmarkRows(n int) []map[string]any {
@@ -29,13 +28,13 @@ func benchmarkRows(n int) []map[string]any {
 	return rows
 }
 
-func benchmarkPrimitiveSchema() map[string]pb.DataType {
-	return map[string]pb.DataType{
-		"id":         pb.DataType_INT64,
-		"name":       pb.DataType_UTF8,
-		"age":        pb.DataType_INT64,
-		"salary":     pb.DataType_INT64,
-		"department": pb.DataType_UTF8,
+func benchmarkPrimitiveSchema() map[string]DataType {
+	return map[string]DataType{
+		"id":         DataTypeInt64,
+		"name":       DataTypeUTF8,
+		"age":        DataTypeInt64,
+		"salary":     DataTypeInt64,
+		"department": DataTypeUTF8,
 	}
 }
 
@@ -304,7 +303,7 @@ func BenchmarkExprMapBatches(b *testing.B) {
 						{Name: batch.Schema().Field(0).Name, Type: arrow.PrimitiveTypes.Int64},
 					}, nil)
 					return array.NewRecordBatch(schema, []arrow.Array{values}, int64(col.Len())), nil
-				}, ExprMapBatchesOptions{ReturnType: pb.DataType_INT64}).Alias("age_plus_ten")
+				}, ExprMapBatchesOptions{ReturnType: DataTypeInt64}).Alias("age_plus_ten")
 
 				b.ReportAllocs()
 				b.ResetTimer()
@@ -338,7 +337,7 @@ func BenchmarkExprMapBatches(b *testing.B) {
 						{Name: "age_salary", Type: arrow.PrimitiveTypes.Int64},
 					}, nil)
 					return array.NewRecordBatch(schema, []arrow.Array{values}, int64(ageCol.Len())), nil
-				}, ExprMapBatchesOptions{ReturnType: pb.DataType_INT64}).Alias("age_salary")
+				}, ExprMapBatchesOptions{ReturnType: DataTypeInt64}).Alias("age_salary")
 
 				b.ReportAllocs()
 				b.ResetTimer()
@@ -388,7 +387,7 @@ func BenchmarkExprVsMapBatches(b *testing.B) {
 					{Name: batch.Schema().Field(0).Name, Type: arrow.PrimitiveTypes.Int64},
 				}, nil)
 				return array.NewRecordBatch(schema, []arrow.Array{values}, int64(col.Len())), nil
-			}, ExprMapBatchesOptions{ReturnType: pb.DataType_INT64}).Alias("age_plus_ten")
+			}, ExprMapBatchesOptions{ReturnType: DataTypeInt64}).Alias("age_plus_ten")
 			mapMulti := MapBatches([]Expr{Col("age"), Col("salary")}, func(batch arrow.RecordBatch) (arrow.RecordBatch, error) {
 				ageCol := batch.Column(0).(*array.Int64)
 				salaryCol := batch.Column(1).(*array.Int64)
@@ -407,7 +406,7 @@ func BenchmarkExprVsMapBatches(b *testing.B) {
 					{Name: "age_salary", Type: arrow.PrimitiveTypes.Int64},
 				}, nil)
 				return array.NewRecordBatch(schema, []arrow.Array{values}, int64(ageCol.Len())), nil
-			}, ExprMapBatchesOptions{ReturnType: pb.DataType_INT64}).Alias("age_salary")
+			}, ExprMapBatchesOptions{ReturnType: DataTypeInt64}).Alias("age_salary")
 			nativeMulti := Col("age").Add(Col("salary")).Alias("age_salary")
 
 			b.Run("NativeSingle", func(b *testing.B) {

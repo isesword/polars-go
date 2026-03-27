@@ -5,8 +5,8 @@ import (
 	"runtime"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/isesword/polars-go-bridge/bridge"
-	pb "github.com/isesword/polars-go-bridge/proto"
+	"github.com/isesword/polars-go/bridge"
+	pb "github.com/isesword/polars-go/proto"
 )
 
 // EagerFrame represents a low-level eager Polars DataFrame held by the Rust

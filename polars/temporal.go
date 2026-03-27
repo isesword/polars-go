@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	pb "github.com/isesword/polars-go-bridge/proto"
 )
 
 var temporalLayouts = []string{
@@ -28,21 +27,21 @@ var timeOnlyLayouts = []string{
 	time.RFC3339,
 }
 
-func normalizeTemporalValueForJSON(value any, dataType pb.DataType) (string, error) {
+func normalizeTemporalValueForJSON(value any, dataType DataType) (string, error) {
 	switch dataType {
-	case pb.DataType_DATE:
+	case DataTypeDate:
 		t, err := toDateTime(value)
 		if err != nil {
 			return "", err
 		}
 		return t.Format("2006-01-02"), nil
-	case pb.DataType_DATETIME:
+	case DataTypeDatetime:
 		t, err := toDateTime(value)
 		if err != nil {
 			return "", err
 		}
 		return t.Format(time.RFC3339Nano), nil
-	case pb.DataType_TIME:
+	case DataTypeTime:
 		t, err := toTimeOfDay(value)
 		if err != nil {
 			return "", err

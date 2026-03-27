@@ -8,8 +8,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/isesword/polars-go-bridge/bridge"
-	pb "github.com/isesword/polars-go-bridge/proto"
+	"github.com/isesword/polars-go/bridge"
 )
 
 // NewEagerFrameFromMap creates an eager DataFrame from column-oriented Go data.
@@ -53,7 +52,7 @@ func NewEagerFrameFromRows(brg *bridge.Bridge, rows []map[string]any) (*EagerFra
 func NewEagerFrameFromRowsAuto(
 	brg *bridge.Bridge,
 	rows []map[string]any,
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*EagerFrame, error) {
 	if shouldUseArrowRowsPath(schema) {
 		recordBatch, err := NewArrowRecordBatchFromRowsWithSchema(rows, schema)
@@ -92,7 +91,7 @@ func NewEagerFrameFromRowsWithArrowSchema(
 func NewEagerFrameFromMapWithSchema(
 	brg *bridge.Bridge,
 	data map[string]interface{},
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*EagerFrame, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("data is empty")
@@ -131,7 +130,7 @@ func NewEagerFrameFromMapWithArrowSchema(
 func NewEagerFrameFromRowsWithSchema(
 	brg *bridge.Bridge,
 	rows []map[string]any,
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*EagerFrame, error) {
 	columns, err := rowsToColumnJSON(rows)
 	if err != nil {
@@ -155,7 +154,7 @@ type dataframeColumnsPayload struct {
 func newDataFrameFromColumns(
 	brg *bridge.Bridge,
 	columns []columnData,
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*EagerFrame, error) {
 	if len(schema) > 0 {
 		var err error
@@ -183,7 +182,7 @@ func newDataFrameFromColumns(
 	return newDataFrame(dfHandle, brg), nil
 }
 
-func schemaToJSON(schema map[string]pb.DataType) map[string]string {
+func schemaToJSON(schema map[string]DataType) map[string]string {
 	if len(schema) == 0 {
 		return nil
 	}
@@ -396,7 +395,7 @@ func normalizeRowValue(value any) (any, error) {
 	return value, nil
 }
 
-func applySchemaToColumns(columns []columnData, schema map[string]pb.DataType) ([]columnData, error) {
+func applySchemaToColumns(columns []columnData, schema map[string]DataType) ([]columnData, error) {
 	if len(schema) == 0 {
 		return columns, nil
 	}
@@ -426,48 +425,48 @@ func applySchemaToColumns(columns []columnData, schema map[string]pb.DataType) (
 	return normalized, nil
 }
 
-func normalizeValueForSchema(value any, dataType pb.DataType) (any, error) {
+func normalizeValueForSchema(value any, dataType DataType) (any, error) {
 	if value == nil {
 		return nil, nil
 	}
 
 	switch dataType {
-	case pb.DataType_INT64, pb.DataType_INT32, pb.DataType_INT16, pb.DataType_INT8:
+	case DataTypeInt64, DataTypeInt32, DataTypeInt16, DataTypeInt8:
 		v, err := toInt64(value)
 		if err != nil {
 			return nil, err
 		}
 		return v, nil
-	case pb.DataType_UINT64, pb.DataType_UINT32, pb.DataType_UINT16, pb.DataType_UINT8:
+	case DataTypeUInt64, DataTypeUInt32, DataTypeUInt16, DataTypeUInt8:
 		v, err := toUint64(value)
 		if err != nil {
 			return nil, err
 		}
 		return v, nil
-	case pb.DataType_FLOAT64, pb.DataType_FLOAT32:
+	case DataTypeFloat64, DataTypeFloat32:
 		v, err := toFloat64(value)
 		if err != nil {
 			return nil, err
 		}
 		return v, nil
-	case pb.DataType_BOOL:
+	case DataTypeBool:
 		if b, ok := value.(bool); ok {
 			return b, nil
 		}
 		return nil, fmt.Errorf("expected bool, got %T", value)
-	case pb.DataType_UTF8:
+	case DataTypeUTF8:
 		if s, ok := value.(string); ok {
 			return s, nil
 		}
 		return fmt.Sprintf("%v", value), nil
-	case pb.DataType_DATE, pb.DataType_DATETIME, pb.DataType_TIME:
+	case DataTypeDate, DataTypeDatetime, DataTypeTime:
 		return normalizeTemporalValueForJSON(value, dataType)
 	default:
 		return value, nil
 	}
 }
 
-func shouldUseArrowRowsPath(schema map[string]pb.DataType) bool {
+func shouldUseArrowRowsPath(schema map[string]DataType) bool {
 	if !arrowRowsPathSupported() || len(schema) == 0 {
 		return false
 	}
@@ -481,23 +480,23 @@ func shouldUseArrowRowsPath(schema map[string]pb.DataType) bool {
 	return true
 }
 
-func isArrowRowsDataTypeSupported(dataType pb.DataType) bool {
+func isArrowRowsDataTypeSupported(dataType DataType) bool {
 	switch dataType {
-	case pb.DataType_INT64,
-		pb.DataType_INT32,
-		pb.DataType_INT16,
-		pb.DataType_INT8,
-		pb.DataType_UINT64,
-		pb.DataType_UINT32,
-		pb.DataType_UINT16,
-		pb.DataType_UINT8,
-		pb.DataType_FLOAT64,
-		pb.DataType_FLOAT32,
-		pb.DataType_BOOL,
-		pb.DataType_UTF8,
-		pb.DataType_DATE,
-		pb.DataType_DATETIME,
-		pb.DataType_TIME:
+	case DataTypeInt64,
+		DataTypeInt32,
+		DataTypeInt16,
+		DataTypeInt8,
+		DataTypeUInt64,
+		DataTypeUInt32,
+		DataTypeUInt16,
+		DataTypeUInt8,
+		DataTypeFloat64,
+		DataTypeFloat32,
+		DataTypeBool,
+		DataTypeUTF8,
+		DataTypeDate,
+		DataTypeDatetime,
+		DataTypeTime:
 		return true
 	default:
 		return false
@@ -517,6 +516,8 @@ func toInt64(value any) (int64, error) {
 	case int8:
 		return int64(v), nil
 	case uint:
+		return int64(v), nil
+	case uintptr:
 		return int64(v), nil
 	case uint64:
 		return int64(v), nil
@@ -552,6 +553,8 @@ func toUint64(value any) (uint64, error) {
 	case int8:
 		return uint64(v), nil
 	case uint:
+		return uint64(v), nil
+	case uintptr:
 		return uint64(v), nil
 	case uint64:
 		return v, nil
@@ -591,6 +594,8 @@ func toFloat64(value any) (float64, error) {
 	case int8:
 		return float64(v), nil
 	case uint:
+		return float64(v), nil
+	case uintptr:
 		return float64(v), nil
 	case uint64:
 		return float64(v), nil

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	pb "github.com/isesword/polars-go-bridge/proto"
+	pb "github.com/isesword/polars-go/proto"
 )
 
 // SQLContext is the Go-facing SQL entrypoint aligned with Polars SQLContext.

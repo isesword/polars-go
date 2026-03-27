@@ -1,7 +1,7 @@
 package polars
 
 import (
-	pb "github.com/isesword/polars-go-bridge/proto"
+	pb "github.com/isesword/polars-go/proto"
 )
 
 // DtYear extracts the year from a Date/Datetime expression.

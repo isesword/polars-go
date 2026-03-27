@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	pb "github.com/isesword/polars-go-bridge/proto"
+	pb "github.com/isesword/polars-go/proto"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -103,8 +103,8 @@ type CSVScanOptions struct {
 	TryParseDates     *bool
 	QuoteChar         *byte
 	CommentPrefix     *string
-	Schema            map[string]pb.DataType
-	Encoding          *pb.CsvEncoding
+	Schema            map[string]DataType
+	Encoding          *CsvEncoding
 	IgnoreErrors      *bool
 }
 

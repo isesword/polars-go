@@ -8,7 +8,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow/cdata"
 	"github.com/ebitengine/purego"
-	"github.com/isesword/polars-go-bridge/bridge"
+	"github.com/isesword/polars-go/bridge"
 )
 
 var exprMapBatchesCallbackPtr = purego.NewCallback(goExprMapBatchesCallback)

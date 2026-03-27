@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/isesword/polars-go-bridge/bridge"
-	"github.com/isesword/polars-go-bridge/polars"
+	"github.com/isesword/polars-go/bridge"
+	"github.com/isesword/polars-go/polars"
 )
 
 func main() {

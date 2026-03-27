@@ -6,26 +6,26 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	pb "github.com/isesword/polars-go-bridge/proto"
+	pb "github.com/isesword/polars-go/proto"
 )
 
 // 数据类型常量
 var (
-	Int64    = pb.DataType_INT64
-	Int32    = pb.DataType_INT32
-	Int16    = pb.DataType_INT16
-	Int8     = pb.DataType_INT8
-	UInt64   = pb.DataType_UINT64
-	UInt32   = pb.DataType_UINT32
-	UInt16   = pb.DataType_UINT16
-	UInt8    = pb.DataType_UINT8
-	Float64  = pb.DataType_FLOAT64
-	Float32  = pb.DataType_FLOAT32
-	Boolean  = pb.DataType_BOOL
-	String   = pb.DataType_UTF8
-	Date     = pb.DataType_DATE
-	Datetime = pb.DataType_DATETIME
-	Time     = pb.DataType_TIME
+	Int64    = DataTypeInt64
+	Int32    = DataTypeInt32
+	Int16    = DataTypeInt16
+	Int8     = DataTypeInt8
+	UInt64   = DataTypeUInt64
+	UInt32   = DataTypeUInt32
+	UInt16   = DataTypeUInt16
+	UInt8    = DataTypeUInt8
+	Float64  = DataTypeFloat64
+	Float32  = DataTypeFloat32
+	Boolean  = DataTypeBool
+	String   = DataTypeUTF8
+	Date     = DataTypeDate
+	Datetime = DataTypeDatetime
+	Time     = DataTypeTime
 )
 
 // Expr 表达式构建器
@@ -34,7 +34,7 @@ type Expr struct {
 }
 
 type ExprMapBatchesOptions struct {
-	ReturnType pb.DataType
+	ReturnType DataType
 }
 
 type ValueCountsOptions struct {
@@ -460,7 +460,7 @@ func (e Expr) Not() Expr {
 
 // Cast 类型转换（严格模式）
 // 示例: Col("age").Cast(Int32, true)
-func (e Expr) Cast(dataType pb.DataType, strict bool) Expr {
+func (e Expr) Cast(dataType DataType, strict bool) Expr {
 	return Expr{
 		inner: &pb.Expr{
 			Kind: &pb.Expr_Cast{
@@ -476,7 +476,7 @@ func (e Expr) Cast(dataType pb.DataType, strict bool) Expr {
 
 // StrictCast 严格模式类型转换（转换失败报错）
 // 示例: Col("age").StrictCast(Int32)
-func (e Expr) StrictCast(dataType pb.DataType) Expr {
+func (e Expr) StrictCast(dataType DataType) Expr {
 	return e.Cast(dataType, true)
 }
 

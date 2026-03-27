@@ -9,7 +9,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/cdata"
-	"github.com/isesword/polars-go-bridge/bridge"
+	"github.com/isesword/polars-go/bridge"
 )
 
 func exportDataFrameToArrowRecordBatch(brg *bridge.Bridge, handle uint64) (arrow.RecordBatch, error) {

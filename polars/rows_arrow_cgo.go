@@ -10,7 +10,6 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory/mallocator"
-	pb "github.com/isesword/polars-go-bridge/proto"
 )
 
 var recordBatchAllocator = mallocator.NewMallocator()
@@ -19,7 +18,7 @@ var recordBatchAllocator = mallocator.NewMallocator()
 // Arrow RecordBatch using an explicit primitive schema.
 func NewArrowRecordBatchFromRowsWithSchema(
 	rows []map[string]any,
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (arrow.RecordBatch, error) {
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("rows is empty")
@@ -85,37 +84,37 @@ func NewArrowRecordBatchFromRowsWithArrowSchema(
 	return builder.NewRecordBatch(), nil
 }
 
-func arrowDataTypeFromPrimitive(dataType pb.DataType) (arrow.DataType, error) {
+func arrowDataTypeFromPrimitive(dataType DataType) (arrow.DataType, error) {
 	switch dataType {
-	case pb.DataType_INT64:
+	case DataTypeInt64:
 		return arrow.PrimitiveTypes.Int64, nil
-	case pb.DataType_INT32:
+	case DataTypeInt32:
 		return arrow.PrimitiveTypes.Int32, nil
-	case pb.DataType_INT16:
+	case DataTypeInt16:
 		return arrow.PrimitiveTypes.Int16, nil
-	case pb.DataType_INT8:
+	case DataTypeInt8:
 		return arrow.PrimitiveTypes.Int8, nil
-	case pb.DataType_UINT64:
+	case DataTypeUInt64:
 		return arrow.PrimitiveTypes.Uint64, nil
-	case pb.DataType_UINT32:
+	case DataTypeUInt32:
 		return arrow.PrimitiveTypes.Uint32, nil
-	case pb.DataType_UINT16:
+	case DataTypeUInt16:
 		return arrow.PrimitiveTypes.Uint16, nil
-	case pb.DataType_UINT8:
+	case DataTypeUInt8:
 		return arrow.PrimitiveTypes.Uint8, nil
-	case pb.DataType_FLOAT64:
+	case DataTypeFloat64:
 		return arrow.PrimitiveTypes.Float64, nil
-	case pb.DataType_FLOAT32:
+	case DataTypeFloat32:
 		return arrow.PrimitiveTypes.Float32, nil
-	case pb.DataType_BOOL:
+	case DataTypeBool:
 		return arrow.FixedWidthTypes.Boolean, nil
-	case pb.DataType_UTF8:
+	case DataTypeUTF8:
 		return arrow.BinaryTypes.String, nil
-	case pb.DataType_DATE:
+	case DataTypeDate:
 		return arrow.FixedWidthTypes.Date32, nil
-	case pb.DataType_DATETIME:
+	case DataTypeDatetime:
 		return &arrow.TimestampType{Unit: arrow.Microsecond}, nil
-	case pb.DataType_TIME:
+	case DataTypeTime:
 		return &arrow.Time64Type{Unit: arrow.Microsecond}, nil
 	default:
 		return nil, fmt.Errorf("unsupported Arrow schema data type: %s", dataType.String())

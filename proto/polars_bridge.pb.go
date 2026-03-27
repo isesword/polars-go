@@ -7442,7 +7442,7 @@ const file_proto_polars_bridge_proto_rawDesc = "" +
 	"\x04UTF8\x10\v\x12\b\n" +
 	"\x04DATE\x10\f\x12\f\n" +
 	"\bDATETIME\x10\r\x12\b\n" +
-	"\x04TIME\x10\x0eB,Z*github.com/isesword/polars-go-bridge/protob\x06proto3"
+	"\x04TIME\x10\x0eB%Z#github.com/isesword/polars-go/protob\x06proto3"
 
 var (
 	file_proto_polars_bridge_proto_rawDescOnce sync.Once

@@ -43,18 +43,18 @@ Go (获取结果)
 
 默认推荐的入口：
 
-- `polars.NewDataFrame(...)`
-- `polars.NewDataFrameFromArrow(...)`
+- `pl.NewDataFrame(...)`
+- `pl.NewDataFrameFromArrow(...)`
 - `brg.ExecuteArrow(...)`
 
 对接 GoFrame / MySQL 时，推荐直接用：
 
-- `polars.NewDataFrame(rows, polars.WithSchema(schema))`
-- `polars.NewDataFrame(structRows)`
+- `pl.NewDataFrame(rows, pl.WithSchema(schema))`
+- `pl.NewDataFrame(structRows)`
 
 这样高层会走对象导入流程，并由 Rust 负责推断；如果你已经有 Arrow，再显式使用 `NewDataFrameFromArrow(...)`。
 如果你更偏好显式命名，也可以用 `NewDataFrameFromMaps(...)` 或 `NewDataFrameFromColumns(...)`。
-如果你需要为 Go 的 row-oriented / column-oriented 数据显式声明嵌套 schema，可以使用 `polars.NewDataFrame(data, polars.WithArrowSchema(schema))`。
+如果你需要为 Go 的 row-oriented / column-oriented 数据显式声明嵌套 schema，可以使用 `pl.NewDataFrame(data, pl.WithArrowSchema(schema))`。
 
 ### Go / Python Polars 命名对照
 
@@ -69,7 +69,7 @@ Go (获取结果)
 | `ToArrow()` | `to_arrow()` |
 | `Collect()` | `collect()` |
 | `ToMaps()` | `to_dicts()` |
-| `polars.ToStructs[T](df)` | `to_dicts()` 后绑定到 typed objects |
+| `pl.ToStructs[T](df)` | `to_dicts()` 后绑定到 typed objects |
 
 如果你是从 Python Polars 迁移过来，可以优先按这张表找对应入口。
 
@@ -78,11 +78,11 @@ Go (获取结果)
 除了 `[]map[string]any` / `map[string]interface{}`，现在也支持直接使用 Go struct slice：
 
 - 导入：
-  - `polars.NewDataFrame([]MyStruct{...})`
-  - `polars.NewDataFrameFromStructs([]MyStruct{...})`
+  - `pl.NewDataFrame([]MyStruct{...})`
+  - `pl.NewDataFrameFromStructs([]MyStruct{...})`
 - 导出：
-  - `polars.ToStructs[MyStruct](df)`
-  - `polars.ToStructPointers[MyStruct](df)`
+  - `pl.ToStructs[MyStruct](df)`
+  - `pl.ToStructPointers[MyStruct](df)`
 
 示例：
 
@@ -108,13 +108,13 @@ users := []User{
     {ID: 2, Name: "Bob"},
 }
 
-df, err := polars.NewDataFrame(users)
+df, err := pl.NewDataFrame(users)
 if err != nil {
     log.Fatal(err)
 }
 defer df.Close()
 
-typed, err := polars.ToStructs[User](df)
+typed, err := pl.ToStructs[User](df)
 if err != nil {
     log.Fatal(err)
 }
@@ -147,7 +147,7 @@ tag 规则：
 - 它不是文件格式，而是一套内存交换协议。
 - 双方通过 `schema` 和 `array` 指针描述同一份 Arrow 列式内存。
 - 在本项目里，这条路径用于：
-  - `polars.NewDataFrameFromArrow(...)`
+  - `pl.NewDataFrameFromArrow(...)`
   - `brg.ExecuteArrow(...)`
   - `Collect()` / `ToMaps()` / `DataFrame.ToMaps()` 的底层结果导出
 
@@ -163,10 +163,10 @@ tag 规则：
 
 - eager:
   - `(*DataFrame).WriteJSON(w io.Writer)`
-  - `(*DataFrame).WriteNDJSON(w io.Writer, opts ...polars.WriteNDJSONOptions)`
+  - `(*DataFrame).WriteNDJSON(w io.Writer, opts ...pl.WriteNDJSONOptions)`
 - lazy:
   - `(*LazyFrame).SinkJSON(w io.Writer)`
-  - `(*LazyFrame).SinkNDJSON(w io.Writer, opts ...polars.SinkNDJSONOptions)`
+  - `(*LazyFrame).SinkNDJSON(w io.Writer, opts ...pl.SinkNDJSONOptions)`
 
 实现说明：
 
@@ -180,7 +180,7 @@ tag 规则：
 示例：
 
 ```go
-df, _ := polars.NewDataFrame([]map[string]any{
+df, _ := pl.NewDataFrame([]map[string]any{
     {"id": 1, "name": "Alice"},
     {"id": 2, "name": "Bob"},
 })
@@ -190,18 +190,18 @@ var jsonBuf bytes.Buffer
 _ = df.WriteJSON(&jsonBuf)
 
 var ndjsonBuf bytes.Buffer
-_ = df.WriteNDJSON(&ndjsonBuf, polars.WriteNDJSONOptions{
-    Compression: polars.NDJSONCompressionGzip,
+_ = df.WriteNDJSON(&ndjsonBuf, pl.WriteNDJSONOptions{
+    Compression: pl.NDJSONCompressionGzip,
 })
 
-lf := df.Filter(polars.Col("id").Gt(polars.Lit(1)))
+lf := df.Filter(pl.Col("id").Gt(pl.Lit(1)))
 
 var sinkBuf bytes.Buffer
 _ = lf.SinkJSON(&sinkBuf)
 
 var sinkNDJSONBuf bytes.Buffer
-_ = lf.SinkNDJSON(&sinkNDJSONBuf, polars.SinkNDJSONOptions{
-    Compression: polars.NDJSONCompressionNone,
+_ = lf.SinkNDJSON(&sinkNDJSONBuf, pl.SinkNDJSONOptions{
+    Compression: pl.NDJSONCompressionNone,
 })
 ```
 
@@ -215,8 +215,8 @@ _ = lf.SinkNDJSON(&sinkNDJSONBuf, polars.SinkNDJSONOptions{
 
 当前提供一个先走 Go 侧实现的 Excel 读取入口：
 
-- `polars.ReadExcel(path string, opts ...polars.ExcelReadOptions)`
-- `polars.ReadExcelSheets(path string, opts ...polars.ExcelReadOptions)`
+- `pl.ReadExcel(path string, opts ...pl.ExcelReadOptions)`
+- `pl.ReadExcelSheets(path string, opts ...pl.ExcelReadOptions)`
 
 第一版支持范围：
 
@@ -231,7 +231,7 @@ _ = lf.SinkNDJSON(&sinkNDJSONBuf, polars.SinkNDJSONOptions{
 示例：
 
 ```go
-df, err := polars.ReadExcel("users.xlsx", polars.ExcelReadOptions{
+df, err := pl.ReadExcel("users.xlsx", pl.ExcelReadOptions{
     SheetName: "Sheet1",
 })
 if err != nil {
@@ -248,7 +248,7 @@ fmt.Println(rows)
 ```go
 hasHeader := false
 
-df, err := polars.ReadExcel("users.xlsx", polars.ExcelReadOptions{
+df, err := pl.ReadExcel("users.xlsx", pl.ExcelReadOptions{
     SheetID:   2,
     HasHeader: &hasHeader,
 })
@@ -257,7 +257,7 @@ df, err := polars.ReadExcel("users.xlsx", polars.ExcelReadOptions{
 读取多个 sheet：
 
 ```go
-frames, err := polars.ReadExcelSheets("users.xlsx")
+frames, err := pl.ReadExcelSheets("users.xlsx")
 if err != nil {
     panic(err)
 }
@@ -285,7 +285,7 @@ defer func() {
   对齐 Python Polars 的 `map_batches` 命名，但当前仍是 eager Go-side batch UDG
 - `Expr.MapBatches(...)`
   对齐 Python Polars 的 `Expr.map_batches` 命名，第一版走 Arrow batch 回调，适合单列表达式的高性能 Go-side UDG
-- `polars.MapBatches([]Expr{...}, ...)`
+- `pl.MapBatches([]Expr{...}, ...)`
   对齐 Python Polars 多表达式 `map_batches` 心智，适合多列表达式输入的高性能 Go-side UDG
 
 建议：
@@ -294,21 +294,21 @@ defer func() {
 - 需要逐行 Go 逻辑时，使用 `MapRows(...)`
 - 需要对整张表做 eager Arrow batch 处理时，使用 `DataFrame.MapBatches(...)`
 - 需要在 `Select(...)` / `WithColumns(...)` 里做单列表达式级 Arrow batch 处理时，使用 `Expr.MapBatches(...)`
-- 需要在 `Select(...)` / `WithColumns(...)` 里做多列表达式级 Arrow batch 处理时，使用 `polars.MapBatches(...)`
+- 需要在 `Select(...)` / `WithColumns(...)` 里做多列表达式级 Arrow batch 处理时，使用 `pl.MapBatches(...)`
 
 ### SQL
 
 当前已提供与 Polars SQLContext 对齐的 Go 入口：
 
-- `polars.NewSQLContext()`
+- `pl.NewSQLContext()`
 - `(*SQLContext).Register(name, table)`
 - `(*SQLContext).RegisterMany(tables)`
 - `(*SQLContext).Unregister(name)`
 - `(*SQLContext).Tables()`
 - `(*SQLContext).ExecuteLazy(query)`
 - `(*SQLContext).Execute(query)`
-- `polars.SQLLazy(query, tables)`
-- `polars.SQL(query, tables)`
+- `pl.SQLLazy(query, tables)`
+- `pl.SQL(query, tables)`
 
 第一版支持注册：
 
@@ -329,7 +329,7 @@ defer func() {
 示例：
 
 ```go
-ctx := polars.NewSQLContext().
+ctx := pl.NewSQLContext().
     Register("population", df).
     RegisterMany(map[string]any{
         "cities": cities,
@@ -355,7 +355,7 @@ defer result.Close()
 移除表后也会立即反映到上下文和 SQL 查询中：
 
 ```go
-ctx := polars.NewSQLContext().
+ctx := pl.NewSQLContext().
     Register("left_tbl", left).
     Register("right_tbl", right).
     Unregister("right_tbl")
@@ -371,7 +371,7 @@ defer result.Close()
 
 当前已提供第一版执行配置入口：
 
-- `polars.SetExecutionOptions(polars.ExecutionOptions{MemoryLimitBytes: ...})`
+- `pl.SetExecutionOptions(pl.ExecutionOptions{MemoryLimitBytes: ...})`
 
 说明：
 
@@ -389,12 +389,12 @@ defer result.Close()
 #### 1. 安装 Go 包
 
 ```bash
-go get github.com/isesword/polars-go-bridge
+go get github.com/isesword/polars-go
 ```
 
 #### 2. 下载预编译的动态库
 
-从 [GitHub Releases](https://github.com/YOUR_USERNAME/polars-go-bridge/releases) 下载对应平台的动态库：
+从 [GitHub Releases](https://github.com/isesword/polars-go/releases) 下载对应平台的动态库：
 
 - **macOS (Intel)**: `libpolars_bridge.dylib` (x86_64-apple-darwin)
 - **macOS (Apple Silicon)**: `libpolars_bridge.dylib` (aarch64-apple-darwin)
@@ -421,12 +421,12 @@ package main
 
 import (
     "log"
-    "github.com/isesword/polars-go-bridge/polars"
+    pl "github.com/isesword/polars-go/polars"
 )
 
 func main() {
     // 使用默认 DataFrame 构造器创建托管 DataFrame
-    df, err := polars.NewDataFrame(map[string]interface{}{
+    df, err := pl.NewDataFrame(map[string]interface{}{
         "name":   []string{"Alice", "Bob", "Charlie"},
         "age":    []int64{25, 30, 35},
         "salary": []float64{50000, 60000, 70000},
@@ -438,12 +438,12 @@ func main() {
 
     // 链式操作
     _, _ = df.
-        Filter(polars.Col("age").Gt(polars.Lit(28))).
-        Select(polars.Col("name"), polars.Col("salary")).
+        Filter(pl.Col("age").Gt(pl.Lit(28))).
+        Select(pl.Col("name"), pl.Col("salary")).
         Collect()
     
     // 或从 CSV 文件扫描
-    lf := polars.ScanCSV("data.csv")
+    lf := pl.ScanCSV("data.csv")
     lf.Print()
 }
 ```
@@ -456,8 +456,7 @@ package main
 import (
     "log"
 
-    "github.com/isesword/polars-go-bridge/polars"
-    pb "github.com/isesword/polars-go-bridge/proto"
+    pl "github.com/isesword/polars-go/polars"
 )
 
 func main() {
@@ -466,18 +465,18 @@ func main() {
         {"id": uint64(2), "name": "Bob", "age": 20},
     }
 
-    schema := map[string]pb.DataType{
-        "id":   pb.DataType_UINT64,
-        "name": pb.DataType_UTF8,
-        "age":  pb.DataType_INT32,
+    schema := map[string]pl.DataType{
+        "id":   pl.DataTypeUInt64,
+        "name": pl.DataTypeUTF8,
+        "age":  pl.DataTypeInt32,
     }
 
-    record, err := polars.NewArrowRecordBatchFromRowsWithSchema(rows, schema)
+    record, err := pl.NewArrowRecordBatchFromRowsWithSchema(rows, schema)
     if err != nil {
         log.Fatal(err)
     }
 
-    df, err := polars.NewDataFrameFromArrow(record)
+    df, err := pl.NewDataFrameFromArrow(record)
     if err != nil {
         log.Fatal(err)
     }
@@ -508,7 +507,7 @@ scripts\\build.bat
 # 2. 生成 Protobuf 代码（如果修改了 proto 文件）
 go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 export PATH=$PATH:$GOPATH/bin
-cd /Users/esword/GolandProjects/src/polars-go-bridge && export PATH=$PATH:$GOPATH/bin && protoc --go_out=. --go_opt=paths=source_relative proto/polars_bridge.proto
+cd /path/to/polars-go && export PATH=$PATH:$GOPATH/bin && protoc --go_out=. --go_opt=paths=source_relative proto/polars_bridge.proto
 ```
 
 ### Benchmark
@@ -519,7 +518,7 @@ go test ./polars -run '^$' -bench Benchmark -benchmem
 
 `ToMaps()` 的专项 benchmark / `pprof` 分析流程见：
 
-- [docs/tomaps-profiling.md](/Users/esword/GolandProjects/src/polars-go-bridge/docs/tomaps-profiling.md)
+- [docs/tomaps-profiling.md](docs/tomaps-profiling.md)
 
 按规模跑某一组：
 
@@ -551,7 +550,7 @@ go test ./polars -run '^$' -bench 'BenchmarkImportRows/Rows2000|BenchmarkQueryCo
 - `ToStructs()` 现在优先走 Arrow 直转并带有常见标量列的直赋值快路径；在当前基线下，已经同时优于 `ToMaps()` 的延迟、内存和分配次数
 - `ToStructPointers()` 会比 `ToStructs()` 多一层对象分配，但在当前基线下仍明显优于 `ToMaps()`
 - `Expr.MapBatches(...)` 单输入在当前实现下已经和原生表达式非常接近
-- 多输入 `polars.MapBatches(...)` 会有额外的 Arrow batch 回调成本，但仍保持在同一量级
+- 多输入 `pl.MapBatches(...)` 会有额外的 Arrow batch 回调成本，但仍保持在同一量级
 
 `ToMaps()` / `ToStructs()` / `ToStructPointers()` 对照（Apple M4 Pro, `go test ./polars -run '^$' -bench 'Benchmark(ToMaps|ToStructs|ToStructPointers)' -benchmem`）：
 
@@ -569,8 +568,8 @@ go test ./polars -run '^$' -bench 'BenchmarkImportRows/Rows2000|BenchmarkQueryCo
 
 Struct 导出选型建议：
 
-- 需要 typed 结果并且希望吞吐/内存都更好时，优先用 `polars.ToStructs[T](df)`
-- 需要保留指针语义或想直接得到 `[]*T` 时，用 `polars.ToStructPointers[T](df)`
+- 需要 typed 结果并且希望吞吐/内存都更好时，优先用 `pl.ToStructs[T](df)`
+- 需要保留指针语义或想直接得到 `[]*T` 时，用 `pl.ToStructPointers[T](df)`
 - 需要最灵活、无 schema 假设的 Go 原生结果时，用 `ToMaps()`
 - 如果输入本身是复杂嵌套 rows，想让导入和导出都更稳定命中列式路径，优先配合 `WithArrowSchema(...)`
 
@@ -584,31 +583,31 @@ package main
 import (
     "fmt"
     "log"
-    "github.com/isesword/polars-go-bridge/polars"
+    pl "github.com/isesword/polars-go/polars"
 )
 
 func main() {
     // 方式 1: 直接打印结果（使用 Polars 原生格式，不需要 Free）
-    polars.ScanCSV("data.csv").
-        Filter(polars.Col("age").Gt(polars.Lit(25))).
-        Select(polars.Col("name"), polars.Col("age")).
+    pl.ScanCSV("data.csv").
+        Filter(pl.Col("age").Gt(pl.Lit(25))).
+        Select(pl.Col("name"), pl.Col("age")).
         Limit(10).
         Print()
 
     // 方式 2: 使用表达式展开选择多列
-    polars.ScanCSV("data.csv").
-        Select(polars.Cols("name", "age", "salary")...).
+    pl.ScanCSV("data.csv").
+        Select(pl.Cols("name", "age", "salary")...).
         Print()
 
     // 方式 3: 选择所有列
-    polars.ScanCSV("data.csv").
-        Select(polars.All()).
+    pl.ScanCSV("data.csv").
+        Select(pl.All()).
         Limit(10).
         Print()
 
     // 方式 4: 获取 Go 原生数据结构
-    rowsDF, err := polars.ScanCSV("data.csv").
-        Filter(polars.Col("age").Gt(polars.Lit(25))).
+    rowsDF, err := pl.ScanCSV("data.csv").
+        Filter(pl.Col("age").Gt(pl.Lit(25))).
         Collect()
     if err != nil {
         log.Fatal(err)
@@ -621,7 +620,7 @@ func main() {
     fmt.Println(rows)
     
     // 方式 5: 获取 EagerFrame 对象（低层接口，推荐仅在需要时使用）
-    eagerDF, err := polars.ScanCSV("data.csv").Collect()
+    eagerDF, err := pl.ScanCSV("data.csv").Collect()
     if err != nil {
         log.Fatal(err)
     }
@@ -640,7 +639,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/isesword/polars-go-bridge/polars"
+    pl "github.com/isesword/polars-go/polars"
 )
 
 type Employee struct {
@@ -650,7 +649,7 @@ type Employee struct {
 }
 
 func main() {
-    df, err := polars.NewDataFrame([]Employee{
+    df, err := pl.NewDataFrame([]Employee{
         {ID: 1, Name: "Alice", Team: "Engineering"},
         {ID: 2, Name: "Bob", Team: "Marketing"},
     })
@@ -659,7 +658,7 @@ func main() {
     }
     defer df.Close()
 
-    out, err := polars.ToStructs[Employee](df)
+    out, err := pl.ToStructs[Employee](df)
     if err != nil {
         log.Fatal(err)
     }
@@ -688,10 +687,10 @@ shape: (3, 2)
 
 ```go
 // 从 CSV 文件扫描（懒加载）
-lf := polars.ScanCSV("path/to/file.csv")
+lf := pl.ScanCSV("path/to/file.csv")
 
 // 从 Parquet 文件扫描（懒加载）
-parquetLF := polars.ScanParquet("path/to/file.parquet")
+parquetLF := pl.ScanParquet("path/to/file.parquet")
 
 // 带读取参数的 CSV / Parquet 扫描
 hasHeader := true
@@ -702,7 +701,7 @@ tryParseDates := true
 quoteChar := byte('\'')
 commentPrefix := "#"
 
-csvWithOptions := polars.ScanCSVWithOptions("path/to/file.csv", polars.CSVScanOptions{
+csvWithOptions := pl.ScanCSVWithOptions("path/to/file.csv", pl.CSVScanOptions{
     HasHeader:     &hasHeader,
     Separator:     &separator,
     SkipRows:      &skipRows,
@@ -710,29 +709,29 @@ csvWithOptions := polars.ScanCSVWithOptions("path/to/file.csv", polars.CSVScanOp
     TryParseDates: &tryParseDates,
     QuoteChar:     &quoteChar,
     CommentPrefix: &commentPrefix,
-    Schema: map[string]pb.DataType{
-        "name":      pb.DataType_UTF8,
-        "age":       pb.DataType_INT64,
-        "joined_at": pb.DataType_DATE,
+    Schema: map[string]pl.DataType{
+        "name":      pl.DataTypeUTF8,
+        "age":       pl.DataTypeInt64,
+        "joined_at": pl.DataTypeDate,
     },
 })
 
 rechunk := true
-parquetWithOptions := polars.ScanParquetWithOptions("path/to/file.parquet", polars.ParquetScanOptions{
+parquetWithOptions := pl.ScanParquetWithOptions("path/to/file.parquet", pl.ParquetScanOptions{
     Rechunk: &rechunk,
 })
 
 // 从内存数据（高层默认入口）
-df, _ := polars.NewDataFrame(rows, polars.WithSchema(schema))
+df, _ := pl.NewDataFrame(rows, pl.WithSchema(schema))
 defer df.Close()
 
 // 从内存数据（更显式的 rows/columns 入口）
-dfFromMaps, _ := polars.NewDataFrameFromMaps(rows, polars.WithSchema(schema))
+dfFromMaps, _ := pl.NewDataFrameFromMaps(rows, pl.WithSchema(schema))
 defer dfFromMaps.Close()
 
 // 从内存数据（Arrow 入口）
-record, _ := polars.NewArrowRecordBatchFromRowsWithSchema(rows, schema)
-dfFromArrow, _ := polars.NewDataFrameFromArrow(record)
+record, _ := pl.NewArrowRecordBatchFromRowsWithSchema(rows, schema)
+dfFromArrow, _ := pl.NewDataFrameFromArrow(record)
 defer dfFromArrow.Close()
 
 _ = parquetLF
@@ -747,36 +746,36 @@ _ = dfFromArrow
 ```go
 // 过滤、选择、添加列、限制行数
 query := lf.
-    Filter(polars.Col("age").Gt(polars.Lit(18))).
-    Select(polars.Col("name"), polars.Col("age"), polars.Col("salary"), polars.Col("department")).
+    Filter(pl.Col("age").Gt(pl.Lit(18))).
+    Select(pl.Col("name"), pl.Col("age"), pl.Col("salary"), pl.Col("department")).
     WithColumns(
-        polars.Col("age").Add(polars.Lit(1)).Alias("next_year_age"),
+        pl.Col("age").Add(pl.Lit(1)).Alias("next_year_age"),
     ).
     Limit(100)
 
 // GroupBy + Aggregation
 summary := lf.GroupBy("department").Agg(
-    polars.Col("salary").Sum().Alias("total_salary"),
-    polars.Col("name").Count().Alias("employee_count"),
-    polars.Col("salary").Median().Alias("median_salary"),
-    polars.Col("name").NUnique().Alias("unique_names"),
+    pl.Col("salary").Sum().Alias("total_salary"),
+    pl.Col("name").Count().Alias("employee_count"),
+    pl.Col("salary").Median().Alias("median_salary"),
+    pl.Col("name").NUnique().Alias("unique_names"),
 )
 
 // Sort / Unique
-sorted := query.Sort(polars.SortOptions{
-    By:         []polars.Expr{polars.Col("age")},
+sorted := query.Sort(pl.SortOptions{
+    By:         []pl.Expr{pl.Col("age")},
     Descending: []bool{true},
 })
 
-uniqueDepartments := lf.Select(polars.Col("department")).Unique(polars.UniqueOptions{
+uniqueDepartments := lf.Select(pl.Col("department")).Unique(pl.UniqueOptions{
     Subset: []string{"department"},
     Keep:   "first",
 })
 
 // Forward fill
 ffilled := lf.Select(
-    polars.Col("id"),
-    polars.Col("value").FFill().Alias("value_ffill"),
+    pl.Col("id"),
+    pl.Col("value").FFill().Alias("value_ffill"),
 )
 
 // Basic dataframe utilities
@@ -791,9 +790,9 @@ backfilled := df.BFill()
 nonNull := df.DropNulls("age", "salary")
 nonNan := df.DropNans("score")
 reversed := df.Reverse()
-sampled := df.SampleN(10, polars.SampleOptions{})
+sampled := df.SampleN(10, pl.SampleOptions{})
 exploded := df.Explode("tags")
-unpivoted := df.Unpivot(polars.UnpivotOptions{
+unpivoted := df.Unpivot(pl.UnpivotOptions{
     On:           []string{"math", "english"},
     Index:        []string{"name"},
     VariableName: "subject",
@@ -802,10 +801,10 @@ unpivoted := df.Unpivot(polars.UnpivotOptions{
 
 // When / Then / Otherwise
 labeled := lf.Select(
-    polars.Col("name"),
-    polars.When(polars.Col("age").Gt(polars.Lit(30))).
-        Then(polars.Lit("senior")).
-        Otherwise(polars.Lit("junior")).
+    pl.Col("name"),
+    pl.When(pl.Col("age").Gt(pl.Lit(30))).
+        Then(pl.Lit("senior")).
+        Otherwise(pl.Lit("junior")).
         Alias("level"),
 )
 
@@ -819,37 +818,37 @@ mappedDF, _ := df.MapRows(func(row map[string]any) (map[string]any, error) {
         "name":  row["name"],
         "level": level,
     }, nil
-}, polars.MapRowsOptions{})
+}, pl.MapRowsOptions{})
 
 // UDG: DataFrame.MapBatches
 batchMappedDF, _ := df.MapBatches(func(batch arrow.RecordBatch) (arrow.RecordBatch, error) {
     // 第一版示例先透传 batch；如果需要变换，可以返回新的 Arrow RecordBatch
     return batch, nil
-}, polars.MapBatchesOptions{})
+}, pl.MapBatchesOptions{})
 
 // UDG: Expr.MapBatches
 exprMapped, _ := df.Select(
-    polars.Col("age").MapBatches(func(batch arrow.RecordBatch) (arrow.RecordBatch, error) {
+    pl.Col("age").MapBatches(func(batch arrow.RecordBatch) (arrow.RecordBatch, error) {
         return batch, nil
-    }, polars.ExprMapBatchesOptions{
-        ReturnType: polars.Int64,
+    }, pl.ExprMapBatchesOptions{
+        ReturnType: pl.Int64,
     }).Alias("age_udg"),
 ).Collect()
 
-// UDG: polars.MapBatches with multiple input expressions
+// UDG: pl.MapBatches with multiple input expressions
 exprMappedMany, _ := df.Select(
-    polars.MapBatches([]polars.Expr{
-        polars.Col("age"),
-        polars.Col("bonus"),
+    pl.MapBatches([]pl.Expr{
+        pl.Col("age"),
+        pl.Col("bonus"),
     }, func(batch arrow.RecordBatch) (arrow.RecordBatch, error) {
         return batch, nil
-    }, polars.ExprMapBatchesOptions{
-        ReturnType: polars.Int64,
+    }, pl.ExprMapBatchesOptions{
+        ReturnType: pl.Int64,
     }).Alias("age_bonus"),
 ).Collect()
 
 // Pivot (eager-only, aligned with Polars eager pivot semantics)
-pivoted, _ := df.Pivot(polars.PivotOptions{
+pivoted, _ := df.Pivot(pl.PivotOptions{
     On:            []string{"subject"},
     Index:         []string{"name"},
     Values:        []string{"score"},
@@ -883,28 +882,28 @@ _ = exprMappedMany
 
 // Window functions
 windowed := lf.Select(
-    polars.Col("name"),
-    polars.Col("department"),
-    polars.Col("salary"),
-    polars.Col("salary").Sum().Over(polars.Col("department")).Alias("department_total_salary"),
-    polars.Col("salary").Rank(polars.RankOptions{
-        Method:     polars.RankDense,
+    pl.Col("name"),
+    pl.Col("department"),
+    pl.Col("salary"),
+    pl.Col("salary").Sum().Over(pl.Col("department")).Alias("department_total_salary"),
+    pl.Col("salary").Rank(pl.RankOptions{
+        Method:     pl.RankDense,
         Descending: true,
-    }).Over(polars.Col("department")).Alias("department_salary_rank"),
-    polars.Col("salary").CumSum(false).Alias("running_salary"),
-    polars.Col("salary").CumCount(false).Alias("running_count"),
-    polars.Col("salary").CumMin(false).Alias("running_min_salary"),
-    polars.Col("salary").CumMax(false).Alias("running_max_salary"),
-    polars.Col("age").CumProd(false).Alias("running_age_product"),
+    }).Over(pl.Col("department")).Alias("department_salary_rank"),
+    pl.Col("salary").CumSum(false).Alias("running_salary"),
+    pl.Col("salary").CumCount(false).Alias("running_count"),
+    pl.Col("salary").CumMin(false).Alias("running_min_salary"),
+    pl.Col("salary").CumMax(false).Alias("running_max_salary"),
+    pl.Col("age").CumProd(false).Alias("running_age_product"),
 )
 
 orderedWindow := lf.Select(
-    polars.Col("name"),
-    polars.Col("department"),
-    polars.Col("age"),
-    polars.Col("salary").CumSum(false).OverWithOptions(polars.OverOptions{
-        PartitionBy: []polars.Expr{polars.Col("department")},
-        OrderBy:     []polars.Expr{polars.Col("age")},
+    pl.Col("name"),
+    pl.Col("department"),
+    pl.Col("age"),
+    pl.Col("salary").CumSum(false).OverWithOptions(pl.OverOptions{
+        PartitionBy: []pl.Expr{pl.Col("department")},
+        OrderBy:     []pl.Expr{pl.Col("age")},
     }).Alias("department_running_salary"),
 )
 
@@ -912,16 +911,16 @@ _ = windowed
 _ = orderedWindow
 
 numericHelpers := lf.Select(
-    polars.Col("value").IsNotNull().Alias("value_not_null"),
-    polars.Col("score").IsNan().Alias("score_is_nan"),
-    polars.Col("score").IsFinite().Alias("score_is_finite"),
-    polars.Col("value").Abs().Alias("abs_value"),
-    polars.Col("value").Round(0).Alias("round_value"),
-    polars.Col("value").Clip(-2.0, 5.0).Alias("clip_value"),
-    polars.Col("value").Sqrt().Alias("sqrt_value"),
-    polars.Col("value").Log(10.0).Alias("log10_value"),
-    polars.Col("value").NullCount().Alias("value_null_count"),
-    polars.Col("department").ValueCounts(polars.ValueCountsOptions{
+    pl.Col("value").IsNotNull().Alias("value_not_null"),
+    pl.Col("score").IsNan().Alias("score_is_nan"),
+    pl.Col("score").IsFinite().Alias("score_is_finite"),
+    pl.Col("value").Abs().Alias("abs_value"),
+    pl.Col("value").Round(0).Alias("round_value"),
+    pl.Col("value").Clip(-2.0, 5.0).Alias("clip_value"),
+    pl.Col("value").Sqrt().Alias("sqrt_value"),
+    pl.Col("value").Log(10.0).Alias("log10_value"),
+    pl.Col("value").NullCount().Alias("value_null_count"),
+    pl.Col("department").ValueCounts(pl.ValueCountsOptions{
         Sort: true,
         Name: "n",
     }).Alias("department_counts"),
@@ -930,27 +929,27 @@ numericHelpers := lf.Select(
 _ = numericHelpers
 
 analytic := lf.Select(
-    polars.Col("name"),
-    polars.Col("age"),
-    polars.Col("age").Shift(1).Alias("prev_age"),
-    polars.Col("age").Diff(1, polars.DiffNullIgnore).Alias("age_diff"),
+    pl.Col("name"),
+    pl.Col("age"),
+    pl.Col("age").Shift(1).Alias("prev_age"),
+    pl.Col("age").Diff(1, pl.DiffNullIgnore).Alias("age_diff"),
 )
 
 _ = analytic
 
 temporal := lf.Select(
-    polars.Col("date_str").StrToDate("%Y-%m-%d").Alias("date_value"),
-    polars.Col("date_str").StrToDate("%Y-%m-%d").DtYear().Alias("year"),
-    polars.Col("date_str").StrToDate("%Y-%m-%d").DtMonth().Alias("month"),
-    polars.Col("date_str").StrToDate("%Y-%m-%d").DtDay().Alias("day"),
-    polars.Col("date_str").StrToDate("%Y-%m-%d").DtWeekday().Alias("weekday"),
-    polars.Col("date_str").StrToDate("%Y-%m-%d").DtMonthStart().Alias("month_start"),
-    polars.Col("date_str").StrToDate("%Y-%m-%d").DtMonthEnd().Alias("month_end"),
-    polars.Col("ts_str").StrToDatetime("%Y-%m-%d %H:%M:%S").Alias("ts_value"),
-    polars.Col("ts_str").StrToDatetime("%Y-%m-%d %H:%M:%S").DtHour().Alias("hour"),
-    polars.Col("ts_str").StrToDatetime("%Y-%m-%d %H:%M:%S").DtMinute().Alias("minute"),
-    polars.Col("ts_str").StrToDatetime("%Y-%m-%d %H:%M:%S").DtSecond().Alias("second"),
-    polars.Col("time_str").StrToTime("%H:%M:%S").Alias("time_value"),
+    pl.Col("date_str").StrToDate("%Y-%m-%d").Alias("date_value"),
+    pl.Col("date_str").StrToDate("%Y-%m-%d").DtYear().Alias("year"),
+    pl.Col("date_str").StrToDate("%Y-%m-%d").DtMonth().Alias("month"),
+    pl.Col("date_str").StrToDate("%Y-%m-%d").DtDay().Alias("day"),
+    pl.Col("date_str").StrToDate("%Y-%m-%d").DtWeekday().Alias("weekday"),
+    pl.Col("date_str").StrToDate("%Y-%m-%d").DtMonthStart().Alias("month_start"),
+    pl.Col("date_str").StrToDate("%Y-%m-%d").DtMonthEnd().Alias("month_end"),
+    pl.Col("ts_str").StrToDatetime("%Y-%m-%d %H:%M:%S").Alias("ts_value"),
+    pl.Col("ts_str").StrToDatetime("%Y-%m-%d %H:%M:%S").DtHour().Alias("hour"),
+    pl.Col("ts_str").StrToDatetime("%Y-%m-%d %H:%M:%S").DtMinute().Alias("minute"),
+    pl.Col("ts_str").StrToDatetime("%Y-%m-%d %H:%M:%S").DtSecond().Alias("second"),
+    pl.Col("time_str").StrToTime("%H:%M:%S").Alias("time_value"),
 )
 
 _ = temporal
@@ -969,8 +968,8 @@ eagerDF, _ := query.Collect()
 defer eagerDF.Free()
 
 // EagerFrame 仍支持链式操作
-result, _ := eagerDF.Filter(polars.Col("age").Gt(polars.Lit(30))).
-    Select(polars.Col("name")).
+result, _ := eagerDF.Filter(pl.Col("age").Gt(pl.Lit(30))).
+    Select(pl.Col("name")).
     Collect()
 defer result.Free()
 ```
@@ -978,54 +977,54 @@ defer result.Free()
 #### Join 示例
 
 ```go
-left := polars.ScanCSV("users.csv")
-right := polars.ScanCSV("profiles.csv")
+left := pl.ScanCSV("users.csv")
+right := pl.ScanCSV("profiles.csv")
 
 // 同名 key join
-joined := left.Join(right, polars.JoinOptions{
+joined := left.Join(right, pl.JoinOptions{
     On:  []string{"id"},
-    How: polars.JoinInner,
+    How: pl.JoinInner,
     Suffix: "_right", // 可选，默认也是 _right
 })
 
 // 只保留左表中“在右表存在匹配 key”的行
-semiJoined := left.Join(right, polars.JoinOptions{
+semiJoined := left.Join(right, pl.JoinOptions{
     On:  []string{"id"},
-    How: polars.JoinSemi,
+    How: pl.JoinSemi,
 })
 
 // 只保留左表中“在右表不存在匹配 key”的行
-antiJoined := left.Join(right, polars.JoinOptions{
+antiJoined := left.Join(right, pl.JoinOptions{
     On:  []string{"id"},
-    How: polars.JoinAnti,
+    How: pl.JoinAnti,
 })
 
 // 笛卡尔积 join，不需要 join key
-crossJoined := left.Join(right, polars.JoinOptions{
-    How: polars.JoinCross,
+crossJoined := left.Join(right, pl.JoinOptions{
+    How: pl.JoinCross,
 })
 
 // 异名 key join
-joined = left.Join(right, polars.JoinOptions{
-    LeftOn:  []polars.Expr{polars.Col("user_id")},
-    RightOn: []polars.Expr{polars.Col("id")},
-    How:     polars.JoinLeft,
+joined = left.Join(right, pl.JoinOptions{
+    LeftOn:  []pl.Expr{pl.Col("user_id")},
+    RightOn: []pl.Expr{pl.Col("id")},
+    How:     pl.JoinLeft,
 })
 
 // 两个内存 DataFrame 也支持直接 join
-leftDF, _ := polars.NewDataFrame([]map[string]any{
+leftDF, _ := pl.NewDataFrame([]map[string]any{
     {"id": 1, "name": "Alice"},
 })
 defer leftDF.Close()
 
-rightDF, _ := polars.NewDataFrame([]map[string]any{
+rightDF, _ := pl.NewDataFrame([]map[string]any{
     {"id": 1, "age": 25},
 })
 defer rightDF.Close()
 
-rows, _ := leftDF.Join(rightDF, polars.JoinOptions{
+rows, _ := leftDF.Join(rightDF, pl.JoinOptions{
     On:  []string{"id"},
-    How: polars.JoinInner,
+    How: pl.JoinInner,
 }).Collect()
 defer rows.Free()
 
@@ -1048,10 +1047,10 @@ _ = crossJoined
 #### Concat 示例
 
 ```go
-first := polars.ScanCSV("part1.csv")
-second := polars.ScanCSV("part2.csv")
+first := pl.ScanCSV("part1.csv")
+second := pl.ScanCSV("part2.csv")
 
-combined := polars.Concat([]*polars.LazyFrame{first, second}, polars.ConcatOptions{
+combined := pl.Concat([]*pl.LazyFrame{first, second}, pl.ConcatOptions{
     Parallel:      true,
     MaintainOrder: true,
 })
@@ -1066,76 +1065,76 @@ _ = combined
 
 ```go
 // 列引用
-polars.Col("column_name")
+pl.Col("column_name")
 
 // 多列引用（表达式展开）
-polars.Cols("col1", "col2", "col3")  // 返回 []Expr
+pl.Cols("col1", "col2", "col3")  // 返回 []Expr
 
 // 选择所有列
-polars.All()  // 相当于 pl.all()
+pl.All()  // 相当于 pl.all()
 
 // 字面量
-polars.Lit(42)          // 整数
-polars.Lit(3.14)        // 浮点数
-polars.Lit("hello")     // 字符串
-polars.Lit(true)        // 布尔值
+pl.Lit(42)          // 整数
+pl.Lit(3.14)        // 浮点数
+pl.Lit("hello")     // 字符串
+pl.Lit(true)        // 布尔值
 
 // 算术操作
-polars.Col("x").Add(polars.Lit(1))      // 加法 x + 1
-polars.Col("x").Sub(polars.Lit(2))      // 减法 x - 2
-polars.Col("x").Mul(polars.Lit(3))      // 乘法 x * 3
-polars.Col("x").Div(polars.Lit(4))      // 除法 x / 4
-polars.Col("x").Mod(polars.Lit(3))      // 取模 x % 3
-polars.Col("x").Pow(polars.Lit(2))      // 幂运算 x ** 2
+pl.Col("x").Add(pl.Lit(1))      // 加法 x + 1
+pl.Col("x").Sub(pl.Lit(2))      // 减法 x - 2
+pl.Col("x").Mul(pl.Lit(3))      // 乘法 x * 3
+pl.Col("x").Div(pl.Lit(4))      // 除法 x / 4
+pl.Col("x").Mod(pl.Lit(3))      // 取模 x % 3
+pl.Col("x").Pow(pl.Lit(2))      // 幂运算 x ** 2
 
 // 比较操作
-polars.Col("age").Gt(polars.Lit(18))    // 大于 >
-polars.Col("age").Ge(polars.Lit(18))    // 大于等于 >=
-polars.Col("age").Lt(polars.Lit(65))    // 小于 <
-polars.Col("age").Le(polars.Lit(65))    // 小于等于 <=
-polars.Col("age").Eq(polars.Lit(30))    // 等于 ==
-polars.Col("age").Ne(polars.Lit(30))    // 不等于 !=
+pl.Col("age").Gt(pl.Lit(18))    // 大于 >
+pl.Col("age").Ge(pl.Lit(18))    // 大于等于 >=
+pl.Col("age").Lt(pl.Lit(65))    // 小于 <
+pl.Col("age").Le(pl.Lit(65))    // 小于等于 <=
+pl.Col("age").Eq(pl.Lit(30))    // 等于 ==
+pl.Col("age").Ne(pl.Lit(30))    // 不等于 !=
 
 // 逻辑操作
-polars.Col("a").And(polars.Col("b"))    // 逻辑与
-polars.Col("a").Or(polars.Col("b"))     // 逻辑或
-polars.Col("a").Not()                    // 逻辑取反
-polars.Col("a").Xor(polars.Col("b"))    // 异或
+pl.Col("a").And(pl.Col("b"))    // 逻辑与
+pl.Col("a").Or(pl.Col("b"))     // 逻辑或
+pl.Col("a").Not()                    // 逻辑取反
+pl.Col("a").Xor(pl.Col("b"))    // 异或
 
 // 类型转换
-polars.Col("age").Cast(polars.Int32, true)       // 严格模式转换
-polars.Col("age").Cast(polars.Float64, false)    // 非严格模式（失败转 null）
-polars.Col("age").StrictCast(polars.Int16)       // 严格模式快捷方法
+pl.Col("age").Cast(pl.Int32, true)       // 严格模式转换
+pl.Col("age").Cast(pl.Float64, false)    // 非严格模式（失败转 null）
+pl.Col("age").StrictCast(pl.Int16)       // 严格模式快捷方法
 
 // 支持的数据类型
-polars.Int64, polars.Int32, polars.Int16, polars.Int8
-polars.UInt64, polars.UInt32, polars.UInt16, polars.UInt8
-polars.Float64, polars.Float32
-polars.Boolean
-polars.String
-polars.Date, polars.Datetime, polars.Time
+pl.Int64, pl.Int32, pl.Int16, pl.Int8
+pl.UInt64, pl.UInt32, pl.UInt16, pl.UInt8
+pl.Float64, pl.Float32
+pl.Boolean
+pl.String
+pl.Date, pl.Datetime, pl.Time
 
 // 别名
-polars.Col("salary").Mul(polars.Lit(1.1)).Alias("new_salary")
+pl.Col("salary").Mul(pl.Lit(1.1)).Alias("new_salary")
 
 // 空值检查
-polars.Col("phone").IsNull()
+pl.Col("phone").IsNull()
 ```
 
 ## 📚 完整示例
 
-查看 [examples/scan_csv_example.go](examples/scan_csv_example.go) 获取完整的使用示例。
+查看 [examples/scan_csv/main.go](examples/scan_csv/main.go) 获取完整的使用示例。
 
 **示例 1: 基本扫描**
 ```go
-polars.ScanCSV("testdata/sample.csv").Print()
+pl.ScanCSV("testdata/sample.csv").Print()
 // 输出: 7 行 4 列的完整表格
 ```
 
 **示例 2: 过滤操作**
 ```go
-polars.ScanCSV("testdata/sample.csv").
-    Filter(polars.Col("age").Gt(polars.Lit(28))).
+pl.ScanCSV("testdata/sample.csv").
+    Filter(pl.Col("age").Gt(pl.Lit(28))).
     Print()
 // 输出: 4 行（年龄 > 28）
 ```
@@ -1143,27 +1142,27 @@ polars.ScanCSV("testdata/sample.csv").
 **示例 3: 选择列**
 ```go
 // 单列选择
-polars.ScanCSV("testdata/sample.csv").
-    Select(polars.Col("name"), polars.Col("age")).
+pl.ScanCSV("testdata/sample.csv").
+    Select(pl.Col("name"), pl.Col("age")).
     Print()
 // 输出: 7 行 2 列（只有 name 和 age）
 
 // 多列选择（表达式展开）
-polars.ScanCSV("testdata/sample.csv").
-    Select(polars.Cols("name", "age", "salary")...).
+pl.ScanCSV("testdata/sample.csv").
+    Select(pl.Cols("name", "age", "salary")...).
     Print()
 
 // 选择所有列
-polars.ScanCSV("testdata/sample.csv").
-    Select(polars.All()).
+pl.ScanCSV("testdata/sample.csv").
+    Select(pl.All()).
     Print()
 ```
 
 **示例 4: 组合操作**
 ```go
-polars.ScanCSV("testdata/sample.csv").
-    Filter(polars.Col("age").Gt(polars.Lit(25))).
-    Select(polars.Col("name"), polars.Col("salary")).
+pl.ScanCSV("testdata/sample.csv").
+    Filter(pl.Col("age").Gt(pl.Lit(25))).
+    Select(pl.Col("name"), pl.Col("salary")).
     Limit(3).
     Print()
 // 输出: 3 行 2 列
@@ -1171,10 +1170,10 @@ polars.ScanCSV("testdata/sample.csv").
 
 **示例 5: 复杂过滤**
 ```go
-polars.ScanCSV("testdata/sample.csv").
+pl.ScanCSV("testdata/sample.csv").
     Filter(
-        polars.Col("department").Eq(polars.Lit("Engineering")).
-            And(polars.Col("salary").Gt(polars.Lit(60000))),
+        pl.Col("department").Eq(pl.Lit("Engineering")).
+            And(pl.Col("salary").Gt(pl.Lit(60000))),
     ).
     Print()
 // 输出: 2 行（Engineering 部门且工资 > 60000）
@@ -1182,12 +1181,12 @@ polars.ScanCSV("testdata/sample.csv").
 
 **示例 6: 类型转换**
 ```go
-polars.ScanCSV("testdata/sample.csv").
+pl.ScanCSV("testdata/sample.csv").
     Select(
-        polars.Col("age"),
-        polars.Col("age").Cast(polars.Int32, true).Alias("age_int32"),
-        polars.Col("age").Cast(polars.Float32, true).Alias("age_float"),
-        polars.Col("age").Gt(polars.Lit(30)).Cast(polars.Int8, true).Alias("is_old"),
+        pl.Col("age"),
+        pl.Col("age").Cast(pl.Int32, true).Alias("age_int32"),
+        pl.Col("age").Cast(pl.Float32, true).Alias("age_float"),
+        pl.Col("age").Gt(pl.Lit(30)).Cast(pl.Int8, true).Alias("is_old"),
     ).
     Limit(3).
     Print()
@@ -1197,8 +1196,8 @@ polars.ScanCSV("testdata/sample.csv").
 ### 运行示例
 
 ```bash
-cd /path/to/polars-go-bridge
-POLARS_BRIDGE_LIB=./libpolars_bridge.dylib go run examples/scan_csv_example.go
+cd /path/to/polars-go
+POLARS_BRIDGE_LIB=./libpolars_bridge.dylib go run examples/scan_csv/main.go
 ```
 
 **输出示例**：
@@ -1262,8 +1261,8 @@ go test ./...
 
 ```go
 ✅ 正确：Print() 自动管理资源
-polars.ScanCSV("data.csv").
-    Filter(polars.Col("age").Gt(polars.Lit(25))).
+pl.ScanCSV("data.csv").
+    Filter(pl.Col("age").Gt(pl.Lit(25))).
     Print()
 // 无需调用 Free
 ```
@@ -1272,8 +1271,8 @@ polars.ScanCSV("data.csv").
 
 ```go
 ✅ 推荐：Collect() 后 defer Free，再调用 ToMaps()
-df, err := polars.ScanCSV("data.csv").
-    Filter(polars.Col("age").Gt(polars.Lit(25))).
+df, err := pl.ScanCSV("data.csv").
+    Filter(pl.Col("age").Gt(pl.Lit(25))).
     Collect()
 if err != nil {
     return err
@@ -1287,7 +1286,7 @@ rows, err := df.ToMaps()
 
 ```go
 ✅ 正确：使用 defer 确保释放
-df, err := polars.ScanCSV("data.csv").Collect()
+df, err := pl.ScanCSV("data.csv").Collect()
 if err != nil {
     log.Fatal(err)
 }
@@ -1296,7 +1295,7 @@ defer df.Free()  // 必须调用！
 df.Print()
 
 ❌ 错误：忘记调用 Free 会导致 Rust 端内存泄露
-df, _ := polars.ScanCSV("data.csv").Collect()
+df, _ := pl.ScanCSV("data.csv").Collect()
 df.Print()  // 泄露！
 ```
 
@@ -1304,7 +1303,7 @@ df.Print()  // 泄露！
 
 ```go
 ✅ 推荐：高层入口使用 Close
-df, err := polars.NewDataFrame(rows, polars.WithSchema(schema))
+df, err := pl.NewDataFrame(rows, pl.WithSchema(schema))
 if err != nil {
     log.Fatal(err)
 }
@@ -1317,12 +1316,12 @@ df.Print()
 
 ```go
 ✅ 正确
-record, err := polars.NewArrowRecordBatchFromRowsWithSchema(rows, schema)
+record, err := pl.NewArrowRecordBatchFromRowsWithSchema(rows, schema)
 if err != nil {
     log.Fatal(err)
 }
 
-df, err := polars.NewDataFrameFromArrow(record)
+df, err := pl.NewDataFrameFromArrow(record)
 if err != nil {
     log.Fatal(err)
 }
@@ -1333,7 +1332,7 @@ defer df.Close()
 
 ```go
 ✅ 兼容模式：低层入口仍然可用
-df, err := polars.NewEagerFrameFromRowsWithSchema(brg, rows, schema)
+df, err := pl.NewEagerFrameFromRowsWithSchema(brg, rows, schema)
 if err != nil {
     log.Fatal(err)
 }
@@ -1344,16 +1343,16 @@ defer df.Free()
 
 ```go
 ✅ 正确：链式操作后使用 Collect() + ToMaps() 或 Print
-df, _ := polars.ScanCSV("data.csv").Collect()
+df, _ := pl.ScanCSV("data.csv").Collect()
 defer df.Free()
 
 // EagerFrame 的 Filter/Select 返回 LazyFrame
-result, _ := df.Filter(polars.Col("age").Gt(polars.Lit(30))).
+result, _ := df.Filter(pl.Col("age").Gt(pl.Lit(30))).
     Collect()
 defer result.Free()
 
 ❌ 注意：再次 Collect() 会创建新的 EagerFrame
-df2, _ := df.Filter(polars.Col("age").Gt(polars.Lit(30))).
+df2, _ := df.Filter(pl.Col("age").Gt(pl.Lit(30))).
     Collect()
 defer df2.Free()  // 需要再次 Free！
 ```
@@ -1386,7 +1385,7 @@ func TestMemoryLeak(t *testing.T) {
     
     // 创建和释放大量 EagerFrame
     for i := 0; i < 10000; i++ {
-        df, _ := polars.ScanCSV("testdata/sample.csv").Collect()
+        df, _ := pl.ScanCSV("testdata/sample.csv").Collect()
         df.Free()
     }
     
@@ -1415,7 +1414,7 @@ func TestMemoryLeak(t *testing.T) {
 ## 📂 项目结构
 
 ```
-polars-go-bridge/
+polars-go/
 ├── bridge/                    # Go FFI 桥接层
 │   ├── arrow_cdata.go        # Arrow C Data Interface 定义
 │   ├── loader_unix.go        # Unix/macOS 动态库加载
@@ -1443,7 +1442,7 @@ polars-go-bridge/
 │   ├── small.csv
 │   └── large_sample.csv
 ├── examples/                 # 示例代码
-│   └── scan_csv_example.go
+│   └── main.go
 └── scripts/                  # 构建脚本
     ├── build.sh
     └── run.sh
@@ -1530,9 +1529,9 @@ DataFrame
 #### 最常见的入口
 
 ```go
-lf := polars.ScanCSV("data.csv")     // *LazyFrame
+lf := pl.ScanCSV("data.csv")     // *LazyFrame
 eagerDF, _ := lf.Collect()           // *EagerFrame
-df, _ := polars.NewDataFrame(rows)   // *DataFrame
+df, _ := pl.NewDataFrame(rows)   // *DataFrame
 ```
 
 #### 怎么选
@@ -1545,9 +1544,9 @@ df, _ := polars.NewDataFrame(rows)   // *DataFrame
 
 ```go
 // ❌ 这些操作都不会立即执行，只是构建执行计划
-lf := polars.ScanCSV("data.csv")           // 计划①: 要读 CSV
-lf2 := lf.Filter(polars.Col("age").Gt(polars.Lit(25)))   // 计划②: 要过滤
-lf3 := lf2.Select(polars.Col("name"))                    // 计划③: 要选择列
+lf := pl.ScanCSV("data.csv")           // 计划①: 要读 CSV
+lf2 := lf.Filter(pl.Col("age").Gt(pl.Lit(25)))   // 计划②: 要过滤
+lf3 := lf2.Select(pl.Col("name"))                    // 计划③: 要选择列
 
 // ✅ 直到这里才真正执行所有操作！
 df, _ := lf3.Collect()  // 现在才读文件、过滤、选择
@@ -1559,11 +1558,11 @@ df, _ := lf3.Collect()  // 现在才读文件、过滤、选择
 
 ```go
 // 高层托管对象：更接近 pl.DataFrame(...)
-df, _ := polars.NewDataFrame(rows, polars.WithSchema(schema))
+df, _ := pl.NewDataFrame(rows, pl.WithSchema(schema))
 defer df.Close()
 
 // 低层已物化对象：通常只在需要精细控制时使用
-eagerDF, _ := polars.ScanCSV("data.csv").Collect()
+eagerDF, _ := pl.ScanCSV("data.csv").Collect()
 defer eagerDF.Free()
 
 // 两者都可以直接访问数据
@@ -1581,12 +1580,12 @@ _ = rows1
 
 **方案 A：返回 LazyFrame（当前实现）✅**
 ```go
-df, _ := polars.ScanCSV("data.csv").Collect()  // 100MB 内存
+df, _ := pl.ScanCSV("data.csv").Collect()  // 100MB 内存
 defer df.Free()
 
 // 构建执行计划（几乎不占内存）
-lazyResult := df.Filter(polars.Col("age").Gt(polars.Lit(28))).
-    Select(polars.Col("name"), polars.Col("age")).
+lazyResult := df.Filter(pl.Col("age").Gt(pl.Lit(28))).
+    Select(pl.Col("name"), pl.Col("age")).
     Limit(10)
 
 // 一次性执行优化后的计划
@@ -1598,12 +1597,12 @@ defer result.Free()
 
 **方案 B：如果返回 EagerFrame（假设）❌**
 ```go
-df, _ := polars.ScanCSV("data.csv").Collect()  // 100MB 内存
+df, _ := pl.ScanCSV("data.csv").Collect()  // 100MB 内存
 defer df.Free()
 
 // 每一步都立即执行，创建中间结果
-df1 := df.Filter(polars.Col("age").Gt(polars.Lit(28)))  // 立即执行：80MB
-df2 := df1.Select(polars.Col("name"), polars.Col("age"))  // 立即执行：60MB
+df1 := df.Filter(pl.Col("age").Gt(pl.Lit(28)))  // 立即执行：80MB
+df2 := df1.Select(pl.Col("name"), pl.Col("age"))  // 立即执行：60MB
 df3 := df2.Limit(10)  // 立即执行：1KB
 
 // 总内存：100MB + 80MB + 60MB + 1KB = 240MB+
@@ -1627,9 +1626,9 @@ df3 := df2.Limit(10)  // 立即执行：1KB
 
 ```go
 // ✅ 全程懒加载，最优性能
-df, _ := polars.ScanCSV("data.csv").
-    Filter(polars.Col("age").Gt(polars.Lit(25))).
-    Select(polars.Col("name")).
+df, _ := pl.ScanCSV("data.csv").
+    Filter(pl.Col("age").Gt(pl.Lit(25))).
+    Select(pl.Col("name")).
     Collect()  // 一次性执行所有操作
 defer df.Free()
 rows, _ := df.ToMaps()
@@ -1644,19 +1643,19 @@ rows, _ := df.ToMaps()
 
 ```go
 // 先物化到 EagerFrame
-df, _ := polars.ScanCSV("data.csv").Collect()
+df, _ := pl.ScanCSV("data.csv").Collect()
 defer df.Free()
 
 // 多次使用同一份数据
-tmp1, _ := df.Filter(polars.Col("age").Gt(polars.Lit(25))).Collect()
+tmp1, _ := df.Filter(pl.Col("age").Gt(pl.Lit(25))).Collect()
 defer tmp1.Free()
 result1, _ := tmp1.ToMaps()
 
-tmp2, _ := df.Filter(polars.Col("age").Lt(polars.Lit(30))).Collect()
+tmp2, _ := df.Filter(pl.Col("age").Lt(pl.Lit(30))).Collect()
 defer tmp2.Free()
 result2, _ := tmp2.ToMaps()
 
-tmp3, _ := df.Select(polars.Col("name")).Collect()
+tmp3, _ := df.Select(pl.Col("name")).Collect()
 defer tmp3.Free()
 result3, _ := tmp3.ToMaps()
 ```
@@ -1711,9 +1710,9 @@ for _, row := range rows {
 
 ```go
 // 步骤 1: 创建懒加载计划（什么都没执行）
-lf := polars.ScanCSV("data.csv").           // 计划①: 读 CSV
-    Filter(polars.Col("age").Gt(polars.Lit(25))).        // 计划②: 过滤
-    Select(polars.Col("name"), polars.Col("age"))        // 计划③: 选择列
+lf := pl.ScanCSV("data.csv").           // 计划①: 读 CSV
+    Filter(pl.Col("age").Gt(pl.Lit(25))).        // 计划②: 过滤
+    Select(pl.Col("name"), pl.Col("age"))        // 计划③: 选择列
 
 // 步骤 2: 执行计划，获得 EagerFrame（现在才真正执行）
 df, _ := lf.Collect()  // 🚀 执行！数据进入内存
@@ -1723,7 +1722,7 @@ defer df.Free()
 
 // 步骤 3: 在 EagerFrame 上继续操作
 // ⚠️ df.Filter() 又返回了 LazyFrame！
-lf2 := df.Filter(polars.Col("age").Gt(polars.Lit(30)))   // 又变回懒加载计划
+lf2 := df.Filter(pl.Col("age").Gt(pl.Lit(30)))   // 又变回懒加载计划
 
 // 步骤 4: 再次执行
 result, _ := lf2.Collect()  // 🚀 再次执行！
@@ -1800,13 +1799,17 @@ EagerFrame（新的结果）
 - [x] Pivot 操作（eager）
 - [x] Forward fill (`FFill`)
 - [x] Concat / Union 风格的数据联合操作
+- [x] 基础 benchmark 套件（JSON vs Arrow 导入 / 内存输入 vs CSV 扫描 / ToMaps）
+- [x] 完善错误处理和错误信息（`ValidationError` / 关闭态错误 / schema mismatch / Excel 导入错误等）
 - [x] 完善的测试用例
 
 ### 计划中 📋
-- [ ] 支持更多表达式（日期函数、更多窗口函数等）
-- [x] 基础 benchmark 套件（JSON vs Arrow 导入 / 内存输入 vs CSV 扫描 / ToMaps）
-- [ ] 继续完善错误处理和错误信息
-- [ ] 支持流式处理大文件
+- [ ] 支持更多表达式（继续补齐剩余日期/窗口/字符串/数值辅助表达式）
+- [ ] 为公开 API 增加更系统的表达式覆盖清单与对照示例
+- [ ] 扩展 benchmark 套件（Join / GroupBy / Struct 导入导出 / NDJSON / Excel）
+- [ ] 继续补强错误信息的可读性（更多字段上下文、类型上下文、建议性提示）
+- [ ] 支持真正的流式大文件输出（避免 `SinkNDJSON` 先 collect）
+- [ ] 支持更适合大文件场景的扫描/分批处理能力
 
 ## 🤝 贡献
 

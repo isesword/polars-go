@@ -6,7 +6,7 @@
 
 ## 2026-03-25
 
-这一版的重点是把 `polars-go-bridge` 往“更像 Go 库、也更适合真实业务接入”的方向推进了一步。
+这一版的重点是把 `polars-go` 往“更像 Go 库、也更适合真实业务接入”的方向推进了一步。
 
 ### Go Struct Import / Export
 
@@ -38,7 +38,7 @@
 ### Docs And Examples
 
 - README 现在包含 `[]struct <-> DataFrame` 的完整说明、性能建议和最新 benchmark。
-- 新增对照示例 [examples/struct_roundtrip_example.go](/Users/esword/GolandProjects/src/polars-go-bridge/examples/struct_roundtrip_example.go)。
+- 新增对照示例 [examples/struct_roundtrip/main.go](../examples/struct_roundtrip/main.go)。
 
 ### Verification
 

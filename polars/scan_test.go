@@ -19,8 +19,8 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/isesword/polars-go-bridge/bridge"
-	pb "github.com/isesword/polars-go-bridge/proto"
+	"github.com/isesword/polars-go/bridge"
+	pb "github.com/isesword/polars-go/proto"
 	"github.com/xuri/excelize/v2"
 	"google.golang.org/protobuf/proto"
 )
@@ -173,10 +173,10 @@ func TestScanCSV(t *testing.T) {
 			TryParseDates:     &tryParseDates,
 			QuoteChar:         &quoteChar,
 			CommentPrefix:     &commentPrefix,
-			Schema: map[string]pb.DataType{
-				"name":      pb.DataType_UTF8,
-				"age":       pb.DataType_INT64,
-				"joined_at": pb.DataType_DATE,
+			Schema: map[string]DataType{
+				"name":      DataTypeUTF8,
+				"age":       DataTypeInt64,
+				"joined_at": DataTypeDate,
 			},
 		}))
 		if err != nil {
@@ -209,14 +209,14 @@ func TestScanCSV(t *testing.T) {
 			t.Fatalf("failed to write csv fixture: %v", err)
 		}
 
-		encoding := pb.CsvEncoding_CSV_ENCODING_LOSSY_UTF8
+		encoding := CSVEncodingLossyUTF8
 		ignoreErrors := true
 		rows, err := collectToMaps(t, ScanCSVWithOptions(path, CSVScanOptions{
 			Encoding:     &encoding,
 			IgnoreErrors: &ignoreErrors,
-			Schema: map[string]pb.DataType{
-				"name": pb.DataType_UTF8,
-				"age":  pb.DataType_INT64,
+			Schema: map[string]DataType{
+				"name": DataTypeUTF8,
+				"age":  DataTypeInt64,
 			},
 		}))
 		if err != nil {
@@ -1348,10 +1348,10 @@ func TestAdvancedConvenienceOperations(t *testing.T) {
 		nullValue := ""
 		df := ScanCSVWithOptions(path, CSVScanOptions{
 			NullValue: &nullValue,
-			Schema: map[string]pb.DataType{
-				"name":  pb.DataType_UTF8,
-				"value": pb.DataType_FLOAT64,
-				"score": pb.DataType_FLOAT64,
+			Schema: map[string]DataType{
+				"name":  DataTypeUTF8,
+				"value": DataTypeFloat64,
+				"score": DataTypeFloat64,
 			},
 		})
 
@@ -2191,10 +2191,10 @@ func TestDataFrameFromMap(t *testing.T) {
 			"id":    []interface{}{1, 2, 3},
 			"age":   []interface{}{nil, 20, 30},
 			"score": []interface{}{1, 2, 3},
-		}, map[string]pb.DataType{
-			"id":    pb.DataType_UINT64,
-			"age":   pb.DataType_INT32,
-			"score": pb.DataType_FLOAT64,
+		}, map[string]DataType{
+			"id":    DataTypeUInt64,
+			"age":   DataTypeInt32,
+			"score": DataTypeFloat64,
 		})
 		if err != nil {
 			t.Fatalf("Failed to create DataFrame with schema: %v", err)
@@ -2284,10 +2284,10 @@ func TestDataFrameFromRows(t *testing.T) {
 		df, err := NewEagerFrameFromRowsWithSchema(brg, []map[string]any{
 			{"id": 1, "name": "Alice", "age": nil},
 			{"id": 2, "name": "Bob", "age": 20},
-		}, map[string]pb.DataType{
-			"id":   pb.DataType_UINT64,
-			"name": pb.DataType_UTF8,
-			"age":  pb.DataType_INT32,
+		}, map[string]DataType{
+			"id":   DataTypeUInt64,
+			"name": DataTypeUTF8,
+			"age":  DataTypeInt32,
 		})
 		if err != nil {
 			t.Fatalf("Failed to create DataFrame from rows with schema: %v", err)
@@ -2332,12 +2332,12 @@ func TestDataFrameFromRows(t *testing.T) {
 			},
 		}
 
-		df, err := NewEagerFrameFromRowsWithSchema(brg, goframeRows, map[string]pb.DataType{
-			"id":         pb.DataType_UINT64,
-			"name":       pb.DataType_UTF8,
-			"age":        pb.DataType_INT32,
-			"salary":     pb.DataType_FLOAT64,
-			"created_at": pb.DataType_UTF8,
+		df, err := NewEagerFrameFromRowsWithSchema(brg, goframeRows, map[string]DataType{
+			"id":         DataTypeUInt64,
+			"name":       DataTypeUTF8,
+			"age":        DataTypeInt32,
+			"salary":     DataTypeFloat64,
+			"created_at": DataTypeUTF8,
 		})
 		if err != nil {
 			t.Fatalf("Failed to create DataFrame from fake GoFrame rows: %v", err)
@@ -2394,10 +2394,10 @@ func TestDataFrameFromRowsConcurrent(t *testing.T) {
 				df, err := NewEagerFrameFromRowsWithSchema(brg, []map[string]any{
 					{"id": idBase, "name": fmt.Sprintf("user-%d-%d", i, iter), "age": nil},
 					{"id": idBase + 100, "name": fmt.Sprintf("user-%d-%d-b", i, iter), "age": i + iter + 20},
-				}, map[string]pb.DataType{
-					"id":   pb.DataType_INT64,
-					"name": pb.DataType_UTF8,
-					"age":  pb.DataType_INT32,
+				}, map[string]DataType{
+					"id":   DataTypeInt64,
+					"name": DataTypeUTF8,
+					"age":  DataTypeInt32,
 				})
 				if err != nil {
 					errCh <- fmt.Errorf("worker %d iteration %d create failed: %w", i, iter, err)
@@ -2508,12 +2508,12 @@ func TestRowsToArrowToNewDataFrame(t *testing.T) {
 			"created_at": "2026-03-24 11:00:00",
 		},
 	}
-	schema := map[string]pb.DataType{
-		"id":         pb.DataType_UINT64,
-		"name":       pb.DataType_UTF8,
-		"age":        pb.DataType_INT32,
-		"salary":     pb.DataType_FLOAT64,
-		"created_at": pb.DataType_UTF8,
+	schema := map[string]DataType{
+		"id":         DataTypeUInt64,
+		"name":       DataTypeUTF8,
+		"age":        DataTypeInt32,
+		"salary":     DataTypeFloat64,
+		"created_at": DataTypeUTF8,
 	}
 
 	record, err := NewArrowRecordBatchFromRowsWithSchema(rows, schema)
@@ -2562,11 +2562,11 @@ func TestRowsTemporalArrowRoundTrip(t *testing.T) {
 			"clock_at":   createdAt,
 		},
 	}
-	schema := map[string]pb.DataType{
-		"id":         pb.DataType_INT64,
-		"created_at": pb.DataType_DATETIME,
-		"birthday":   pb.DataType_DATE,
-		"clock_at":   pb.DataType_TIME,
+	schema := map[string]DataType{
+		"id":         DataTypeInt64,
+		"created_at": DataTypeDatetime,
+		"birthday":   DataTypeDate,
+		"clock_at":   DataTypeTime,
 	}
 
 	record, err := NewArrowRecordBatchFromRowsWithSchema(rows, schema)
@@ -2977,8 +2977,8 @@ func TestArrowSchemaMismatchError(t *testing.T) {
 	rows := []map[string]any{
 		{"age": "not-a-number"},
 	}
-	schema := map[string]pb.DataType{
-		"age": pb.DataType_INT32,
+	schema := map[string]DataType{
+		"age": DataTypeInt32,
 	}
 
 	_, err := NewArrowRecordBatchFromRowsWithSchema(rows, schema)
@@ -3000,9 +3000,9 @@ func TestNewDataFrameFromRowsAuto(t *testing.T) {
 	}
 
 	t.Run("AutoWithSchema", func(t *testing.T) {
-		df, err := NewDataFrameFromRowsAuto(rows, map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		df, err := NewDataFrameFromRowsAuto(rows, map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		})
 		if err != nil {
 			t.Fatalf("NewDataFrameFromRowsAuto failed: %v", err)
@@ -3057,9 +3057,9 @@ func TestDataFrameAPI(t *testing.T) {
 		frame, err := NewDataFrame([]map[string]any{
 			{"id": 1, "name": "Alice"},
 			{"id": 2, "name": "Bob"},
-		}, WithSchema(map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		}, WithSchema(map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		}))
 		if err != nil {
 			t.Fatalf("DataFrame rows constructor failed: %v", err)
@@ -3291,11 +3291,11 @@ func TestDataFrameAPI(t *testing.T) {
 			"name":       []string{"Alice", "Bob"},
 			"age":        []interface{}{nil, int64(20)},
 			"created_at": []string{"2026-03-24T10:00:00+08:00", "2026-03-24T11:00:00+08:00"},
-		}, WithSchema(map[string]pb.DataType{
-			"id":         pb.DataType_UINT64,
-			"name":       pb.DataType_UTF8,
-			"age":        pb.DataType_INT64,
-			"created_at": pb.DataType_UTF8,
+		}, WithSchema(map[string]DataType{
+			"id":         DataTypeUInt64,
+			"name":       DataTypeUTF8,
+			"age":        DataTypeInt64,
+			"created_at": DataTypeUTF8,
 		}))
 		if err != nil {
 			t.Fatalf("NewDataFrame column dispatch with schema failed: %v", err)
@@ -3331,9 +3331,9 @@ func TestDataFrameAPI(t *testing.T) {
 		frame, err := NewDataFrameFromMaps([]map[string]any{
 			{"id": 1, "name": "Alice"},
 			{"id": 2, "name": "Bob"},
-		}, WithSchema(map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		}, WithSchema(map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		}))
 		if err != nil {
 			t.Fatalf("NewDataFrameFromMaps failed: %v", err)
@@ -3353,9 +3353,9 @@ func TestDataFrameAPI(t *testing.T) {
 		rows, err := QueryMaps([]map[string]any{
 			{"id": 1, "name": "Alice"},
 			{"id": 2, "name": "Bob"},
-		}, map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		}, map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		}, func(frame *DataFrame) *LazyFrame {
 			return frame.Filter(Col("id").Gt(Lit(1))).Select(Col("name"))
 		})
@@ -3370,9 +3370,9 @@ func TestDataFrameAPI(t *testing.T) {
 	t.Run("DataFrameCloseInvalidatesObject", func(t *testing.T) {
 		frame, err := NewDataFrame([]map[string]any{
 			{"id": 1, "name": "Alice"},
-		}, WithSchema(map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		}, WithSchema(map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		}))
 		if err != nil {
 			t.Fatalf("DataFrame failed: %v", err)
@@ -3395,9 +3395,9 @@ func TestDataFrameAPI(t *testing.T) {
 	t.Run("DataFrameFinalizerOwnsEagerFrame", func(t *testing.T) {
 		frame, err := NewDataFrame([]map[string]any{
 			{"id": 1, "name": "Alice"},
-		}, WithSchema(map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		}, WithSchema(map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		}))
 		if err != nil {
 			t.Fatalf("DataFrame failed: %v", err)
@@ -3570,9 +3570,9 @@ func TestDataFrameFromArrowManaged(t *testing.T) {
 	record, err := NewArrowRecordBatchFromRowsWithSchema([]map[string]any{
 		{"id": uint64(1), "name": "Alice"},
 		{"id": uint64(2), "name": "Bob"},
-	}, map[string]pb.DataType{
-		"id":   pb.DataType_UINT64,
-		"name": pb.DataType_UTF8,
+	}, map[string]DataType{
+		"id":   DataTypeUInt64,
+		"name": DataTypeUTF8,
 	})
 	if err != nil {
 		t.Fatalf("NewArrowRecordBatchFromRowsWithSchema failed: %v", err)
@@ -3599,9 +3599,9 @@ func TestDataFrameFromArrowManaged(t *testing.T) {
 
 	polarsStyleRecord, err := NewArrowRecordBatchFromRowsWithSchema([]map[string]any{
 		{"id": uint64(3), "name": "Carl"},
-	}, map[string]pb.DataType{
-		"id":   pb.DataType_UINT64,
-		"name": pb.DataType_UTF8,
+	}, map[string]DataType{
+		"id":   DataTypeUInt64,
+		"name": DataTypeUTF8,
 	})
 	if err != nil {
 		t.Fatalf("NewArrowRecordBatchFromRowsWithSchema failed: %v", err)
@@ -3670,9 +3670,9 @@ func TestEagerFrameToArrow(t *testing.T) {
 
 	eager, err := NewEagerFrameFromRowsWithSchema(brg, []map[string]any{
 		{"id": uint64(10), "city": "Shanghai"},
-	}, map[string]pb.DataType{
-		"id":   pb.DataType_UINT64,
-		"city": pb.DataType_UTF8,
+	}, map[string]DataType{
+		"id":   DataTypeUInt64,
+		"city": DataTypeUTF8,
 	})
 	if err != nil {
 		t.Fatalf("NewEagerFrameFromRowsWithSchema failed: %v", err)
@@ -3781,10 +3781,10 @@ func TestDataFrameMapBatches(t *testing.T) {
 			}
 			row["level"] = level
 		}
-		return NewArrowRecordBatchFromRowsWithSchema(rows, map[string]pb.DataType{
-			"name":  pb.DataType_UTF8,
-			"age":   pb.DataType_INT64,
-			"level": pb.DataType_UTF8,
+		return NewArrowRecordBatchFromRowsWithSchema(rows, map[string]DataType{
+			"name":  DataTypeUTF8,
+			"age":   DataTypeInt64,
+			"level": DataTypeUTF8,
 		})
 	}, MapBatchesOptions{})
 	if err != nil {
@@ -3900,7 +3900,7 @@ func TestExprMapBatches(t *testing.T) {
 				}, nil)
 				record := array.NewRecordBatch(schema, []arrow.Array{values}, int64(col.Len()))
 				return record, nil
-			}, ExprMapBatchesOptions{ReturnType: pb.DataType_INT64}).
+			}, ExprMapBatchesOptions{ReturnType: DataTypeInt64}).
 			Alias("age_plus_ten"),
 	))
 	fmt.Println(rows)
@@ -3961,7 +3961,7 @@ func TestMapBatchesMultipleExprs(t *testing.T) {
 			}, nil)
 			record := array.NewRecordBatch(schema, []arrow.Array{values}, int64(ageCol.Len()))
 			return record, nil
-		}, ExprMapBatchesOptions{ReturnType: pb.DataType_INT64}).Alias("age_bonus"),
+		}, ExprMapBatchesOptions{ReturnType: DataTypeInt64}).Alias("age_bonus"),
 	))
 	fmt.Println(rows)
 	if err != nil {
@@ -3992,7 +3992,7 @@ func TestExprMapBatchesError(t *testing.T) {
 	_, err = collectToMaps(t, df.Select(
 		Col("age").MapBatches(func(batch arrow.RecordBatch) (arrow.RecordBatch, error) {
 			return nil, fmt.Errorf("boom")
-		}, ExprMapBatchesOptions{ReturnType: pb.DataType_INT64}).Alias("age_fail"),
+		}, ExprMapBatchesOptions{ReturnType: DataTypeInt64}).Alias("age_fail"),
 	))
 	if err == nil {
 		t.Fatal("Expected Expr.MapBatches error, got nil")
@@ -4347,9 +4347,9 @@ func TestDataFrameFreeBehavior(t *testing.T) {
 		df, err := NewEagerFrameFromRowsWithSchema(brg, []map[string]any{
 			{"id": 1, "name": "Alice"},
 			{"id": 2, "name": "Bob"},
-		}, map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		}, map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		})
 		if err != nil {
 			t.Fatalf("Failed to create DataFrame: %v", err)
@@ -4376,9 +4376,9 @@ func TestDataFrameFreeBehavior(t *testing.T) {
 	t.Run("FreeIsIdempotent", func(t *testing.T) {
 		df, err := NewEagerFrameFromRowsWithSchema(brg, []map[string]any{
 			{"id": 1, "name": "Alice"},
-		}, map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		}, map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		})
 		if err != nil {
 			t.Fatalf("Failed to create DataFrame: %v", err)
@@ -4397,9 +4397,9 @@ func TestDataFrameFreeBehavior(t *testing.T) {
 		rows, err := NewDataFrameFromRowsWithSchema([]map[string]any{
 			{"id": 1, "name": "Alice"},
 			{"id": 2, "name": "Bob"},
-		}, map[string]pb.DataType{
-			"id":   pb.DataType_INT64,
-			"name": pb.DataType_UTF8,
+		}, map[string]DataType{
+			"id":   DataTypeInt64,
+			"name": DataTypeUTF8,
 		})
 		if err != nil {
 			t.Fatalf("Failed to create DataFrame: %v", err)
@@ -4424,9 +4424,9 @@ func TestDataFrameFreeBehavior(t *testing.T) {
 			df, err := NewEagerFrameFromRowsWithSchema(brg, []map[string]any{
 				{"id": 1, "name": "Alice"},
 				{"id": 2, "name": "Bob"},
-			}, map[string]pb.DataType{
-				"id":   pb.DataType_INT64,
-				"name": pb.DataType_UTF8,
+			}, map[string]DataType{
+				"id":   DataTypeInt64,
+				"name": DataTypeUTF8,
 			})
 			if err != nil {
 				return err

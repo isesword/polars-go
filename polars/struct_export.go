@@ -297,15 +297,31 @@ func toDuration(value any) (time.Duration, error) {
 		return time.ParseDuration(v)
 	case []byte:
 		return time.ParseDuration(string(v))
+	case int8:
+		return time.Duration(v), nil
+	case int16:
+		return time.Duration(v), nil
+	case int32:
+		return time.Duration(v), nil
 	case int64:
 		return time.Duration(v), nil
-	case float64:
-		return time.Duration(v), nil
 	case int:
+		return time.Duration(v), nil
+	case uintptr:
+		return time.Duration(v), nil
+	case uint8:
+		return time.Duration(v), nil
+	case uint16:
+		return time.Duration(v), nil
+	case uint32:
 		return time.Duration(v), nil
 	case uint64:
 		return time.Duration(v), nil
 	case uint:
+		return time.Duration(v), nil
+	case float32:
+		return time.Duration(v), nil
+	case float64:
 		return time.Duration(v), nil
 	case jsonNumberLike:
 		iv, err := strconv.ParseInt(v.String(), 10, 64)

@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	pb "github.com/isesword/polars-go-bridge/proto"
 )
 
 // NewArrowRecordBatchFromRowsWithSchema 将行式数据按显式 schema 转为 Arrow RecordBatch。
@@ -15,7 +14,7 @@ import (
 // 无 cgo 时不可用，因为当前高性能 Arrow 导入链依赖 cgo。
 func NewArrowRecordBatchFromRowsWithSchema(
 	_ []map[string]any,
-	_ map[string]pb.DataType,
+	_ map[string]DataType,
 ) (arrow.RecordBatch, error) {
 	return nil, fmt.Errorf("NewArrowRecordBatchFromRowsWithSchema requires cgo (set CGO_ENABLED=1)")
 }

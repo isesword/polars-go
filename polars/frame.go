@@ -6,8 +6,7 @@ import (
 	"runtime"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/isesword/polars-go-bridge/bridge"
-	pb "github.com/isesword/polars-go-bridge/proto"
+	"github.com/isesword/polars-go/bridge"
 )
 
 // DataFrame is a higher-level wrapper around EagerFrame.
@@ -25,7 +24,7 @@ type DataFrame struct {
 type ImportOption func(*importConfig)
 
 type importConfig struct {
-	schema      map[string]pb.DataType
+	schema      map[string]DataType
 	arrowSchema *arrow.Schema
 }
 
@@ -50,7 +49,7 @@ func newDataFrameWrapper(df *EagerFrame) *DataFrame {
 }
 
 // WithSchema applies an explicit schema to high-level import constructors.
-func WithSchema(schema map[string]pb.DataType) ImportOption {
+func WithSchema(schema map[string]DataType) ImportOption {
 	return func(cfg *importConfig) {
 		cfg.schema = schema
 	}
@@ -118,7 +117,7 @@ func NewDataFrameFromMaps(rows []map[string]any, opts ...ImportOption) (*DataFra
 // Go data using an explicit schema.
 func NewDataFrameFromMapsWithSchema(
 	rows []map[string]any,
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*DataFrame, error) {
 	return NewDataFrameFromMaps(rows, WithSchema(schema))
 }
@@ -147,7 +146,7 @@ func NewDataFrameFromColumns(data map[string]interface{}, opts ...ImportOption) 
 // column-oriented Go data using an explicit schema.
 func NewDataFrameFromColumnsWithSchema(
 	data map[string]interface{},
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*DataFrame, error) {
 	return NewDataFrameFromColumns(data, WithSchema(schema))
 }
@@ -193,7 +192,7 @@ func NewDataFrameFromArrow(recordBatch arrow.RecordBatch) (*DataFrame, error) {
 // Prefer NewDataFrameFromMaps or NewDataFrameFromMapsWithSchema for new code.
 func NewDataFrameFromRowsAuto(
 	rows []map[string]any,
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*DataFrame, error) {
 	brg, err := resolveBridge(nil)
 	if err != nil {
@@ -212,7 +211,7 @@ func NewDataFrameFromRowsAuto(
 // Prefer NewDataFrameFromMapsWithSchema for new code.
 func NewDataFrameFromRowsWithSchema(
 	rows []map[string]any,
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*DataFrame, error) {
 	brg, err := resolveBridge(nil)
 	if err != nil {
@@ -248,7 +247,7 @@ func NewDataFrameFromRowsWithArrowSchema(
 // Prefer NewDataFrameFromColumnsWithSchema for new code.
 func NewDataFrameFromMapWithSchema(
 	data map[string]interface{},
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 ) (*DataFrame, error) {
 	brg, err := resolveBridge(nil)
 	if err != nil {
@@ -690,7 +689,7 @@ func pivotEagerFrame(brg *bridge.Bridge, handle uint64, opts PivotOptions) (*Eag
 // builder, materializes maps, and releases internal resources automatically.
 func QueryMaps(
 	rows []map[string]any,
-	schema map[string]pb.DataType,
+	schema map[string]DataType,
 	build func(*DataFrame) *LazyFrame,
 ) ([]map[string]interface{}, error) {
 	frame, err := NewDataFrameFromRowsWithSchema(rows, schema)

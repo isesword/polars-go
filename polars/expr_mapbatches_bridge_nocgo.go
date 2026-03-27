@@ -6,7 +6,7 @@ package polars
 import (
 	"fmt"
 
-	"github.com/isesword/polars-go-bridge/bridge"
+	"github.com/isesword/polars-go/bridge"
 )
 
 func registerExprMapBatchesBridgeCallback(_ *bridge.Bridge) error {

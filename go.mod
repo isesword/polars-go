@@ -1,4 +1,4 @@
-module github.com/isesword/polars-go-bridge
+module github.com/isesword/polars-go
 
 go 1.25.0
 

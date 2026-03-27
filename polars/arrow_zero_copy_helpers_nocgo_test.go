@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/isesword/polars-go-bridge/bridge"
+	"github.com/isesword/polars-go/bridge"
 )
 
 func zeroCopySupported() bool {

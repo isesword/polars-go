@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	pb "github.com/isesword/polars-go-bridge/proto"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -17,7 +16,7 @@ type ExcelReadOptions struct {
 	SheetIDs     []int
 	HasHeader    *bool
 	RaiseIfEmpty bool
-	Schema       map[string]pb.DataType
+	Schema       map[string]DataType
 	ArrowSchema  *arrow.Schema
 }
 

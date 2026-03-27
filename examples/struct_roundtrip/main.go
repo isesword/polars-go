@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/isesword/polars-go-bridge/polars"
+	"github.com/isesword/polars-go/polars"
 )
 
 type Profile struct {

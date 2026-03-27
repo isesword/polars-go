@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package polars_bridge;
 
-option go_package = "github.com/isesword/polars-go-bridge/proto";
+option go_package = "github.com/isesword/polars-go/proto";
 
 // Plan 版本 v1
 message Plan {

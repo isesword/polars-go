@@ -11,7 +11,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/cdata"
 	"github.com/apache/arrow-go/v18/arrow/memory/mallocator"
-	"github.com/isesword/polars-go-bridge/bridge"
+	"github.com/isesword/polars-go/bridge"
 )
 
 func zeroCopySupported() bool {
