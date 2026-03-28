@@ -585,6 +585,47 @@ go test ./polars -run '^$' -bench Benchmark -benchmem
 - `ScanCSV` / `ScanParquet` 这类文件扫描路径，Go bridge 依然明显占优
 - 内存 DataFrame 上直接做 `ToMaps` / `GroupBy` / `Join` / `SinkNDJSONFile`，当前样例里 Python Polars 更快
 
+如果只想快速看 `100000` 行下“导入 / 处理 / 导出”三段的当前差异，可以先看这张速览表：
+
+| 阶段 | 场景 | Python | Go | 对比 |
+|---|---|---:|---:|---|
+| 导入 | `pl.from_dicts` / `NewDataFrameFromMaps` | `31006 us/op` | `242591 us/op` | Go 慢 `7.8x` |
+| 导入 | `pl.from_dicts` / `NewDataFrameFromMaps` `1M` | `530326 us/op` | `3383736 us/op` | Go 慢 `6.4x` |
+| 处理 | `collect_only` | `336 us/op` | `3402 us/op` | Go 慢 `10.1x` |
+| 处理 | `collect_only` `1M` | `11488 us/op` | `33934 us/op` | Go 慢 `3.0x` |
+| 处理 | `group_by_collect_only` | `4200 us/op` | `11239 us/op` | Go 慢 `2.7x` |
+| 处理 | `group_by_collect_only` `1M` | `16194 us/op` | `121097 us/op` | Go 慢 `7.5x` |
+| 处理 | `join_collect_only` | `6861 us/op` | `16502 us/op` | Go 慢 `2.4x` |
+| 处理 | `join_collect_only` `1M` | `18193 us/op` | `191474 us/op` | Go 慢 `10.5x` |
+| 导出 | `to_maps` | `44711 us/op` | `16663 us/op` | Go 快 `2.7x` |
+| 导出 | `to_maps` `1M` | `653895 us/op` | `259798 us/op` | Go 快 `2.5x` |
+| 导出 | `join_export_only` | `37699 us/op` | `10888 us/op` | Go 快 `3.5x` |
+| 导出 | `join_export_only` `1M` | `532299 us/op` | `157233 us/op` | Go 快 `3.4x` |
+
+这张表对应的完整说明和更小/更大规模样本，见：
+
+- [docs/python-polars-comparison.md](docs/python-polars-comparison.md)
+
+对应的内存量级也可以一起看，注意这里是近似对照：
+
+- Python `memory_mib` 当前基于 `ru_maxrss`
+- Go `memory_mib` 当前基于 `runtime.MemStats.Sys`
+
+| 阶段 | 场景 | Python | Go |
+|---|---|---:|---:|
+| 导入 | `pl.from_dicts` / `NewDataFrameFromMaps` `100k` | `113.6 MiB` | `109.1 MiB` |
+| 导入 | `pl.from_dicts` / `NewDataFrameFromMaps` `1M` | `704.5 MiB` | `965.0 MiB` |
+| 处理 | `collect_only` `100k` | `134.1 MiB` | `37.9 MiB` |
+| 处理 | `collect_only` `1M` | `667.3 MiB` | `283.9 MiB` |
+| 处理 | `group_by_collect_only` `100k` | `132.5 MiB` | `41.9 MiB` |
+| 处理 | `group_by_collect_only` `1M` | `630.6 MiB` | `294.8 MiB` |
+| 处理 | `join_collect_only` `100k` | `150.9 MiB` | `37.6 MiB` |
+| 处理 | `join_collect_only` `1M` | `715.0 MiB` | `287.4 MiB` |
+| 导出 | `to_maps` `100k` | `242.3 MiB` | `104.7 MiB` |
+| 导出 | `to_maps` `1M` | `1733.3 MiB` | `833.6 MiB` |
+| 导出 | `join_export_only` `100k` | `222.4 MiB` | `87.9 MiB` |
+| 导出 | `join_export_only` `1M` | `1503.8 MiB` | `794.5 MiB` |
+
 按规模跑某一组：
 
 ```bash

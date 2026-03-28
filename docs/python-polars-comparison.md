@@ -308,6 +308,75 @@ scripts/compare_memory_with_python_polars.sh \
 
 这说明前面那批“内存 DataFrame 上 Python 更快”的结果，很大概率不是 Polars 算子本身不行，而是 Go 侧当前默认的内存导入路径太重。
 
+## 最新复跑结果
+
+为了更直接回答“当前实现里，导入 / 处理 / 导出三段各自差多少”，我在同一台机器上又补跑了一轮分段对比。
+
+这轮口径和前面的样例不同，分两部分看：
+
+- 导入：Python 使用 `pl.from_dicts(..., schema=...)`，Go 使用 `NewDataFrameFromMaps(..., WithSchema(...))`
+- 处理 / 导出：Python 和 Go 都使用共享 fixture；Go 侧显式走 `--import-mode arrow`，尽量把加载方式的影响压低，重点观察进入 Polars 之后的处理和导出差异
+
+测试环境：
+
+- 日期：`2026-03-28`
+- 机器：Apple M4 Pro
+- Python Polars：`1.35.2`
+
+### 分段吞吐对比
+
+| 阶段 | 场景 | Python | Go | 结论 |
+|---|---|---:|---:|---|
+| 导入 | `from_dicts/maps` `2000` 行 | `910 us/op` | `4918 us/op` | Go 约慢 `5.4x` |
+| 导入 | `from_dicts/maps` `10000` 行 | `2683 us/op` | `23578 us/op` | Go 约慢 `8.8x` |
+| 导入 | `from_dicts/maps` `100000` 行 | `31006 us/op` | `242591 us/op` | Go 约慢 `7.8x` |
+| 导入 | `from_dicts/maps` `1000000` 行 | `530326 us/op` | `3383736 us/op` | Go 约慢 `6.4x` |
+| 处理 | `collect_only` `4000` 行 | `86 us/op` | `327 us/op` | Go 约慢 `3.8x` |
+| 处理 | `collect_only` `100000` 行 | `336 us/op` | `3402 us/op` | Go 约慢 `10.1x` |
+| 处理 | `collect_only` `1000000` 行 | `11488 us/op` | `33934 us/op` | Go 约慢 `3.0x` |
+| 处理 | `group_by_collect_only` `4000` 行 | `175 us/op` | `1088 us/op` | Go 约慢 `6.2x` |
+| 处理 | `group_by_collect_only` `100000` 行 | `4200 us/op` | `11239 us/op` | Go 约慢 `2.7x` |
+| 处理 | `group_by_collect_only` `1000000` 行 | `16194 us/op` | `121097 us/op` | Go 约慢 `7.5x` |
+| 处理 | `join_collect_only` `4000` 行 | `327 us/op` | `1528 us/op` | Go 约慢 `4.7x` |
+| 处理 | `join_collect_only` `100000` 行 | `6861 us/op` | `16502 us/op` | Go 约慢 `2.4x` |
+| 处理 | `join_collect_only` `1000000` 行 | `18193 us/op` | `191474 us/op` | Go 约慢 `10.5x` |
+| 导出 | `to_maps` `4000` 行 | `1483 us/op` | `778 us/op` | Go 约快 `1.9x` |
+| 导出 | `to_maps` `100000` 行 | `44711 us/op` | `16663 us/op` | Go 约快 `2.7x` |
+| 导出 | `to_maps` `1000000` 行 | `653895 us/op` | `259798 us/op` | Go 约快 `2.5x` |
+| 导出 | `join_export_only` `4000` 行 | `999 us/op` | `499 us/op` | Go 约快 `2.0x` |
+| 导出 | `join_export_only` `100000` 行 | `37699 us/op` | `10888 us/op` | Go 约快 `3.5x` |
+| 导出 | `join_export_only` `1000000` 行 | `532299 us/op` | `157233 us/op` | Go 约快 `3.4x` |
+
+### 最新结论
+
+- 当前最大差距仍然在“Go 对象进入 Rust/Polars”的导入阶段。
+- 进入 Polars 之后，处理阶段仍有差距，但已经明显小于导入阶段。
+- 结果导出回宿主语言对象时，当前 Go 侧 `ToMaps()` / join 导出反而更快。
+- 所以现在如果继续做性能优化，优先级仍然应该是“继续压加载桥接成本”，而不是先盯 `ToMaps()` 或最终结果导出。
+
+### 分段内存对比
+
+说明：
+
+- Python `memory_mib` 基于 `ru_maxrss`
+- Go `memory_mib` 基于 `runtime.MemStats.Sys`
+- 这组结果更适合看趋势和量级，不适合作为严格等价的 peak RSS 对照
+
+| 阶段 | 场景 | Python | Go |
+|---|---|---:|---:|
+| 导入 | `from_dicts/maps` `100000` 行 | `113.6 MiB` | `109.1 MiB` |
+| 导入 | `from_dicts/maps` `1000000` 行 | `704.5 MiB` | `965.0 MiB` |
+| 处理 | `collect_only` `100000` 行 | `134.1 MiB` | `37.9 MiB` |
+| 处理 | `collect_only` `1000000` 行 | `667.3 MiB` | `283.9 MiB` |
+| 处理 | `group_by_collect_only` `100000` 行 | `132.5 MiB` | `41.9 MiB` |
+| 处理 | `group_by_collect_only` `1000000` 行 | `630.6 MiB` | `294.8 MiB` |
+| 处理 | `join_collect_only` `100000` 行 | `150.9 MiB` | `37.6 MiB` |
+| 处理 | `join_collect_only` `1000000` 行 | `715.0 MiB` | `287.4 MiB` |
+| 导出 | `to_maps` `100000` 行 | `242.3 MiB` | `104.7 MiB` |
+| 导出 | `to_maps` `1000000` 行 | `1733.3 MiB` | `833.6 MiB` |
+| 导出 | `join_export_only` `100000` 行 | `222.4 MiB` | `87.9 MiB` |
+| 导出 | `join_export_only` `1000000` 行 | `1503.8 MiB` | `794.5 MiB` |
+
 ## 注意事项
 
 - 这不是官方 upstream 对官方 upstream 的严格基准，只是一套便于日常回归的近似同口径对照。
