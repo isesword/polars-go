@@ -796,6 +796,59 @@ enum DataType {
   TIME = 14;
 }
 
+message RowsImportField {
+  string name = 1;
+  DataType dtype = 2;
+  bool has_dtype = 3;
+}
+
+message RowsImportOptions {
+  repeated RowsImportField schema_fields = 1;
+  map<string, DataType> schema_overrides = 2;
+  bool strict = 3;
+  optional uint64 infer_schema_length = 4;
+}
+
+message RowStructField {
+  string name = 1;
+  RowValue value = 2;
+}
+
+message RowStruct {
+  repeated RowStructField fields = 1;
+}
+
+message RowRecord {
+  repeated RowValue values = 1;
+}
+
+message RowList {
+  repeated RowValue values = 1;
+}
+
+message RowValue {
+  oneof kind {
+    NullValue null_val = 1;
+    bool bool_val = 2;
+    sint64 int_val = 3;
+    uint64 uint_val = 4;
+    double float_val = 5;
+    string string_val = 6;
+    bytes bytes_val = 7;
+    sint32 date_val = 8;
+    sint64 datetime_val = 9;
+    sint64 time_val = 10;
+    RowList list_val = 11;
+    RowStruct struct_val = 12;
+  }
+}
+
+message RowsPayload {
+  repeated string row_order = 1;
+  repeated RowRecord rows = 2;
+  RowsImportOptions options = 3;
+}
+
 // ============ 字符串函数消息类型 ============
 
 // 通用字符串函数（单一表达式）

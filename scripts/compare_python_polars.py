@@ -83,7 +83,7 @@ def loops_for_size(n: int) -> int:
     return 2
 
 
-def maxrss_mib() -> float:
+def memory_mib() -> float:
     value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     if sys.platform == "darwin":
         return value / (1024 * 1024)
@@ -113,22 +113,59 @@ def build_cases(
     parquet_path = fixture_dir / f"polars_compare_{n}.parquet"
     base_data = frame_data(n)
     left_data, right_data = join_frame_data(n)
+    base_frame = pl.DataFrame(base_data)
+    base_lf = base_frame.lazy().filter(pl.col("age") > 30).select(
+        ["name", "salary", "department"]
+    )
+    group_by_lf = base_frame.lazy().group_by("department").agg(
+        [
+            pl.col("salary").sum().alias("salary_sum"),
+            pl.col("id").count().alias("employee_count"),
+            pl.col("age").mean().alias("avg_age"),
+        ]
+    )
+    join_left_frame = pl.DataFrame(left_data)
+    join_right_frame = pl.DataFrame(right_data)
+    join_lf = join_left_frame.lazy().join(join_right_frame.lazy(), on="id", how="inner").select(
+        ["id", "salary", "bonus"]
+    )
+    group_by_result: pl.DataFrame | None = None
+    join_result: pl.DataFrame | None = None
 
-    def base_df() -> pl.DataFrame:
-        return pl.DataFrame(base_data)
+    def get_group_by_result() -> pl.DataFrame:
+        nonlocal group_by_result
+        if group_by_result is None:
+            group_by_result = group_by_lf.collect()
+        return group_by_result
 
-    def join_frames() -> tuple[pl.DataFrame, pl.DataFrame]:
-        return pl.DataFrame(left_data), pl.DataFrame(right_data)
+    def get_join_result() -> pl.DataFrame:
+        nonlocal join_result
+        if join_result is None:
+            join_result = join_lf.collect()
+        return join_result
+
+    def join_import_only() -> int:
+        pl.DataFrame(left_data)
+        pl.DataFrame(right_data)
+        return 1
 
     return {
+        "import_only": (
+            "  ImportOnly",
+            lambda: pl.DataFrame(base_data),
+        ),
+        "collect_only": (
+            "  CollectOnly(df.lazy.filter.select.collect)",
+            lambda: base_lf.collect(),
+        ),
         "query_collect_like": (
             "  QueryCollectLike(df.filter.select.to_dicts)",
-            lambda: base_df().filter(pl.col("age") > 30)
+            lambda: pl.DataFrame(base_data).filter(pl.col("age") > 30)
             .select(["name", "salary", "department"])
             .to_dicts(),
         ),
-        "to_dicts": ("  ToDicts", lambda: base_df().to_dicts()),
-        "to_maps": ("  ToDicts", lambda: base_df().to_dicts()),
+        "to_dicts": ("  ToDicts", lambda: base_frame.to_dicts()),
+        "to_maps": ("  ToDicts", lambda: base_frame.to_dicts()),
         "scan_csv": (
             "  ScanCSV(filter+select+collect+to_dicts)",
             lambda: pl.scan_csv(csv_path)
@@ -147,7 +184,7 @@ def build_cases(
         ),
         "group_by_agg": (
             "  GroupByAgg(to_dicts)",
-            lambda: base_df().group_by("department")
+            lambda: base_frame.group_by("department")
             .agg(
                 [
                     pl.col("salary").sum().alias("salary_sum"),
@@ -157,13 +194,37 @@ def build_cases(
             )
             .to_dicts(),
         ),
+        "group_by_import_only": (
+            "  GroupByImportOnly",
+            lambda: pl.DataFrame(base_data),
+        ),
+        "group_by_collect_only": (
+            "  GroupByCollectOnly",
+            lambda: group_by_lf.collect(),
+        ),
+        "group_by_export_only": (
+            "  GroupByExportOnly",
+            lambda: get_group_by_result().to_dicts(),
+        ),
         "join_inner": (
             "  JoinInner(select.to_dicts)",
-            lambda: _join_to_dicts(join_frames),
+            lambda: _join_to_dicts(lambda: (join_left_frame, join_right_frame)),
+        ),
+        "join_import_only": (
+            "  JoinImportOnly",
+            join_import_only,
+        ),
+        "join_collect_only": (
+            "  JoinCollectOnly",
+            lambda: join_lf.collect(),
+        ),
+        "join_export_only": (
+            "  JoinExportOnly",
+            lambda: get_join_result().to_dicts(),
         ),
         "sink_ndjson_file": (
             "  SinkNDJSONFile",
-            lambda: _sink_ndjson_size(base_df(), n),
+            lambda: _sink_ndjson_size(base_frame, n),
         ),
     }
 
@@ -191,11 +252,19 @@ def benchmark(fixture_dir: Path, sizes: list[int]) -> None:
         loops = loops_for_size(n)
         cases = build_cases(n, fixture_dir)
         order = [
+            "import_only",
+            "collect_only",
             "query_collect_like",
             "to_dicts",
             "scan_csv",
             "scan_parquet",
+            "group_by_import_only",
+            "group_by_collect_only",
+            "group_by_export_only",
             "group_by_agg",
+            "join_import_only",
+            "join_collect_only",
+            "join_export_only",
             "join_inner",
             "sink_ndjson_file",
         ]
@@ -215,7 +284,7 @@ def benchmark_single_case(fixture_dir: Path, n: int, case_name: str) -> None:
     label, fn = cases[case_name]
     us_per_op = run_case(label, loops, fn)
     print(
-        f"RESULT case={case_name} size={n} us_per_op={us_per_op:.0f} maxrss_mib={maxrss_mib():.1f}"
+        f"RESULT case={case_name} size={n} us_per_op={us_per_op:.0f} memory_mib={memory_mib():.1f}"
     )
 
 

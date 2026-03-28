@@ -26,19 +26,19 @@ pub fn build_list_expr(kind: &proto::expr::Kind) -> Option<Result<Expr, BridgeEr
         Kind::ListVar(moment) => Some(build_list_var(moment)),
         Kind::ListContains(contains) => Some(build_list_contains(contains)),
         Kind::ListSort(sort) => Some(build_list_sort(sort)),
-        Kind::ListReverse(func) => {
-            Some(build_unary(func, "ListReverse", |expr| expr.list().reverse()))
-        }
+        Kind::ListReverse(func) => Some(build_unary(func, "ListReverse", |expr| {
+            expr.list().reverse()
+        })),
         Kind::ListUnique(unique) => Some(build_list_unique(unique)),
-        Kind::ListNUnique(func) => {
-            Some(build_unary(func, "ListNUnique", |expr| expr.list().n_unique()))
-        }
-        Kind::ListArgMin(func) => {
-            Some(build_unary(func, "ListArgMin", |expr| expr.list().arg_min()))
-        }
-        Kind::ListArgMax(func) => {
-            Some(build_unary(func, "ListArgMax", |expr| expr.list().arg_max()))
-        }
+        Kind::ListNUnique(func) => Some(build_unary(func, "ListNUnique", |expr| {
+            expr.list().n_unique()
+        })),
+        Kind::ListArgMin(func) => Some(build_unary(func, "ListArgMin", |expr| {
+            expr.list().arg_min()
+        })),
+        Kind::ListArgMax(func) => Some(build_unary(func, "ListArgMax", |expr| {
+            expr.list().arg_max()
+        })),
         Kind::ListAny(func) => Some(build_unary(func, "ListAny", |expr| expr.list().any())),
         Kind::ListAll(func) => Some(build_unary(func, "ListAll", |expr| expr.list().all())),
         Kind::ListDropNulls(func) => Some(build_unary(func, "ListDropNulls", |expr| {
@@ -158,23 +158,35 @@ fn build_list_shift(shift: &proto::ListShift) -> Result<Expr, BridgeError> {
 }
 
 fn build_list_sample(sample: &proto::ListSample, is_fraction: bool) -> Result<Expr, BridgeError> {
-    let expr = build_inner_expr(&sample.expr, if is_fraction { "ListSampleFraction" } else { "ListSampleN" })?;
-    let value = build_inner_expr(&sample.value, if is_fraction { "ListSampleFraction" } else { "ListSampleN" })?;
-    let seed = if sample.has_seed { Some(sample.seed) } else { None };
-    if is_fraction {
-        Ok(expr.list().sample_fraction(
-            value,
-            sample.with_replacement,
-            sample.shuffle,
-            seed,
-        ))
+    let expr = build_inner_expr(
+        &sample.expr,
+        if is_fraction {
+            "ListSampleFraction"
+        } else {
+            "ListSampleN"
+        },
+    )?;
+    let value = build_inner_expr(
+        &sample.value,
+        if is_fraction {
+            "ListSampleFraction"
+        } else {
+            "ListSampleN"
+        },
+    )?;
+    let seed = if sample.has_seed {
+        Some(sample.seed)
     } else {
-        Ok(expr.list().sample_n(
-            value,
-            sample.with_replacement,
-            sample.shuffle,
-            seed,
-        ))
+        None
+    };
+    if is_fraction {
+        Ok(expr
+            .list()
+            .sample_fraction(value, sample.with_replacement, sample.shuffle, seed))
+    } else {
+        Ok(expr
+            .list()
+            .sample_n(value, sample.with_replacement, sample.shuffle, seed))
     }
 }
 
@@ -196,10 +208,7 @@ fn build_list_diff(diff: &proto::ListDiff) -> Result<Expr, BridgeError> {
 fn build_list_std(moment: &proto::ListMoment) -> Result<Expr, BridgeError> {
     let expr = build_inner_expr(&moment.expr, "ListStd")?;
     let ddof = u8::try_from(moment.ddof).map_err(|_| {
-        BridgeError::InvalidArgument(format!(
-            "ListStd ddof out of range for u8: {}",
-            moment.ddof
-        ))
+        BridgeError::InvalidArgument(format!("ListStd ddof out of range for u8: {}", moment.ddof))
     })?;
     Ok(expr.list().std(ddof))
 }
@@ -207,10 +216,7 @@ fn build_list_std(moment: &proto::ListMoment) -> Result<Expr, BridgeError> {
 fn build_list_var(moment: &proto::ListMoment) -> Result<Expr, BridgeError> {
     let expr = build_inner_expr(&moment.expr, "ListVar")?;
     let ddof = u8::try_from(moment.ddof).map_err(|_| {
-        BridgeError::InvalidArgument(format!(
-            "ListVar ddof out of range for u8: {}",
-            moment.ddof
-        ))
+        BridgeError::InvalidArgument(format!("ListVar ddof out of range for u8: {}", moment.ddof))
     })?;
     Ok(expr.list().var(ddof))
 }

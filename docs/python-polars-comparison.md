@@ -2,6 +2,82 @@
 
 这份文档记录一套“同机器、近似同口径”的对比流程，用来观察本仓库和 Python Polars 在常见数据处理路径上的端到端差异。
 
+## 一页摘要
+
+- 当前最明显的瓶颈是 Go 侧的内存导入路径，尤其是默认 `json` 导入；`arrow` 路径能把这部分成本显著压下去。
+- `CollectOnly` 很轻，说明 `lazy -> collect` 和查询执行不是主瓶颈。
+- `ToMaps()` / `ToStructs()` 有成本，但不是最重的一层。
+- `GroupBy` 和 `Join` 的主要开销更多在输入构建和执行阶段，导出阶段次之。
+- 文件扫描型 workload 仍然是 Go bridge 的强项。
+- 这份对比基准统一按列式输入跑，Go 侧显式走 `NewDataFrameFromColumns(...)`，和 Python 的 `dict of lists` 对齐。
+
+## 因果图
+
+```mermaid
+flowchart TD
+  A["Go 侧输入数据"] --> B{"导入路径"}
+  B -->|"JSON"| C["Go 侧对象整理"]
+  B -->|"Arrow"| D["直接构造 Arrow RecordBatch"]
+  C --> E["Rust 反序列化"]
+  D --> E
+
+  E --> F["Rust Polars 执行"]
+  F --> G{"结果导出"}
+  G -->|"ToMaps / ToDicts"| H["Arrow -> Go 对象"]
+  G -->|"ToStructs"| I["Arrow -> Go struct"]
+  G -->|"Arrow"| J["尽量留在 Arrow 侧"]
+
+  C --> K["宿主语言开销大"]
+  H --> K
+  I --> K
+  K --> L["数据越大，桥接成本越明显"]
+  L --> M["Go bridge 看起来更慢"]
+
+  D --> N["桥接更薄"]
+  N --> O["更多成本留在 Rust 侧"]
+  O --> P["更接近 Python Polars"]
+```
+
+这张图的核心结论是：
+
+ - Python 大数据更占优，通常不是因为 Python 算子更强，而是因为它更少在宿主语言边界上搬数据。
+ - 你现在的 Go bridge 在默认 `json` 路径下，会把更多成本放在 Go 侧的对象构建、序列化和结果物化上。
+ - `arrow` 路径已经证明，桥接越薄，性能和内存越接近 Python Polars。
+
+## 输入流转图
+
+```mermaid
+flowchart TD
+  A["用户输入"] --> B{"输入形态"}
+
+  B -->|"列式 map"| C["NewDataFrameFromColumns"]
+  B -->|"行式 rows"| D["NewDataFrameFromMaps"]
+  B -->|"Arrow"| E["NewDataFrameFromArrow"]
+  B -->|"CSV / Parquet"| F["ScanCSV / ScanParquet"]
+
+  C --> G["Go 侧列数据归一化"]
+  G --> H["JSON 兼容路径"]
+  H --> I["Rust 解析 JSON"]
+  I --> J["构建 Polars DataFrame"]
+
+  D --> K["Go 侧行转列"]
+  K --> H
+
+  E --> L["Arrow C Data Interface"]
+  L --> J
+
+  F --> M["Go 侧仅构建 Lazy Plan"]
+  M --> N["Rust 执行时读取文件"]
+  N --> J
+```
+
+这张图对应的是仓库里最常见的 4 条读入路径：
+
+- `NewDataFrameFromColumns(...)` 适合已经是列式数据的场景，和 Python 的 `dict of lists` 对齐。
+- `NewDataFrameFromMaps(...)` 适合 `list of dicts`，但会多一层行转列。
+- `NewDataFrameFromArrow(...)` 适合已经有 Arrow 数据的高性能路径。
+- `ScanCSV(...)` / `ScanParquet(...)` 走的是 lazy scan，Go 侧只建计划，真正读文件的是 Rust。
+
 ## 对比目标
 
 这里关注的是更贴近业务接入的整体路径，而不是只盯底层算子：
@@ -34,9 +110,13 @@
 - `scripts/compare_with_python_polars.sh`
   一次性串起 fixture 准备、Python 对照和 Go bridge 对照。
 - `scripts/compare_memory_with_python_polars.sh`
-  以“每个 case 单独进程”的方式跑峰值内存对照，并输出 `maxrss_mib`。
+  以“每个 case 单独进程”的方式跑内存对照，并输出 `memory_mib`。
 
 补充：
+
+- `memory_mib` 是脚本当前输出的统一内存字段名。
+- Python 侧当前基于 `resource.getrusage(...).ru_maxrss`。
+- Go 侧当前基于 `runtime.MemStats.Sys`，这是为了保持 Windows 可编译。
 
 - `scripts/compare_go_polars.go` 以及两个 shell 脚本现在支持 `--import-mode` / `--go-import-mode`
   可以在 Go 侧切换 `json` 和 `arrow` 两种内存导入方式。
@@ -106,104 +186,106 @@ scripts/compare_memory_with_python_polars.sh \
 
 测试环境：
 
-- 日期：`2026-03-27`
+- 日期：`2026-03-28`
 - 机器：Apple M4 Pro
-- Python Polars：`1.36.1`
-- 口径：按列输入、按 case 惰性构造
+- Python Polars：`1.35.2`
+- 口径：按列输入，Go 侧显式走 `NewDataFrameFromColumns(...)`，Python 侧使用 `dict of lists`
 
-### 4k 行
+### 吞吐对比
 
-| 场景 | Go bridge | Python Polars | 备注 |
-|---|---:|---:|---|
-| QueryCollect-like | `2182 us/op` | `1086 us/op` | Python 更快 |
-| ToMaps / ToDicts | `2213 us/op` | `1430 us/op` | Python 更快 |
-| ScanCSV | `902 us/op` | `1139 us/op` | Go 更快 |
-| ScanParquet | `773 us/op` | `1001 us/op` | Go 更快 |
-| GroupByAgg | `1818 us/op` | `635 us/op` | Python 更快 |
-| JoinInner | `2617 us/op` | `1616 us/op` | Python 更快 |
-| SinkNDJSONFile | `1865 us/op` | `945 us/op` | Python 更快 |
+| 场景 | Python | Go JSON | Go Arrow |
+|---|---:|---:|---:|
+| ImportOnly | `345 / 1345` | `1878 / 7306` | `174 / 367` |
+| CollectOnly | `85 / 79` | `132 / 241` | `155 / 129` |
+| QueryCollectLike | `1168 / 4476` | `2151 / 8039` | `787 / 1803` |
+| ToDicts / ToMaps | `1289 / 5977` | `669 / 3143` | `746 / 2391` |
+| ScanCSV | `1234 / 3930` | `1001 / 3288` | `912 / 2584` |
+| ScanParquet | `1029 / 3657` | `729 / 2649` | `682 / 1644` |
+| GroupByImportOnly | `361 / 1326` | `1627 / 6718` | `122 / 334` |
+| GroupByCollectOnly | `197 / 298` | `308 / 487` | `234 / 323` |
+| GroupByExportOnly | `2 / 2` | `6 / 8` | `6 / 8` |
+| GroupByAgg | `170 / 276` | `274 / 397` | `228 / 376` |
+| JoinImportOnly | `381 / 1436` | `1909 / 7605` | `114 / 304` |
+| JoinCollectOnly | `308 / 399` | `560 / 523` | `338 / 529` |
+| JoinExportOnly | `1008 / 4623` | `508 / 1776` | `428 / 1538` |
+| JoinInner | `1462 / 5210` | `1030 / 2516` | `786 / 1928` |
+| SinkNDJSONFile | `583 / 726` | `459 / 609` | `296 / 486` |
 
-### 100k 行
+这里每个单元格都是 `4000 行 / 16000 行`。
 
-| 场景 | Go bridge | Python Polars | 备注 |
-|---|---:|---:|---|
-| QueryCollect-like | `51471 us/op` | `27237 us/op` | Python 更快 |
-| ToMaps / ToDicts | `56790 us/op` | `38582 us/op` | Python 更快 |
-| ScanCSV | `13633 us/op` | `21466 us/op` | Go 更快 |
-| ScanParquet | `9892 us/op` | `24849 us/op` | Go 更快 |
-| GroupByAgg | `43888 us/op` | `7963 us/op` | Python 更快 |
-| JoinInner | `61516 us/op` | `33289 us/op` | Python 更快 |
-| SinkNDJSONFile | `46152 us/op` | `9720 us/op` | Python 更快 |
+### 峰值内存对比
 
-### 1M 行
+| 场景 | Python | Go JSON | Go Arrow |
+|---|---:|---:|---:|
+| ImportOnly | `68.9 / 76.1` | `25.1 / 33.0` | `25.1 / 33.0` |
+| CollectOnly | `71.5 / 76.8` | `29.6 / 33.4` | `29.6 / 33.4` |
+| QueryCollectLike | `73.5 / 88.6` | `36.3 / 48.0` | `36.3 / 48.0` |
+| ToDicts / ToMaps | `73.2 / 93.0` | `28.0 / 39.8` | `28.0 / 39.8` |
+| ScanCSV | `87.0 / 102.2` | `41.2 / 49.5` | `41.2 / 49.5` |
+| ScanParquet | `86.1 / 102.5` | `49.7 / 58.4` | `49.7 / 58.4` |
+| GroupByImportOnly | `68.8 / 76.1` | `25.7 / 32.6` | `25.7 / 32.6` |
+| GroupByCollectOnly | `72.6 / 79.0` | `31.0 / 34.7` | `31.0 / 34.7` |
+| GroupByExportOnly | `70.2 / 74.7` | `30.5 / 34.2` | `30.5 / 34.2` |
+| GroupByAgg | `72.3 / 78.6` | `31.0 / 35.2` | `31.0 / 35.2` |
+| JoinImportOnly | `68.9 / 73.7` | `25.4 / 31.8` | `25.4 / 31.8` |
+| JoinCollectOnly | `76.3 / 80.4` | `39.5 / 45.0` | `39.5 / 45.0` |
+| JoinExportOnly | `73.5 / 91.2` | `44.1 / 54.8` | `44.1 / 54.8` |
+| JoinInner | `80.2 / 98.1` | `46.1 / 57.1` | `46.1 / 57.1` |
+| SinkNDJSONFile | `80.6 / 88.7` | `42.1 / 46.1` | `42.1 / 46.1` |
 
-| 场景 | Go bridge | Python Polars | 备注 |
-|---|---:|---:|---|
-| QueryCollect-like | `567946 us/op` | `316973 us/op` | Python 更快 |
-| ToMaps / ToDicts | `592082 us/op` | `407287 us/op` | Python 更快 |
-| ScanCSV | `124380 us/op` | `243888 us/op` | Go 更快 |
-| ScanParquet | `89925 us/op` | `234180 us/op` | Go 更快 |
-| GroupByAgg | `457104 us/op` | `80299 us/op` | Python 更快 |
-| JoinInner | `626925 us/op` | `332167 us/op` | Python 更快 |
-| SinkNDJSONFile | `469598 us/op` | `101503 us/op` | Python 更快 |
+### 结论
 
-## 峰值内存（maxrss）
+- 这次已经是**真正的列式对比**，不是行式输入混在一起了。
+- `CollectOnly` 仍然很轻，说明 query 执行本身不是主瓶颈。
+- `ImportOnly` 仍然是最明显的差距点，Go 的 `json` 入口最重，`arrow` 明显更接近 Python。
+- `GroupByExportOnly` 基本可以忽略，说明导出不是 groupby 的主要成本。
+- `JoinCollectOnly` 和 `JoinExportOnly` 都有成本，但主瓶颈仍然更偏输入和执行阶段。
 
-时间更快不等于进程峰值驻留内存更低，所以这里单独补一份 `maxrss` 结果。
+## group_by / join 细分
 
-说明：
+在上面那轮拆分基础上，又把 `GroupBy` 和 `Join` 额外切成了三段：
 
-- 这里的 `maxrss_mib` 是“每个 case 独立进程”的峰值驻留内存。
-- 这更接近“真实命令跑起来最高占了多少内存”，而不是 Go benchmark 里的 `B/op`。
-- `maxrss` 会包含运行时、自身进程常驻开销、桥接库加载以及测试数据本身，所以它和 `B/op` 不是一个概念。
+- `ImportOnly`：只看输入构建
+- `CollectOnly`：只看执行
+- `ExportOnly`：只看结果导出
 
-### 4k 行
+这轮只跑了 Go `arrow` 路径，测试环境仍然是：
 
-| 场景 | Python Polars | Go bridge | 备注 |
-|---|---:|---:|---|
-| QueryCollect-like | `80.2 MiB` | `39.9 MiB` | Go 更低 |
-| ToMaps / ToDicts | `79.3 MiB` | `30.2 MiB` | Go 更低 |
-| ScanCSV | `86.8 MiB` | `38.0 MiB` | Go 更低 |
-| ScanParquet | `85.6 MiB` | `47.5 MiB` | Go 更低 |
-| GroupByAgg | `78.5 MiB` | `37.8 MiB` | Go 更低 |
-| JoinInner | `87.4 MiB` | `46.8 MiB` | Go 更低 |
-| SinkNDJSONFile | `80.1 MiB` | `48.4 MiB` | Go 更低 |
+- 日期：`2026-03-28`
+- 机器：Apple M4 Pro
+- Python Polars：`1.35.2`
 
-### 100k 行
+### 吞吐对比
 
-| 场景 | Python Polars | Go bridge | 备注 |
-|---|---:|---:|---|
-| QueryCollect-like | `196.9 MiB` | `328.0 MiB` | Python 更低 |
-| ToMaps / ToDicts | `237.2 MiB` | `359.3 MiB` | Python 更低 |
-| ScanCSV | `203.8 MiB` | `93.1 MiB` | Go 更低 |
-| ScanParquet | `205.8 MiB` | `93.3 MiB` | Go 更低 |
-| GroupByAgg | `128.4 MiB` | `323.6 MiB` | Python 更低 |
-| JoinInner | `233.0 MiB` | `396.5 MiB` | Python 更低 |
-| SinkNDJSONFile | `148.2 MiB` | `326.6 MiB` | Python 更低 |
+| 场景 | Python | Go Arrow |
+|---|---:|---:|
+| GroupByImportOnly | `320 / 1234` | `114 / 317` |
+| GroupByCollectOnly | `180 / 259` | `275 / 319` |
+| GroupByExportOnly | `2 / 2` | `6 / 11` |
+| GroupByAgg | `202 / 311` | `224 / 284` |
+| JoinImportOnly | `366 / 1370` | `112 / 318` |
+| JoinCollectOnly | `321 / 417` | `401 / 436` |
+| JoinExportOnly | `926 / 4403` | `466 / 1514` |
+| JoinInner | `1483 / 5099` | `792 / 1941` |
 
-### 1M 行
+### 峰值内存对比
 
-| 场景 | Python Polars | Go bridge | 备注 |
-|---|---:|---:|---|
-| QueryCollect-like | `1259.6 MiB` | `2193.8 MiB` | Python 更低 |
-| ToMaps / ToDicts | `1746.4 MiB` | `2605.1 MiB` | Python 更低 |
-| ScanCSV | `1258.6 MiB` | `577.3 MiB` | Go 更低 |
-| ScanParquet | `1261.2 MiB` | `542.8 MiB` | Go 更低 |
-| GroupByAgg | `603.7 MiB` | `2617.2 MiB` | Python 更低 |
-| JoinInner | `1621.5 MiB` | `1885.2 MiB` | Python 更低 |
-| SinkNDJSONFile | `715.5 MiB` | `2892.2 MiB` | Python 更低 |
+| 场景 | Python | Go Arrow |
+|---|---:|---:|
+| GroupByImportOnly | `69.1 / 76.5` | `25.0 / 32.7` |
+| GroupByCollectOnly | `72.7 / 78.4` | `31.1 / 34.8` |
+| GroupByExportOnly | `70.1 / 74.9` | `30.0 / 34.2` |
+| GroupByAgg | `72.2 / 78.3` | `31.3 / 35.3` |
+| JoinImportOnly | `69.0 / 73.9` | `25.3 / 31.5` |
+| JoinCollectOnly | `76.4 / 80.9` | `39.4 / 44.6` |
+| JoinExportOnly | `73.0 / 91.1` | `44.5 / 54.8` |
+| JoinInner | `80.2 / 99.0` | `45.2 / 57.0` |
 
-## 解读建议
+### 结论补充
 
-- 更严格控制变量后，结论比旧版更分化：
-  - `ScanCSV` / `ScanParquet` 这类文件扫描路径，Go bridge 依然明显占优。
-  - 内存 DataFrame 上直接做 `ToMaps`、`GroupBy`、`Join`、`SinkNDJSONFile`，当前样例里 Python Polars 更快。
-- 峰值内存也不再是单边结论：
-  - 小样本 `4k` 时，Go bridge 普遍更低。
-  - 到 `100k / 1M` 时，`scan` 路径反而是 Go 更低，但内存 DataFrame / groupby / join / sink 这些路径通常是 Python 更低。
-- 这说明“Go bridge vs Python Polars”不能只用一句“谁更快/更省内存”概括，更准确的说法是：
-  - 文件扫描型 workload：Go bridge 很强。
-  - 内存 DataFrame 上的宿主对象导出与复杂物化路径：当前样例里 Python Polars 更稳。
+- `GroupByExportOnly` 基本可以忽略，说明 groupby 的主要成本在输入和执行，不在最终导出。
+- `JoinExportOnly` 比 `JoinCollectOnly` 更重，但整体仍然是 `Join` 执行阶段和输入阶段更关键。
+- 新拆分进一步支持前面的判断：要优先盯住输入构建和查询执行，而不是只优化最终 `to_dicts()` / `ToMaps()`。
 
 ## Arrow 导入实验
 

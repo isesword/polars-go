@@ -43,6 +43,7 @@ type Bridge struct {
 	dfPrint                          func(uint64) int32
 	dfFree                           func(uint64)
 	dfFromColumns                    func(*byte, uintptr, *uint64) int32
+	dfFromRows                       func(*byte, uintptr, *uint64) int32
 	dfFromArrow                      func(*ArrowSchema, *ArrowArray, *uint64) int32
 	dfPivot                          func(uint64, *byte, uintptr, *uint64) int32
 	sqlCollectDF                     func(*byte, uintptr, *byte, uintptr, *uint64, uintptr, *uint64) int32
@@ -102,6 +103,7 @@ func loadBridge(libPath string) (*Bridge, error) {
 	purego.RegisterLibFunc(&b.dfPrint, lib, "bridge_df_print")
 	purego.RegisterLibFunc(&b.dfFree, lib, "bridge_df_free")
 	purego.RegisterLibFunc(&b.dfFromColumns, lib, "bridge_df_from_columns")
+	purego.RegisterLibFunc(&b.dfFromRows, lib, "bridge_df_from_rows")
 	purego.RegisterLibFunc(&b.dfFromArrow, lib, "bridge_df_from_arrow")
 	purego.RegisterLibFunc(&b.dfPivot, lib, "bridge_df_pivot")
 	purego.RegisterLibFunc(&b.sqlCollectDF, lib, "bridge_sql_collect_df")
@@ -391,6 +393,23 @@ func (b *Bridge) CreateDataFrameFromColumns(jsonData []byte) (uint64, error) {
 	var dfHandle uint64
 	ret := b.dfFromColumns(&jsonData[0], uintptr(len(jsonData)), &dfHandle)
 	runtime.KeepAlive(jsonData) // 确保在 FFI 调用期间 jsonData 不被 GC
+
+	if ret != 0 {
+		return 0, b.getLastError()
+	}
+
+	return dfHandle, nil
+}
+
+// CreateDataFrameFromRows creates a DataFrame from protobuf-encoded row data.
+func (b *Bridge) CreateDataFrameFromRows(payload []byte) (uint64, error) {
+	if len(payload) == 0 {
+		return 0, fmt.Errorf("Bridge.CreateDataFrameFromRows: payload is empty")
+	}
+
+	var dfHandle uint64
+	ret := b.dfFromRows(&payload[0], uintptr(len(payload)), &dfHandle)
+	runtime.KeepAlive(payload)
 
 	if ret != 0 {
 		return 0, b.getLastError()

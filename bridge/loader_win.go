@@ -42,6 +42,7 @@ type Bridge struct {
 	dfPrint                          *syscall.Proc
 	dfFree                           *syscall.Proc
 	dfFromColumns                    *syscall.Proc
+	dfFromRows                       *syscall.Proc
 	dfFromArrow                      *syscall.Proc
 	dfPivot                          *syscall.Proc
 	sqlCollectDF                     *syscall.Proc
@@ -136,6 +137,9 @@ func loadBridge(libPath string) (*Bridge, error) {
 	}
 	if b.dfFromColumns, err = lib.FindProc("bridge_df_from_columns"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_df_from_columns: %w", err)
+	}
+	if b.dfFromRows, err = lib.FindProc("bridge_df_from_rows"); err != nil {
+		return nil, fmt.Errorf("failed to find bridge_df_from_rows: %w", err)
 	}
 	if b.dfFromArrow, err = lib.FindProc("bridge_df_from_arrow"); err != nil {
 		return nil, fmt.Errorf("failed to find bridge_df_from_arrow: %w", err)
@@ -511,6 +515,27 @@ func (b *Bridge) CreateDataFrameFromColumns(jsonData []byte) (uint64, error) {
 		uintptr(unsafe.Pointer(&dfHandle)),
 	)
 	runtime.KeepAlive(jsonData)
+
+	if ret != 0 {
+		return 0, b.getLastError()
+	}
+
+	return dfHandle, nil
+}
+
+// CreateDataFrameFromRows creates a DataFrame from protobuf-encoded row data.
+func (b *Bridge) CreateDataFrameFromRows(payload []byte) (uint64, error) {
+	if len(payload) == 0 {
+		return 0, fmt.Errorf("Bridge.CreateDataFrameFromRows: payload is empty")
+	}
+
+	var dfHandle uint64
+	ret, _, _ := b.dfFromRows.Call(
+		uintptr(unsafe.Pointer(&payload[0])),
+		uintptr(len(payload)),
+		uintptr(unsafe.Pointer(&dfHandle)),
+	)
+	runtime.KeepAlive(payload)
 
 	if ret != 0 {
 		return 0, b.getLastError()

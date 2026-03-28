@@ -23,6 +23,9 @@ var structTypeCache sync.Map
 
 // NewDataFrameFromStructs creates a managed dataframe from a slice of structs or struct pointers.
 func NewDataFrameFromStructs[T any](rows []T, opts ...ImportOption) (*DataFrame, error) {
+	if len(rows) == 0 {
+		return NewDataFrameFromMaps(nil, opts...)
+	}
 	maps, err := structRowsToMaps(rows)
 	if err != nil {
 		return nil, err

@@ -4133,6 +4133,325 @@ func TestLazyAndEagerModes(t *testing.T) {
 	})
 }
 
+func TestRowsImportFromDictsSemantics(t *testing.T) {
+	t.Run("SchemaDropsExtrasAndExtendsMissing", func(t *testing.T) {
+		frame, err := NewDataFrameFromMaps([]map[string]any{
+			{"id": 1, "name": "Alice", "extra": true},
+			{"id": 2},
+		}, WithSchema(map[string]DataType{
+			"id":  DataTypeInt64,
+			"age": DataTypeInt64,
+		}))
+		if err != nil {
+			t.Fatalf("NewDataFrameFromMaps with partial schema failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("expected 2 rows, got %d", len(rows))
+		}
+		if _, ok := rows[0]["name"]; ok {
+			t.Fatalf("expected undeclared column name to be dropped: %#v", rows[0])
+		}
+		if _, ok := rows[0]["extra"]; ok {
+			t.Fatalf("expected undeclared column extra to be dropped: %#v", rows[0])
+		}
+		if got, err := toInt64(rows[0]["id"]); err != nil || got != 1 {
+			t.Fatalf("unexpected id value: %v (%v)", rows[0]["id"], err)
+		}
+		if rows[0]["age"] != nil || rows[1]["age"] != nil {
+			t.Fatalf("expected schema-only age column to be null-filled: %#v", rows)
+		}
+	})
+
+	t.Run("SchemaOverridesOnlyAffectExistingColumns", func(t *testing.T) {
+		frame, err := NewDataFrameFromMaps([]map[string]any{
+			{"a": "2", "b": "x"},
+		}, WithSchemaOverrides(map[string]DataType{
+			"a":       DataTypeInt64,
+			"missing": DataTypeInt64,
+		}))
+		if err != nil {
+			t.Fatalf("NewDataFrameFromMaps with schema overrides failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("expected 1 row, got %d", len(rows))
+		}
+		if got, err := toInt64(rows[0]["a"]); err != nil || got != 2 {
+			t.Fatalf("unexpected coerced a value: %v (%v)", rows[0]["a"], err)
+		}
+		if _, ok := rows[0]["missing"]; ok {
+			t.Fatalf("schema override should not add missing column: %#v", rows[0])
+		}
+	})
+
+	t.Run("ColumnNamesSelectByNameAndAddMissingColumns", func(t *testing.T) {
+		frame, err := NewDataFrameFromMaps([]map[string]any{
+			{"x": 1, "y": 2, "drop": "ignored"},
+		}, WithColumnNames([]string{"y", "x", "z"}))
+		if err != nil {
+			t.Fatalf("NewDataFrameFromMaps with column names failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("expected 1 row, got %d", len(rows))
+		}
+		if len(rows[0]) != 3 {
+			t.Fatalf("expected only y/x/z columns, got %#v", rows[0])
+		}
+		if got, err := toInt64(rows[0]["y"]); err != nil || got != 2 {
+			t.Fatalf("unexpected y value: %v (%v)", rows[0]["y"], err)
+		}
+		if got, err := toInt64(rows[0]["x"]); err != nil || got != 1 {
+			t.Fatalf("unexpected x value: %v (%v)", rows[0]["x"], err)
+		}
+		if rows[0]["z"] != nil {
+			t.Fatalf("expected missing z column to be null-filled, got %#v", rows[0]["z"])
+		}
+	})
+
+	t.Run("SchemaFieldsApplyExplicitDtypes", func(t *testing.T) {
+		frame, err := NewDataFrameFromMaps([]map[string]any{
+			{"a": "2", "b": "3.5"},
+		}, WithSchemaFields([]SchemaField{
+			{Name: "a", Type: DataTypeInt64},
+			{Name: "b", Type: DataTypeFloat64},
+		}))
+		if err != nil {
+			t.Fatalf("NewDataFrameFromMaps with schema fields failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if got, err := toInt64(rows[0]["a"]); err != nil || got != 2 {
+			t.Fatalf("unexpected typed a value: %v (%v)", rows[0]["a"], err)
+		}
+		if got, ok := rows[0]["b"].(float64); !ok || got != 3.5 {
+			t.Fatalf("unexpected typed b value: %T %#v", rows[0]["b"], rows[0]["b"])
+		}
+	})
+
+	t.Run("EmptyRowsFollowPythonSemantics", func(t *testing.T) {
+		if _, err := NewDataFrameFromMaps(nil); err == nil {
+			t.Fatal("expected empty rows without schema to fail")
+		} else if !strings.Contains(err.Error(), "no data, cannot infer schema") {
+			t.Fatalf("unexpected empty rows error: %v", err)
+		}
+
+		schemaFrame, err := NewDataFrameFromMaps(nil, WithSchema(map[string]DataType{
+			"a": DataTypeInt64,
+		}))
+		if err != nil {
+			t.Fatalf("empty rows with schema failed: %v", err)
+		}
+		defer schemaFrame.Close()
+
+		rows, err := collectToMaps(t, schemaFrame.Select(Col("a")))
+		if err != nil {
+			t.Fatalf("empty rows with schema select failed: %v", err)
+		}
+		if len(rows) != 0 {
+			t.Fatalf("expected 0 rows from empty schema frame, got %d", len(rows))
+		}
+
+		namesFrame, err := NewDataFrameFromMaps(nil, WithColumnNames([]string{"a"}))
+		if err != nil {
+			t.Fatalf("empty rows with column names failed: %v", err)
+		}
+		defer namesFrame.Close()
+
+		rows, err = collectToMaps(t, namesFrame.Select(Col("a")))
+		if err != nil {
+			t.Fatalf("empty rows with column names select failed: %v", err)
+		}
+		if len(rows) != 0 {
+			t.Fatalf("expected 0 rows from empty named frame, got %d", len(rows))
+		}
+
+		overrideFrame, err := NewDataFrameFromMaps(nil, WithSchemaOverrides(map[string]DataType{
+			"a": DataTypeInt64,
+		}))
+		if err != nil {
+			t.Fatalf("empty rows with overrides failed: %v", err)
+		}
+		defer overrideFrame.Close()
+
+		if _, err := collectToMaps(t, overrideFrame.Select(Col("a"))); err == nil {
+			t.Fatal("expected selecting override-only missing column to fail")
+		}
+	})
+
+	t.Run("StrictFalseCoercesBadValuesToNull", func(t *testing.T) {
+		frame, err := NewDataFrameFromMaps([]map[string]any{
+			{"a": "2"},
+			{"a": "bad"},
+		}, WithSchemaOverrides(map[string]DataType{
+			"a": DataTypeInt64,
+		}), WithStrict(false))
+		if err != nil {
+			t.Fatalf("strict=false import failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if got, err := toInt64(rows[0]["a"]); err != nil || got != 2 {
+			t.Fatalf("unexpected first strict=false value: %v (%v)", rows[0]["a"], err)
+		}
+		if rows[1]["a"] != nil {
+			t.Fatalf("expected bad strict=false value to become null, got %#v", rows[1]["a"])
+		}
+	})
+
+	t.Run("StrictTrueRejectsBadValues", func(t *testing.T) {
+		_, err := NewDataFrameFromMaps([]map[string]any{
+			{"a": "2"},
+			{"a": "bad"},
+		}, WithSchemaOverrides(map[string]DataType{
+			"a": DataTypeInt64,
+		}), WithStrict(true))
+		if err == nil {
+			t.Fatal("expected strict=true import to fail")
+		}
+	})
+
+	t.Run("InferSchemaLengthControlsSampling", func(t *testing.T) {
+		shortFrame, err := NewDataFrameFromMaps([]map[string]any{
+			{"a": int64(1)},
+			{"a": 2.5},
+		}, WithInferSchemaLength(1))
+		if err != nil {
+			t.Fatalf("short inference sample import failed: %v", err)
+		}
+		defer shortFrame.Close()
+
+		shortRows, err := shortFrame.ToMaps()
+		if err != nil {
+			t.Fatalf("short inference sample ToMaps failed: %v", err)
+		}
+		if got, err := toInt64(shortRows[0]["a"]); err != nil || got != 1 {
+			t.Fatalf("unexpected first short-sample value: %v (%v)", shortRows[0]["a"], err)
+		}
+		if got, err := toInt64(shortRows[1]["a"]); err != nil || got != 2 {
+			t.Fatalf("expected second short-sample value to truncate to 2, got %v (%v)", shortRows[1]["a"], err)
+		}
+
+		frame, err := NewDataFrameFromMaps([]map[string]any{
+			{"a": int64(1)},
+			{"a": 2.5},
+		}, WithInferSchemaAll())
+		if err != nil {
+			t.Fatalf("infer all import failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if got, ok := rows[0]["a"].(float64); !ok || got != 1 {
+			t.Fatalf("expected float64 1 from infer all, got %T %#v", rows[0]["a"], rows[0]["a"])
+		}
+		if got, ok := rows[1]["a"].(float64); !ok || got != 2.5 {
+			t.Fatalf("expected float64 2.5 from infer all, got %T %#v", rows[1]["a"], rows[1]["a"])
+		}
+	})
+
+	t.Run("NestedRowsRoundTripWithoutArrowSchema", func(t *testing.T) {
+		eventAt := time.Date(2026, 3, 28, 10, 30, 0, 123000000, time.UTC)
+		frame, err := NewDataFrameFromMaps([]map[string]any{
+			{
+				"id":       int64(1),
+				"tags":     []any{"go", nil, "polars"},
+				"profile":  map[string]any{"city": "Shanghai", "score": int64(9)},
+				"payload":  []byte("abc"),
+				"event_at": eventAt,
+			},
+		})
+		if err != nil {
+			t.Fatalf("nested rows import failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("expected 1 row, got %d", len(rows))
+		}
+
+		tags, ok := rows[0]["tags"].([]interface{})
+		if !ok || len(tags) != 3 || tags[0] != "go" || tags[1] != nil || tags[2] != "polars" {
+			t.Fatalf("unexpected nested tags value: %#v", rows[0]["tags"])
+		}
+		profile, ok := rows[0]["profile"].(map[string]interface{})
+		if !ok || profile["city"] != "Shanghai" {
+			t.Fatalf("unexpected nested profile value: %#v", rows[0]["profile"])
+		}
+		if got, err := toInt64(profile["score"]); err != nil || got != 9 {
+			t.Fatalf("unexpected nested profile score: %v (%v)", profile["score"], err)
+		}
+		assertBinaryValue(t, rows[0]["payload"], []byte("abc"))
+		gotTime, ok := rows[0]["event_at"].(time.Time)
+		if !ok {
+			t.Fatalf("expected event_at to round-trip as time.Time, got %T", rows[0]["event_at"])
+		}
+		if !gotTime.Equal(eventAt) {
+			t.Fatalf("unexpected event_at value: got %v want %v", gotTime, eventAt)
+		}
+	})
+
+	t.Run("StructRowsUseSameSemanticsAsMapRows", func(t *testing.T) {
+		type row struct {
+			ID   any `polars:"id"`
+			Name any `polars:"name"`
+		}
+
+		frame, err := NewDataFrameFromStructs([]row{
+			{ID: "2", Name: "Alice"},
+			{ID: "bad", Name: "Bob"},
+		}, WithSchemaOverrides(map[string]DataType{
+			"id": DataTypeInt64,
+		}), WithStrict(false))
+		if err != nil {
+			t.Fatalf("struct rows import failed: %v", err)
+		}
+		defer frame.Close()
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			t.Fatalf("ToMaps failed: %v", err)
+		}
+		if got, err := toInt64(rows[0]["id"]); err != nil || got != 2 {
+			t.Fatalf("unexpected first struct row id: %v (%v)", rows[0]["id"], err)
+		}
+		if rows[1]["id"] != nil {
+			t.Fatalf("expected second struct row id to be null, got %#v", rows[1]["id"])
+		}
+	})
+}
+
 func TestDataFrameAcrossFunctions(t *testing.T) {
 	createUsers := func() (*DataFrame, error) {
 		return NewDataFrame([]map[string]any{

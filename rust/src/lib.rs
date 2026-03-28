@@ -2,15 +2,16 @@ use polars::datatypes::{DataType, TimeUnit};
 use polars::io::json::{JsonFormat, JsonWriter};
 use polars::io::SerWriter;
 use polars::lazy::prelude::NDJsonWriterOptions;
-use polars::prelude::{ExternalCompression, FileWriteFormat, SinkTarget, UnifiedSinkArgs};
 use polars::prelude::{by_name, element};
 use polars::prelude::{AnyValue, DataFrame, IntoLazy, Series};
+use polars::prelude::{ExternalCompression, FileWriteFormat, SinkTarget, UnifiedSinkArgs};
 use polars::sql::SQLContext;
 use polars_plan::prelude::SinkDestination;
 use polars_utils::pl_path::PlRefPath;
 use prost::Message;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::env;
 use std::ffi::CString;
 use std::io::Cursor;
 use std::os::raw::{c_char, c_int};
@@ -19,6 +20,7 @@ use std::ptr;
 use std::slice;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::OnceLock;
+use std::time::Instant;
 
 mod proto {
     include!("proto/polars_bridge.rs");
@@ -30,6 +32,7 @@ mod executor;
 mod expr_list;
 mod expr_str;
 mod expr_temporal;
+mod rows_import;
 
 use error::{BridgeError, ErrorCode};
 
@@ -96,7 +99,11 @@ fn clear_last_error() {
     });
 }
 
-fn write_output_string(value: String, out_ptr: *mut *const c_char, out_len: *mut usize) -> Result<(), BridgeError> {
+fn write_output_string(
+    value: String,
+    out_ptr: *mut *const c_char,
+    out_len: *mut usize,
+) -> Result<(), BridgeError> {
     if out_ptr.is_null() || out_len.is_null() {
         return Err(BridgeError::InvalidArgument("Null output pointers".into()));
     }
@@ -137,15 +144,13 @@ fn export_dataframe_json(df: &DataFrame, format: c_int) -> Result<String, Bridge
                 .map_err(|e| {
                     BridgeError::Execution(format!(
                         "Failed to cast binary column {} to string for JSON export: {}",
-                        cast_name,
-                        e
+                        cast_name, e
                     ))
                 })?;
             df.replace_column(idx, casted.into()).map_err(|e| {
                 BridgeError::Execution(format!(
                     "Failed to replace normalized JSON column {}: {}",
-                    column_name,
-                    e
+                    column_name, e
                 ))
             })?;
         }
@@ -333,8 +338,9 @@ pub extern "C" fn bridge_plan_compile(
         }
 
         let plan_bytes = unsafe { slice::from_raw_parts(plan_bytes_ptr, plan_bytes_len) };
-        let plan = proto::Plan::decode(plan_bytes)
-            .map_err(|e| BridgeError::PlanDecode(format!("failed to decode protobuf plan: {}", e)))?;
+        let plan = proto::Plan::decode(plan_bytes).map_err(|e| {
+            BridgeError::PlanDecode(format!("failed to decode protobuf plan: {}", e))
+        })?;
 
         if plan.plan_version != 1 {
             return Err(BridgeError::PlanVersionUnsupported(plan.plan_version));
@@ -808,12 +814,10 @@ pub extern "C" fn bridge_df_from_columns(
             })?;
 
             let values = col["values"].as_array().ok_or_else(|| {
-                BridgeError::InvalidArgument(
-                    format!(
-                        "bridge_df_from_columns: column {:?} must contain a 'values' array",
-                        name
-                    ),
-                )
+                BridgeError::InvalidArgument(format!(
+                    "bridge_df_from_columns: column {:?} must contain a 'values' array",
+                    name
+                ))
             })?;
 
             let target_type = if let Some(dtype_name) = schema.get(name) {
@@ -833,8 +837,8 @@ pub extern "C" fn bridge_df_from_columns(
                 })
                 .collect::<Result<_, _>>()?;
 
-            let mut series = Series::from_any_values(name.into(), &any_values, true)
-                .map_err(|e| {
+            let mut series =
+                Series::from_any_values(name.into(), &any_values, true).map_err(|e| {
                     BridgeError::Execution(format!(
                         "failed to create series for column {:?}: {}",
                         name, e
@@ -854,8 +858,9 @@ pub extern "C" fn bridge_df_from_columns(
 
         // 创建 DataFrame
         let columns: Vec<_> = series_vec.into_iter().map(|s| s.into()).collect();
-        let df = DataFrame::new_infer_height(columns)
-            .map_err(|e| BridgeError::Execution(format!("failed to create dataframe from columns: {}", e)))?;
+        let df = DataFrame::new_infer_height(columns).map_err(|e| {
+            BridgeError::Execution(format!("failed to create dataframe from columns: {}", e))
+        })?;
         enforce_memory_limit(&df, "dataframe import from columns")?;
 
         // 存储 DataFrame 并返回句柄
@@ -864,6 +869,63 @@ pub extern "C" fn bridge_df_from_columns(
 
         Ok(0)
     })
+}
+
+#[no_mangle]
+pub extern "C" fn bridge_df_from_rows(
+    payload_ptr: *const u8,
+    payload_len: usize,
+    out_df_handle: *mut u64,
+) -> c_int {
+    ffi_guard!({
+        if payload_ptr.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_from_rows: payload_ptr is null".into(),
+            ));
+        }
+        if out_df_handle.is_null() {
+            return Err(BridgeError::InvalidArgument(
+                "bridge_df_from_rows: out_df_handle is null".into(),
+            ));
+        }
+
+        let payload_slice = unsafe { slice::from_raw_parts(payload_ptr, payload_len) };
+        let profile_enabled = rows_import_profile_enabled();
+        let decode_started = Instant::now();
+        let payload = proto::RowsPayload::decode(payload_slice).map_err(|e| {
+            BridgeError::InvalidArgument(format!(
+                "bridge_df_from_rows: payload is not valid protobuf row data: {}",
+                e
+            ))
+        })?;
+        let decode_elapsed = decode_started.elapsed();
+
+        let import_started = Instant::now();
+        let df = rows_import::dataframe_from_rows_payload(payload)?;
+        let import_elapsed = import_started.elapsed();
+        enforce_memory_limit(&df, "dataframe import from rows")?;
+
+        if profile_enabled {
+            eprintln!(
+                "[bridge_df_from_rows] protobuf_decode={:.3}ms rust_rows_import={:.3}ms rows={} cols={}",
+                decode_elapsed.as_secs_f64() * 1000.0,
+                import_elapsed.as_secs_f64() * 1000.0,
+                df.height(),
+                df.width(),
+            );
+        }
+
+        let handle = Box::into_raw(Box::new(df)) as u64;
+        unsafe { *out_df_handle = handle };
+        Ok(0)
+    })
+}
+
+fn rows_import_profile_enabled() -> bool {
+    matches!(
+        env::var("POLARS_BRIDGE_PROFILE_ROWS_IMPORT").as_deref(),
+        Ok("1") | Ok("true") | Ok("TRUE") | Ok("yes") | Ok("YES")
+    )
 }
 
 #[no_mangle]
@@ -991,7 +1053,9 @@ pub extern "C" fn bridge_df_pivot(
                     None,
                 )
             })
-            .map_err(|e| BridgeError::Execution(format!("failed to derive pivot columns: {}", e)))?;
+            .map_err(|e| {
+                BridgeError::Execution(format!("failed to derive pivot columns: {}", e))
+            })?;
 
         let result = df
             .clone()
@@ -1101,26 +1165,18 @@ pub extern "C" fn bridge_sql_collect_df(
             .collect();
         enforce_input_memory_limit(&input_dfs, "sql collect")?;
 
-        let lf = ctx
-            .execute(query)
-            .map_err(|e| {
-                BridgeError::Execution(format!(
-                    "SQL execution failed for query {:?} with tables {:?}: {}",
-                    query,
-                    table_names,
-                    e
-                ))
-            })?;
-        let df = lf
-            .collect()
-            .map_err(|e| {
-                BridgeError::Execution(format!(
-                    "SQL collect failed for query {:?} with tables {:?}: {}",
-                    query,
-                    table_names,
-                    e
-                ))
-            })?;
+        let lf = ctx.execute(query).map_err(|e| {
+            BridgeError::Execution(format!(
+                "SQL execution failed for query {:?} with tables {:?}: {}",
+                query, table_names, e
+            ))
+        })?;
+        let df = lf.collect().map_err(|e| {
+            BridgeError::Execution(format!(
+                "SQL collect failed for query {:?} with tables {:?}: {}",
+                query, table_names, e
+            ))
+        })?;
         enforce_memory_limit(&df, "sql collect")?;
 
         let handle = Box::into_raw(Box::new(df)) as u64;
@@ -1267,26 +1323,18 @@ pub extern "C" fn bridge_sql_collect_df_from_plans(
             ctx.register(name, lf);
         }
 
-        let lf = ctx
-            .execute(query)
-            .map_err(|e| {
-                BridgeError::Execution(format!(
-                    "SQL execution failed for query {:?} with tables {:?}: {}",
-                    query,
-                    table_names,
-                    e
-                ))
-            })?;
-        let df = lf
-            .collect()
-            .map_err(|e| {
-                BridgeError::Execution(format!(
-                    "SQL collect failed for query {:?} with tables {:?}: {}",
-                    query,
-                    table_names,
-                    e
-                ))
-            })?;
+        let lf = ctx.execute(query).map_err(|e| {
+            BridgeError::Execution(format!(
+                "SQL execution failed for query {:?} with tables {:?}: {}",
+                query, table_names, e
+            ))
+        })?;
+        let df = lf.collect().map_err(|e| {
+            BridgeError::Execution(format!(
+                "SQL collect failed for query {:?} with tables {:?}: {}",
+                query, table_names, e
+            ))
+        })?;
         enforce_memory_limit(&df, "sql collect")?;
 
         let handle = Box::into_raw(Box::new(df)) as u64;

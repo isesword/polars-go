@@ -69,12 +69,13 @@ fn build_pivot_on_columns_df(pivot: &proto::Pivot) -> Result<Arc<DataFrame>, Bri
             }
             any_values.push(literal_to_any_value(&row.values[col_idx])?);
         }
-        let mut s = Series::from_any_values(name.as_str().into(), &any_values, true).map_err(|e| {
-            BridgeError::Execution(format!(
-                "failed to build lazy pivot on_columns dataframe column {:?}: {}",
-                name, e
-            ))
-        })?;
+        let mut s =
+            Series::from_any_values(name.as_str().into(), &any_values, true).map_err(|e| {
+                BridgeError::Execution(format!(
+                    "failed to build lazy pivot on_columns dataframe column {:?}: {}",
+                    name, e
+                ))
+            })?;
         s.rename(name.as_str().into());
         series.push(s.into());
     }
@@ -82,11 +83,11 @@ fn build_pivot_on_columns_df(pivot: &proto::Pivot) -> Result<Arc<DataFrame>, Bri
     DataFrame::new(pivot.on_columns.len(), series)
         .map(Arc::new)
         .map_err(|e| {
-        BridgeError::Execution(format!(
-            "failed to build lazy pivot on_columns dataframe: {}",
-            e
-        ))
-    })
+            BridgeError::Execution(format!(
+                "failed to build lazy pivot on_columns dataframe: {}",
+                e
+            ))
+        })
 }
 
 /// 执行 Plan 并打印结果（调用 Polars 原生的 Display）
@@ -488,10 +489,7 @@ fn build_lazy_frame(
                 .as_ref()
                 .ok_or_else(|| BridgeError::PlanSemantic("Unnest has no input".into()))?;
             let lf = build_lazy_frame(input_node, input_dfs)?;
-            Ok(lf.unnest(
-                by_name(unnest.columns.iter().cloned(), true, false),
-                None,
-            ))
+            Ok(lf.unnest(by_name(unnest.columns.iter().cloned(), true, false), None))
         }
         Kind::DropNulls(drop_nulls) => {
             let input_node = drop_nulls
@@ -596,10 +594,8 @@ fn build_lazy_frame(
                 .ok_or_else(|| BridgeError::PlanSemantic("Pivot has no input".into()))?;
             let lf = build_lazy_frame(input_node, input_dfs)?;
             let on_columns = build_pivot_on_columns_df(pivot)?;
-            let agg_expr =
-                crate::build_pivot_agg_expr(pivot.aggregate.as_str())?.unwrap_or_else(|| {
-                    element().first()
-                });
+            let agg_expr = crate::build_pivot_agg_expr(pivot.aggregate.as_str())?
+                .unwrap_or_else(|| element().first());
 
             Ok(lf.pivot(
                 by_name(pivot.on.iter().cloned(), true, false),
@@ -979,10 +975,7 @@ pub fn build_expr(expr: &proto::Expr) -> Result<Expr, BridgeError> {
                     mapping,
                 )
                 .map_err(|err| {
-                    BridgeError::Execution(format!(
-                        "Failed to build window expression: {}",
-                        err
-                    ))
+                    BridgeError::Execution(format!("Failed to build window expression: {}", err))
                 })
             } else {
                 let sort_options = SortOptions {

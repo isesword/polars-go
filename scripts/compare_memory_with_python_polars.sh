@@ -11,11 +11,19 @@ SIZES="${SIZES:-4000,16000}"
 GO_IMPORT_MODE="${GO_IMPORT_MODE:-json}"
 
 CASES=(
+  "import_only"
+  "collect_only"
   "query_collect_like"
   "to_maps"
   "scan_csv"
   "scan_parquet"
+  "group_by_import_only"
+  "group_by_collect_only"
+  "group_by_export_only"
   "group_by_agg"
+  "join_import_only"
+  "join_collect_only"
+  "join_export_only"
   "join_inner"
   "sink_ndjson_file"
 )
@@ -75,7 +83,7 @@ echo "==> Preparing shared fixtures"
   --sizes "$SIZES"
 
 echo
-echo "size,case,engine,us_per_op,maxrss_mib"
+echo "size,case,engine,us_per_op,memory_mib"
 IFS=',' read -r -a SIZE_LIST <<< "$SIZES"
 for size in "${SIZE_LIST[@]}"; do
   for case_name in "${CASES[@]}"; do
@@ -84,7 +92,7 @@ for size in "${SIZE_LIST[@]}"; do
       --case "$case_name" \
       --size "$size" | tail -n 1)"
     py_us="$(echo "$py_result" | sed -E 's/.*us_per_op=([0-9]+).*/\1/')"
-    py_mem="$(echo "$py_result" | sed -E 's/.*maxrss_mib=([0-9]+(\.[0-9]+)?).*/\1/')"
+    py_mem="$(echo "$py_result" | sed -E 's/.*memory_mib=([0-9]+(\.[0-9]+)?).*/\1/')"
     echo "$size,$case_name,python,$py_us,$py_mem"
 
     go_result="$(cd "$REPO_ROOT" && go run ./scripts/compare_go_polars.go \
@@ -93,7 +101,7 @@ for size in "${SIZE_LIST[@]}"; do
       --case "$case_name" \
       --size "$size" | tail -n 1)"
     go_us="$(echo "$go_result" | sed -E 's/.*us_per_op=([0-9]+).*/\1/')"
-    go_mem="$(echo "$go_result" | sed -E 's/.*maxrss_mib=([0-9]+(\.[0-9]+)?).*/\1/')"
+    go_mem="$(echo "$go_result" | sed -E 's/.*memory_mib=([0-9]+(\.[0-9]+)?).*/\1/')"
     echo "$size,$case_name,go,$go_us,$go_mem"
   done
 done

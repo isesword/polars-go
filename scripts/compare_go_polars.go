@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
+	"sync"
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -114,15 +114,13 @@ func joinRightArrowSchema() *arrow.Schema {
 	}, nil)
 }
 
-func maxRSSMiB() float64 {
-	var usage syscall.Rusage
-	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
-		return 0
-	}
-	if runtime.GOOS == "darwin" {
-		return float64(usage.Maxrss) / (1024 * 1024)
-	}
-	return float64(usage.Maxrss) / 1024
+func memoryMiB() float64 {
+	// Use a portable approximation so the benchmark helper compiles on Windows
+	// as well as Unix-like systems. MemStats.Sys reflects bytes obtained from
+	// the OS by the Go runtime, which is stable enough for side-by-side runs.
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	return float64(mem.Sys) / (1024 * 1024)
 }
 
 func runCase(label string, loops int, fn func() (int, error)) float64 {
@@ -167,6 +165,42 @@ func toMapsCount(df *pl.DataFrame) (int, error) {
 		return 0, err
 	}
 	return len(rows), nil
+}
+
+func eagerToMapsCount(df *pl.EagerFrame) (int, error) {
+	rows, err := df.ToMaps()
+	if err != nil {
+		return 0, err
+	}
+	return len(rows), nil
+}
+
+func importOnlyCount(create func() (*pl.DataFrame, error)) (int, error) {
+	df, err := create()
+	if err != nil {
+		return 0, err
+	}
+	defer df.Close()
+	return 1, nil
+}
+
+func importJoinOnlyCount(create func() (*pl.DataFrame, *pl.DataFrame, error)) (int, error) {
+	left, right, err := create()
+	if err != nil {
+		return 0, err
+	}
+	defer left.Close()
+	defer right.Close()
+	return 1, nil
+}
+
+func collectOnlyCount(lf *pl.LazyFrame) (int, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return 0, err
+	}
+	defer df.Free()
+	return 1, nil
 }
 
 func toStructsCount(df *pl.DataFrame) (int, error) {
@@ -241,7 +275,7 @@ func parseImportMode(raw string) (importMode, error) {
 func newDataFrameFromColumnsWithMode(data map[string]interface{}, schema *arrow.Schema, mode importMode) (*pl.DataFrame, error) {
 	switch mode {
 	case importModeJSON:
-		return pl.NewDataFrame(data)
+		return pl.NewDataFrameFromColumns(data)
 	case importModeArrow:
 		record, err := newArrowRecordBatchFromColumns(data, schema)
 		if err != nil {
@@ -315,7 +349,73 @@ func buildCases(n int, fixtureDir string, mode importMode) (map[string]benchCase
 		return left, right, nil
 	}
 
+	baseFrame, err := newBaseFrame()
+	if err != nil {
+		return nil, func() {}, err
+	}
+	baseQuery := baseFrame.Filter(pl.Col("age").Gt(pl.Lit(30))).Select(pl.Col("name"), pl.Col("salary"), pl.Col("department"))
+	groupByQuery := baseFrame.GroupBy("department").Agg(
+		pl.Col("salary").Sum().Alias("salary_sum"),
+		pl.Col("id").Count().Alias("employee_count"),
+		pl.Col("age").Mean().Alias("avg_age"),
+	)
+
+	leftFrame, rightFrame, err := newJoinFrames()
+	if err != nil {
+		baseFrame.Close()
+		return nil, func() {}, err
+	}
+	joinQuery := leftFrame.Join(rightFrame, pl.JoinOptions{On: []string{"id"}, How: pl.JoinInner}).
+		Select(pl.Col("id"), pl.Col("salary"), pl.Col("bonus"))
+
+	var (
+		groupByResult     *pl.EagerFrame
+		groupByResultErr  error
+		groupByResultOnce sync.Once
+		joinResult        *pl.EagerFrame
+		joinResultErr     error
+		joinResultOnce    sync.Once
+	)
+
+	getGroupByResult := func() (*pl.EagerFrame, error) {
+		groupByResultOnce.Do(func() {
+			groupByResult, groupByResultErr = groupByQuery.Collect()
+		})
+		return groupByResult, groupByResultErr
+	}
+
+	getJoinResult := func() (*pl.EagerFrame, error) {
+		joinResultOnce.Do(func() {
+			joinResult, joinResultErr = joinQuery.Collect()
+		})
+		return joinResult, joinResultErr
+	}
+
+	cleanup := func() {
+		if groupByResult != nil {
+			groupByResult.Free()
+		}
+		if joinResult != nil {
+			joinResult.Free()
+		}
+		baseFrame.Close()
+		leftFrame.Close()
+		rightFrame.Close()
+	}
+
 	return map[string]benchCase{
+		"import_only": {
+			label: "  ImportOnly",
+			run: func() (int, error) {
+				return importOnlyCount(newBaseFrame)
+			},
+		},
+		"collect_only": {
+			label: "  CollectOnly(filter+select)",
+			run: func() (int, error) {
+				return collectOnlyCount(baseQuery)
+			},
+		},
 		"query_collect_like": {
 			label: "  QueryCollectLike(df.filter.select.collect.to_maps)",
 			run: func() (int, error) {
@@ -330,23 +430,13 @@ func buildCases(n int, fixtureDir string, mode importMode) (map[string]benchCase
 		"to_maps": {
 			label: "  ToMaps",
 			run: func() (int, error) {
-				df, err := newBaseFrame()
-				if err != nil {
-					return 0, err
-				}
-				defer df.Close()
-				return toMapsCount(df)
+				return toMapsCount(baseFrame)
 			},
 		},
 		"to_structs": {
 			label: "  ToStructs",
 			run: func() (int, error) {
-				df, err := newBaseFrame()
-				if err != nil {
-					return 0, err
-				}
-				defer df.Close()
-				return toStructsCount(df)
+				return toStructsCount(baseFrame)
 			},
 		},
 		"scan_csv": {
@@ -369,53 +459,72 @@ func buildCases(n int, fixtureDir string, mode importMode) (map[string]benchCase
 				)
 			},
 		},
-		"group_by_agg": {
-			label: "  GroupByAgg(to_maps)",
+		"group_by_import_only": {
+			label: "  GroupByImportOnly",
 			run: func() (int, error) {
-				df, err := newBaseFrame()
+				return importOnlyCount(newBaseFrame)
+			},
+		},
+		"group_by_collect_only": {
+			label: "  GroupByCollectOnly",
+			run: func() (int, error) {
+				return collectOnlyCount(groupByQuery)
+			},
+		},
+		"group_by_export_only": {
+			label: "  GroupByExportOnly",
+			run: func() (int, error) {
+				result, err := getGroupByResult()
 				if err != nil {
 					return 0, err
 				}
-				defer df.Close()
-				return collectToMapsCount(
-					df.GroupBy("department").Agg(
-						pl.Col("salary").Sum().Alias("salary_sum"),
-						pl.Col("id").Count().Alias("employee_count"),
-						pl.Col("age").Mean().Alias("avg_age"),
-					),
-				)
+				return eagerToMapsCount(result)
+			},
+		},
+		"group_by_agg": {
+			label: "  GroupByAgg(to_maps)",
+			run: func() (int, error) {
+				return collectToMapsCount(groupByQuery)
 			},
 		},
 		"join_inner": {
 			label: "  JoinInner(select.to_maps)",
 			run: func() (int, error) {
-				left, right, err := newJoinFrames()
+				return collectToMapsCount(joinQuery)
+			},
+		},
+		"join_import_only": {
+			label: "  JoinImportOnly",
+			run: func() (int, error) {
+				return importJoinOnlyCount(newJoinFrames)
+			},
+		},
+		"join_collect_only": {
+			label: "  JoinCollectOnly",
+			run: func() (int, error) {
+				return collectOnlyCount(joinQuery)
+			},
+		},
+		"join_export_only": {
+			label: "  JoinExportOnly",
+			run: func() (int, error) {
+				result, err := getJoinResult()
 				if err != nil {
 					return 0, err
 				}
-				defer left.Close()
-				defer right.Close()
-				return collectToMapsCount(
-					left.Join(right, pl.JoinOptions{On: []string{"id"}, How: pl.JoinInner}).
-						Select(pl.Col("id"), pl.Col("salary"), pl.Col("bonus")),
-				)
+				return eagerToMapsCount(result)
 			},
 		},
 		"sink_ndjson_file": {
 			label: "  SinkNDJSONFile",
 			run: func() (int, error) {
-				df, err := newBaseFrame()
-				if err != nil {
-					return 0, err
-				}
-				defer df.Close()
 				return sinkNDJSONCount(
-					df.Filter(pl.Col("age").Gt(pl.Lit(30))).Select(pl.Col("id"), pl.Col("name"), pl.Col("department")),
+					baseFrame.Filter(pl.Col("age").Gt(pl.Lit(30))).Select(pl.Col("id"), pl.Col("name"), pl.Col("department")),
 					sinkPath,
 				)
 			},
 		},
-	}, func() {}, nil
+	}, cleanup, nil
 }
 
 func main() {
@@ -449,7 +558,7 @@ func main() {
 			panic(fmt.Sprintf("unknown case: %s", *caseName))
 		}
 		usPerOp := runCase(current.label, loops, current.run)
-		fmt.Printf("RESULT case=%s size=%d us_per_op=%.0f maxrss_mib=%.1f\n", *caseName, *singleSize, usPerOp, maxRSSMiB())
+		fmt.Printf("RESULT case=%s size=%d us_per_op=%.0f memory_mib=%.1f\n", *caseName, *singleSize, usPerOp, memoryMiB())
 		return
 	}
 
@@ -463,7 +572,7 @@ func main() {
 		}
 
 		fmt.Printf("Rows%d\n", n)
-		order := []string{"query_collect_like", "to_maps", "to_structs", "scan_csv", "scan_parquet", "group_by_agg", "join_inner", "sink_ndjson_file"}
+		order := []string{"import_only", "collect_only", "query_collect_like", "to_maps", "to_structs", "scan_csv", "scan_parquet", "group_by_import_only", "group_by_collect_only", "group_by_export_only", "group_by_agg", "join_import_only", "join_collect_only", "join_export_only", "join_inner", "sink_ndjson_file"}
 		for _, name := range order {
 			current := cases[name]
 			runCase(current.label, loops, current.run)

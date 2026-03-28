@@ -24,8 +24,13 @@ type DataFrame struct {
 type ImportOption func(*importConfig)
 
 type importConfig struct {
-	schema      map[string]DataType
-	arrowSchema *arrow.Schema
+	schema            map[string]DataType
+	schemaOverrides   map[string]DataType
+	strict            *bool
+	inferSchemaLength *int
+	columnNames       []string
+	schemaFields      []SchemaField
+	arrowSchema       *arrow.Schema
 }
 
 // MapRowsOptions configures DataFrame.MapRows, the first UDG (User-defined Go
@@ -49,13 +54,21 @@ func newDataFrameWrapper(df *EagerFrame) *DataFrame {
 }
 
 // WithSchema applies an explicit schema to high-level import constructors.
+//
+// For row-oriented constructors, this follows Python from_dicts-style partial
+// schema semantics: only declared columns are loaded, extra input columns are
+// dropped, and schema-only columns are null-filled.
 func WithSchema(schema map[string]DataType) ImportOption {
 	return func(cfg *importConfig) {
-		cfg.schema = schema
+		cfg.schema = cloneSchemaMap(schema)
 	}
 }
 
-// WithArrowSchema applies an explicit Arrow schema to row-oriented import constructors.
+// WithArrowSchema applies an explicit Arrow schema to import constructors.
+//
+// This opts the constructor into the explicit Arrow import path and is most
+// useful for nested List/Struct schemas or when the caller already wants
+// Arrow-backed import semantics.
 func WithArrowSchema(schema *arrow.Schema) ImportOption {
 	return func(cfg *importConfig) {
 		cfg.arrowSchema = schema
@@ -84,10 +97,17 @@ func NewDataFrame(data any, opts ...ImportOption) (*DataFrame, error) {
 	case map[string]interface{}:
 		return NewDataFrameFromColumns(v, opts...)
 	default:
+		if looksLikeStructSlice(data) {
+			if rows, err := structSliceToMaps(data); err == nil {
+				return NewDataFrameFromMaps(rows, opts...)
+			} else if isEmptySliceValue(data) {
+				return NewDataFrameFromMaps(nil, opts...)
+			} else {
+				return nil, err
+			}
+		}
 		if rows, err := structSliceToMaps(data); err == nil {
 			return NewDataFrameFromMaps(rows, opts...)
-		} else if looksLikeStructSlice(data) {
-			return nil, err
 		}
 		return nil, fmt.Errorf("unsupported dataframe input type %T", data)
 	}
@@ -97,24 +117,30 @@ func NewDataFrame(data any, opts ...ImportOption) (*DataFrame, error) {
 //
 // Prefer NewDataFrame when you do not need an explicit row-oriented constructor.
 //
-// Schema inference/building is delegated to the Rust engine unless an
-// explicit schema is supplied. Resource cleanup is managed by DataFrame
-// itself, with Close available for deterministic release.
+// Row-oriented maps and struct slices use the Rust-side rows importer aligned
+// with Python pl.from_dicts semantics. WithArrowSchema opts into the explicit
+// Arrow path instead.
+//
+// Resource cleanup is managed by DataFrame itself, with Close available for
+// deterministic release.
 func NewDataFrameFromMaps(rows []map[string]any, opts ...ImportOption) (*DataFrame, error) {
 	brg, err := resolveBridge(nil)
 	if err != nil {
 		return nil, err
 	}
 	cfg := applyImportOptions(opts...)
+	if err := cfg.validateForRows(); err != nil {
+		return nil, unexpectedRowsOptionError("NewDataFrameFromMaps", err)
+	}
 	_ = brg
 	if cfg.arrowSchema != nil {
 		return NewDataFrameFromRowsWithArrowSchema(rows, cfg.arrowSchema)
 	}
-	return NewDataFrameFromRowsWithSchema(rows, cfg.schema)
+	return NewDataFrameFromRowsWithOptions(rows, cfg)
 }
 
 // NewDataFrameFromMapsWithSchema creates a managed DataFrame from row-oriented
-// Go data using an explicit schema.
+// Go data using WithSchema-style partial schema semantics.
 func NewDataFrameFromMapsWithSchema(
 	rows []map[string]any,
 	schema map[string]DataType,
@@ -135,6 +161,9 @@ func NewDataFrameFromColumns(data map[string]interface{}, opts ...ImportOption) 
 		return nil, err
 	}
 	cfg := applyImportOptions(opts...)
+	if err := cfg.validateForColumns(); err != nil {
+		return nil, unexpectedRowsOptionError("NewDataFrameFromColumns", err)
+	}
 	_ = brg
 	if cfg.arrowSchema != nil {
 		return NewDataFrameFromColumnsWithArrowSchema(data, cfg.arrowSchema)
@@ -205,23 +234,30 @@ func NewDataFrameFromRowsAuto(
 	return newDataFrameWrapper(df), nil
 }
 
+func NewDataFrameFromRowsWithOptions(
+	rows []map[string]any,
+	cfg importConfig,
+) (*DataFrame, error) {
+	brg, err := resolveBridge(nil)
+	if err != nil {
+		return nil, err
+	}
+	df, err := NewEagerFrameFromRowsWithOptions(brg, rows, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return newDataFrameWrapper(df), nil
+}
+
 // NewDataFrameFromRowsWithSchema creates a managed DataFrame from row-oriented Go data
-// using the compatibility JSON import path.
+// using the Python-from_dicts compatible rows import path.
 //
 // Prefer NewDataFrameFromMapsWithSchema for new code.
 func NewDataFrameFromRowsWithSchema(
 	rows []map[string]any,
 	schema map[string]DataType,
 ) (*DataFrame, error) {
-	brg, err := resolveBridge(nil)
-	if err != nil {
-		return nil, err
-	}
-	df, err := NewEagerFrameFromRowsWithSchema(brg, rows, schema)
-	if err != nil {
-		return nil, err
-	}
-	return newDataFrameWrapper(df), nil
+	return NewDataFrameFromRowsWithOptions(rows, importConfig{schema: cloneSchemaMap(schema)})
 }
 
 // NewDataFrameFromRowsWithArrowSchema creates a managed DataFrame from

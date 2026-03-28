@@ -31,14 +31,14 @@ func NewEagerFrameFromMap(brg *bridge.Bridge, data map[string]interface{}) (*Eag
 
 // NewEagerFrameFromRows creates an eager DataFrame from row-oriented Go data.
 //
-// This is the compatibility import path. Rows are converted to
-// column-oriented data in Go, serialized to JSON, and then sent to Rust over
-// FFI.
+// This is the Python-from_dicts compatible import path. Rows are normalized
+// in Go, encoded as a protobuf rows payload, and then constructed into a
+// DataFrame in Rust.
 //
 // This API is convenient for database query results and decoded JSON objects.
 // Prefer NewDataFrameFromMaps or NewDataFrame for application-facing code.
 func NewEagerFrameFromRows(brg *bridge.Bridge, rows []map[string]any) (*EagerFrame, error) {
-	return NewEagerFrameFromRowsWithSchema(brg, rows, nil)
+	return NewEagerFrameFromRowsWithOptions(brg, rows, importConfig{})
 }
 
 // NewEagerFrameFromRowsAuto creates an eager DataFrame from row-oriented Go data and
@@ -46,7 +46,8 @@ func NewEagerFrameFromRows(brg *bridge.Bridge, rows []map[string]any) (*EagerFra
 //
 // It prefers the Arrow import path when cgo is enabled, an explicit schema is
 // provided, and every schema data type has an Arrow import implementation.
-// Otherwise it falls back to the compatibility JSON import path.
+// Otherwise it falls back to the protobuf-backed Python-from_dicts compatible
+// rows import path.
 //
 // Prefer NewDataFrameFromRowsAuto for managed application-facing usage.
 func NewEagerFrameFromRowsAuto(
@@ -122,9 +123,7 @@ func NewEagerFrameFromMapWithArrowSchema(
 // NewEagerFrameFromRowsWithSchema creates an eager DataFrame from row-oriented Go data
 // and applies an explicit schema.
 //
-// This is the compatibility import path. Rows are reshaped into columns in
-// Go, missing fields are padded with nil, and the payload is sent to Rust as
-// JSON over FFI.
+// This uses the protobuf-backed Python-from_dicts compatible rows import path.
 //
 // Prefer NewDataFrameFromMapsWithSchema or NewDataFrame for managed usage.
 func NewEagerFrameFromRowsWithSchema(
@@ -132,12 +131,7 @@ func NewEagerFrameFromRowsWithSchema(
 	rows []map[string]any,
 	schema map[string]DataType,
 ) (*EagerFrame, error) {
-	columns, err := rowsToColumnJSON(rows)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert rows: %w", err)
-	}
-
-	return newDataFrameFromColumns(brg, columns, schema)
+	return NewEagerFrameFromRowsWithOptions(brg, rows, importConfig{schema: cloneSchemaMap(schema)})
 }
 
 // columnData 表示单列数据

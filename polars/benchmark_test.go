@@ -181,12 +181,12 @@ func BenchmarkImportRows(b *testing.B) {
 		arrowSchema := benchmarkArrowSchema()
 
 		b.Run(benchmarkSizeLabel(size), func(b *testing.B) {
-			b.Run("JSONWithSchema", func(b *testing.B) {
+			b.Run("RowsFFIWithSchema", func(b *testing.B) {
 				b.ReportAllocs()
 				for i := 0; i < b.N; i++ {
 					df, err := NewDataFrameFromRowsWithSchema(rows, schema)
 					if err != nil {
-						b.Fatalf("json import failed: %v", err)
+						b.Fatalf("rows ffi import failed: %v", err)
 					}
 					df.Close()
 				}

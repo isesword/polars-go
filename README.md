@@ -2,6 +2,48 @@
 
 一个高性能的 Go 语言 Polars 数据处理库，通过 FFI 桥接 Rust Polars，提供类似 Polars 的 Fluent API。
 
+## 一页摘要
+
+- 当前最明显的瓶颈是 Go 侧内存导入路径，尤其是默认 `json` 导入。
+- 切到 `arrow` 后，`ImportOnly` 和 `QueryCollectLike` 的耗时与内存都会明显下降。
+- `CollectOnly` 很轻，说明 `lazy -> collect` 不是主要瓶颈。
+- `ToMaps()` / `ToStructs()` 有成本，但不是最重的一层。
+- `GroupBy` 和 `Join` 的主要开销更多在输入构建和执行阶段。
+- 这份对比基准现在统一按列式输入跑，Go 侧显式走 `NewDataFrameFromColumns(...)`，和 Python 的 `dict of lists` 对齐。
+
+## 因果图
+
+```mermaid
+flowchart TD
+  A["Go 侧输入数据"] --> B{"导入路径"}
+  B -->|"JSON"| C["Go 侧对象整理"]
+  B -->|"Arrow"| D["直接构造 Arrow RecordBatch"]
+  C --> E["Rust 反序列化"]
+  D --> E
+
+  E --> F["Rust Polars 执行"]
+  F --> G{"结果导出"}
+  G -->|"ToMaps / ToDicts"| H["Arrow -> Go 对象"]
+  G -->|"ToStructs"| I["Arrow -> Go struct"]
+  G -->|"Arrow"| J["尽量留在 Arrow 侧"]
+
+  C --> K["宿主语言开销大"]
+  H --> K
+  I --> K
+  K --> L["数据越大，桥接成本越明显"]
+  L --> M["Go bridge 看起来更慢"]
+
+  D --> N["桥接更薄"]
+  N --> O["更多成本留在 Rust 侧"]
+  O --> P["更接近 Python Polars"]
+```
+
+这张图的核心结论是：
+
+- Python 大数据更占优，通常不是因为 Python 算子更强，而是因为它更少在宿主语言边界上搬数据。
+- 你现在的 Go bridge 在默认 `json` 路径下，会把更多成本放在 Go 侧的对象构建、序列化和结果物化上。
+- `arrow` 路径已经证明，桥接越薄，性能和内存越接近 Python Polars。
+
 ## ✨ 特性
 
 - 🚀 **零拷贝数据传输**：使用 Arrow C Data Interface，避免中间序列化开销
@@ -28,6 +70,8 @@ Go (获取结果)
 - Go 侧构建**查询计划（Plan）**，使用 Protobuf 序列化
 - Rust 侧将 Plan 翻译成 Polars 的 LazyFrame 调用
 - Go/Rust 之间的列式数据交换使用 **Arrow C Data Interface**
+- row-oriented `maps / structs` 默认走 Rust-side rows import，Go/Rust 之间使用 protobuf rows payload
+- column-oriented `map[string]slice` 默认 `json` 导入仍是兼容路径，不是性能优先路径；如果已经有列式数据，优先走 `NewDataFrameFromArrow(...)` / `brg.ExecuteArrow(...)`
 
 ## 🔀 数据交换
 
@@ -37,6 +81,7 @@ Go (获取结果)
   这是默认推荐入口，遵循 Go 风格命名，由 Rust 负责 schema 推断和建表；显式 schema 仍然可选。
 - 补充构造器：`NewDataFrameFromMaps(...)` / `NewDataFrameFromColumns(...)`
   当你希望显式表达“rows 导入”或“columns 导入”时，可以使用这两个更具体的入口。
+  其中 `NewDataFrameFromMaps(...)` 对齐 `pl.from_dicts(...)` 语义；`NewDataFrameFromColumns(...)` 仍是列式兼容入口。
 - 显式 Arrow 入口：`NewDataFrameFromArrow(...)` / `brg.ExecuteArrow(...)`
   这类入口用于已经有 Arrow 数据或明确想走 Arrow C Data Interface 的场景。
   如果你的输入是 Go rows / columns，但需要显式声明嵌套 `List / Struct` schema，也可以用 `WithArrowSchema(...)`。
@@ -52,9 +97,10 @@ Go (获取结果)
 - `pl.NewDataFrame(rows, pl.WithSchema(schema))`
 - `pl.NewDataFrame(structRows)`
 
-这样高层会走对象导入流程，并由 Rust 负责推断；如果你已经有 Arrow，再显式使用 `NewDataFrameFromArrow(...)`。
+这样高层会走对象导入流程，并由 Rust 负责推断或按显式 schema 建表；如果你已经有 Arrow，再显式使用 `NewDataFrameFromArrow(...)`。
 如果你更偏好显式命名，也可以用 `NewDataFrameFromMaps(...)` 或 `NewDataFrameFromColumns(...)`。
 如果你需要为 Go 的 row-oriented / column-oriented 数据显式声明嵌套 schema，可以使用 `pl.NewDataFrame(data, pl.WithArrowSchema(schema))`。
+如果你只是在 rows 导入里指定普通标量 schema，优先使用 `WithSchema(...)` / `WithSchemaFields(...)` / `WithColumnNames(...)`。
 
 ### Go / Python Polars 命名对照
 
@@ -573,11 +619,12 @@ go test ./polars -run '^$' -bench 'BenchmarkExcel' -benchmem
 - Excel：`BenchmarkExcel`
 - 表达式回调：`BenchmarkExprMapBatches` / `BenchmarkExprVsMapBatches`
 
-当前基线（Apple M4 Pro, `go test ./polars -run '^$' -bench 'Benchmark(ImportRows|QueryCollect|ToMaps|ToStructs|ToStructPointers|StructImport|Join|GroupBy|NDJSON|Excel|ExprVsMapBatches)' -benchtime=3x -benchmem`）：
+当前基线（Apple M4 Pro, `go test ./polars -run '^$' -bench 'Benchmark(ImportRows|QueryCollect|ToMaps|ToStructs|ToStructPointers|StructImport|Join|GroupBy|NDJSON|Excel|ExprVsMapBatches)' -benchtime=3x -benchmem`；其中 `ImportRows` 两行按当前 rows importer 额外刷新）：
 
 | Benchmark | ns/op | B/op | allocs/op |
 |---|---:|---:|---:|
-| `BenchmarkImportRows/Rows2000/JSONWithSchema` | 1,459,361 | 593,762 | 7,791 |
+| `BenchmarkImportRows/Rows2000/RowsFFIWithSchema` | 6,319,208 | 1,085,905 | 24,025 |
+| `BenchmarkImportRows/Rows10000/RowsFFIWithSchema` | 24,372,117 | 5,398,433 | 120,024 |
 | `BenchmarkImportRows/Rows2000/ArrowSchema` | 601,222 | 67,813 | 4,353 |
 | `BenchmarkQueryCollect/Rows4000/InMemoryArrowBacked` | 591,208 | 1,051,818 | 17,813 |
 | `BenchmarkQueryCollect/Rows4000/CSVScan` | 1,022,778 | 1,052,562 | 17,811 |
@@ -598,12 +645,13 @@ go test ./polars -run '^$' -bench 'BenchmarkExcel' -benchmem
 
 当前 smoke 基线说明：
 
-- `ArrowSchema` 导入明显快于 `JSONWithSchema`，而且分配更少
+- `ArrowSchema` 导入明显快于 `RowsFFIWithSchema`，而且分配更少
+- `RowsFFIWithSchema` 是当前默认 rows import 名称，对应 protobuf-backed Rust rows import，不是旧的 JSON rows 路径
 - 4k 行样本下，内存 Arrow-backed 查询比 CSV 扫描更快
 - `ToMaps()` 目前仍然有比较明显的分配成本，后续值得继续优化
 - `ToStructs()` 现在优先走 Arrow 直转并带有常见标量列的直赋值快路径；在当前基线下，已经同时优于 `ToMaps()` 的延迟、内存和分配次数
 - `ToStructPointers()` 会比 `ToStructs()` 多一层对象分配，但在当前基线下仍明显优于 `ToMaps()`
-- `Struct` 导入目前比 `ArrowSchema` / `JSONWithSchema` 行式导入更重，4k 行样本下已经到 `2.65ms / 2.4MB / 28k allocs`
+- `Struct` 导入目前比 `ArrowSchema` / `RowsFFIWithSchema` 行式导入更重，4k 行样本下已经到 `2.65ms / 2.4MB / 28k allocs`
 - `Join` 在 4k 行样本下仍处在可接受范围，但明显比同规模 `GroupBy` 重
 - `GroupBy` 的常见聚合当前很轻，4k 行样本下只有 `~0.28ms`，而且分配很低
 - `SinkNDJSONFile` 在非 gzip 模式下非常省内存，但 gzip sink 的 CPU 成本明显高于非压缩输出
@@ -784,11 +832,11 @@ parquetWithOptions := pl.ScanParquetWithOptions("path/to/file.parquet", pl.Parqu
 df, _ := pl.NewDataFrame(rows, pl.WithSchema(schema))
 defer df.Close()
 
-// 从内存数据（更显式的 rows/columns 入口）
+// 从内存数据（更显式的 rows 入口，语义对齐 pl.from_dicts）
 dfFromMaps, _ := pl.NewDataFrameFromMaps(rows, pl.WithSchema(schema))
 defer dfFromMaps.Close()
 
-// 从内存数据（Arrow 入口）
+// 从内存数据（显式 Arrow 入口，适合嵌套 schema / Arrow 已就绪场景）
 record, _ := pl.NewArrowRecordBatchFromRowsWithSchema(rows, schema)
 dfFromArrow, _ := pl.NewDataFrameFromArrow(record)
 defer dfFromArrow.Close()

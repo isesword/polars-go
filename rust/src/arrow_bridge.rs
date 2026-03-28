@@ -27,7 +27,9 @@ pub fn export_dataframe_to_arrow(
     let record_batch = df
         .iter_chunks(CompatLevel::newest(), false)
         .next()
-        .ok_or_else(|| BridgeError::ArrowExport("Failed to materialize Arrow record batch".into()))?;
+        .ok_or_else(|| {
+            BridgeError::ArrowExport("Failed to materialize Arrow record batch".into())
+        })?;
     let height = record_batch.height();
     let (schema, arrays) = record_batch.into_schema_and_arrays();
     let fields: Vec<Field> = schema.iter().map(|(_, field)| field.clone()).collect();
@@ -69,9 +71,10 @@ pub fn import_dataframe_from_arrow(
     let fields = match dtype {
         ArrowDataType::Struct(fields) => fields,
         _ => {
-            return Err(BridgeError::ArrowImport(
-                format!("Arrow record batch must be a Struct type, got {:?}", dtype),
-            ))
+            return Err(BridgeError::ArrowImport(format!(
+                "Arrow record batch must be a Struct type, got {:?}",
+                dtype
+            )))
         }
     };
 
@@ -90,8 +93,10 @@ pub fn import_dataframe_from_arrow(
 
     let schema: ArrowSchema = fields.into_iter().collect();
     let arrays = struct_array.values().iter().cloned().collect::<Vec<_>>();
-    let record_batch = RecordBatch::try_new(struct_array.len(), Arc::new(schema), arrays)
-        .map_err(|e| BridgeError::ArrowImport(format!("failed to construct Arrow record batch: {}", e)))?;
+    let record_batch =
+        RecordBatch::try_new(struct_array.len(), Arc::new(schema), arrays).map_err(|e| {
+            BridgeError::ArrowImport(format!("failed to construct Arrow record batch: {}", e))
+        })?;
 
     Ok(DataFrame::from(record_batch))
 }
