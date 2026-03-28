@@ -266,6 +266,36 @@ _ = lf.SinkNDJSONFile("out.jsonl.gz", pl.SinkNDJSONOptions{
 - `SinkJSON(...)` 目前仍然会先 collect 后写出 JSON
 - Python Polars 里 `write_ndjson` / `sink_ndjson` 还包含更偏文件路径语义的参数；当前 Go 版本面向 `io.Writer`，所以只保留与 writer 直接相关的压缩选项
 
+### Parquet 导出
+
+当前提供一个先走 Arrow 导出、再由 Go 侧写 Parquet 文件的入口：
+
+- eager:
+  - `(*DataFrame).WriteParquetFile(path string)`
+- lazy:
+  - `(*LazyFrame).SinkParquetFile(path string)`
+
+示例：
+
+```go
+df, _ := pl.NewDataFrame([]map[string]any{
+    {"id": 1, "name": "Alice"},
+    {"id": 2, "name": "Bob"},
+})
+defer df.Close()
+
+_ = df.WriteParquetFile("out.parquet")
+
+lf := df.Filter(pl.Col("id").Gt(pl.Lit(1)))
+_ = lf.SinkParquetFile("filtered.parquet")
+```
+
+说明：
+
+- 这条路径当前要求 Arrow 导出可用，也就是需要 `CGO_ENABLED=1`
+- `SinkParquetFile(...)` 当前会先 `Collect()` 再写出，适合先补齐 Parquet 文件输出能力
+- 如果后面需要更大数据量的真正 lazy parquet sink，再继续下沉到 Rust 侧扩展
+
 ### Excel 读取
 
 当前提供一个先走 Go 侧实现的 Excel 读取入口：
