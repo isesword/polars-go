@@ -534,6 +534,11 @@ go test ./polars -run '^$' -bench Benchmark -benchmem
 
 - [docs/python-polars-comparison.md](docs/python-polars-comparison.md)
 
+当前这份对照已经更新到“按列输入、按 case 惰性构造”的更严格口径；最新样例结果显示：
+
+- `ScanCSV` / `ScanParquet` 这类文件扫描路径，Go bridge 依然明显占优
+- 内存 DataFrame 上直接做 `ToMaps` / `GroupBy` / `Join` / `SinkNDJSONFile`，当前样例里 Python Polars 更快
+
 按规模跑某一组：
 
 ```bash

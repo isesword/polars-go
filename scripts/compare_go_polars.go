@@ -5,26 +5,39 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/memory"
 	pl "github.com/isesword/polars-go/polars"
 )
 
-func benchmarkRows(n int) []map[string]any {
-	rows := make([]map[string]any, n)
+func benchmarkColumns(n int) map[string]interface{} {
+	ids := make([]int64, n)
+	names := make([]string, n)
+	ages := make([]int64, n)
+	salaries := make([]int64, n)
+	departmentsCol := make([]string, n)
 	departments := []string{"Engineering", "Marketing", "Sales", "Finance"}
 	for i := 0; i < n; i++ {
-		rows[i] = map[string]any{
-			"id":         int64(i + 1),
-			"name":       fmt.Sprintf("user_%05d", i+1),
-			"age":        int64(20 + (i % 30)),
-			"salary":     int64(50000 + (i%17)*1250),
-			"department": departments[i%len(departments)],
-		}
+		ids[i] = int64(i + 1)
+		names[i] = fmt.Sprintf("user_%05d", i+1)
+		ages[i] = int64(20 + (i % 30))
+		salaries[i] = int64(50000 + (i%17)*1250)
+		departmentsCol[i] = departments[i%len(departments)]
 	}
-	return rows
+	return map[string]interface{}{
+		"id":         ids,
+		"name":       names,
+		"age":        ages,
+		"salary":     salaries,
+		"department": departmentsCol,
+	}
 }
 
 type benchmarkStructRow struct {
@@ -35,34 +48,84 @@ type benchmarkStructRow struct {
 	Department string `polars:"department"`
 }
 
-func joinFrames(n int) (*pl.DataFrame, *pl.DataFrame, error) {
-	leftRows := make([]map[string]any, n)
-	rightRows := make([]map[string]any, n)
-	for i := 0; i < n; i++ {
-		leftRows[i] = map[string]any{
-			"id":         int64(i + 1),
-			"department": fmt.Sprintf("dept_%02d", i%16),
-			"salary":     int64(50000 + (i%17)*1250),
-		}
-		rightRows[i] = map[string]any{
-			"id":    int64(i + 1),
-			"level": fmt.Sprintf("L%d", i%6),
-			"bonus": int64(1000 + (i%9)*100),
-		}
-	}
-	left, err := pl.NewDataFrame(leftRows)
-	if err != nil {
-		return nil, nil, err
-	}
-	right, err := pl.NewDataFrame(rightRows)
-	if err != nil {
-		left.Close()
-		return nil, nil, err
-	}
-	return left, right, nil
+type benchCase struct {
+	label string
+	run   func() (int, error)
 }
 
-func runCase(label string, loops int, fn func() (int, error)) {
+type importMode string
+
+const (
+	importModeJSON  importMode = "json"
+	importModeArrow importMode = "arrow"
+)
+
+var arrowAllocator = memory.NewGoAllocator()
+
+func joinColumns(n int) (map[string]interface{}, map[string]interface{}) {
+	leftIDs := make([]int64, n)
+	leftDepartments := make([]string, n)
+	leftSalaries := make([]int64, n)
+	rightIDs := make([]int64, n)
+	rightLevels := make([]string, n)
+	rightBonuses := make([]int64, n)
+	for i := 0; i < n; i++ {
+		leftIDs[i] = int64(i + 1)
+		leftDepartments[i] = fmt.Sprintf("dept_%02d", i%16)
+		leftSalaries[i] = int64(50000 + (i%17)*1250)
+		rightIDs[i] = int64(i + 1)
+		rightLevels[i] = fmt.Sprintf("L%d", i%6)
+		rightBonuses[i] = int64(1000 + (i%9)*100)
+	}
+	return map[string]interface{}{
+			"id":         leftIDs,
+			"department": leftDepartments,
+			"salary":     leftSalaries,
+		}, map[string]interface{}{
+			"id":    rightIDs,
+			"level": rightLevels,
+			"bonus": rightBonuses,
+		}
+}
+
+func benchmarkArrowSchema() *arrow.Schema {
+	return arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "name", Type: arrow.BinaryTypes.String},
+		{Name: "age", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "salary", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "department", Type: arrow.BinaryTypes.String},
+	}, nil)
+}
+
+func joinLeftArrowSchema() *arrow.Schema {
+	return arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "department", Type: arrow.BinaryTypes.String},
+		{Name: "salary", Type: arrow.PrimitiveTypes.Int64},
+	}, nil)
+}
+
+func joinRightArrowSchema() *arrow.Schema {
+	return arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+		{Name: "level", Type: arrow.BinaryTypes.String},
+		{Name: "bonus", Type: arrow.PrimitiveTypes.Int64},
+	}, nil)
+}
+
+func maxRSSMiB() float64 {
+	var usage syscall.Rusage
+	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
+		return 0
+	}
+	if runtime.GOOS == "darwin" {
+		return float64(usage.Maxrss) / (1024 * 1024)
+	}
+	return float64(usage.Maxrss) / 1024
+}
+
+func runCase(label string, loops int, fn func() (int, error)) float64 {
 	if n, err := fn(); err != nil {
 		panic(err)
 	} else if n == 0 {
@@ -80,7 +143,9 @@ func runCase(label string, loops int, fn func() (int, error)) {
 		}
 	}
 	elapsed := time.Since(start)
-	fmt.Printf("%s: %.0f us/op\n", label, float64(elapsed.Microseconds())/float64(loops))
+	usPerOp := float64(elapsed.Microseconds()) / float64(loops)
+	fmt.Printf("%s: %.0f us/op\n", label, usPerOp)
+	return usPerOp
 }
 
 func collectToMapsCount(lf *pl.LazyFrame) (int, error) {
@@ -162,84 +227,248 @@ func parseSizes(raw string) ([]int, error) {
 	return out, nil
 }
 
+func parseImportMode(raw string) (importMode, error) {
+	switch importMode(raw) {
+	case importModeJSON:
+		return importModeJSON, nil
+	case importModeArrow:
+		return importModeArrow, nil
+	default:
+		return "", fmt.Errorf("unsupported import mode %q", raw)
+	}
+}
+
+func newDataFrameFromColumnsWithMode(data map[string]interface{}, schema *arrow.Schema, mode importMode) (*pl.DataFrame, error) {
+	switch mode {
+	case importModeJSON:
+		return pl.NewDataFrame(data)
+	case importModeArrow:
+		record, err := newArrowRecordBatchFromColumns(data, schema)
+		if err != nil {
+			return nil, err
+		}
+		return pl.NewDataFrameFromArrow(record)
+	default:
+		return nil, fmt.Errorf("unsupported import mode %q", mode)
+	}
+}
+
+func newArrowRecordBatchFromColumns(data map[string]interface{}, schema *arrow.Schema) (arrow.RecordBatch, error) {
+	builder := array.NewRecordBuilder(arrowAllocator, schema)
+	defer builder.Release()
+
+	for idx, field := range schema.Fields() {
+		values, ok := data[field.Name]
+		if !ok {
+			return nil, fmt.Errorf("missing column %q", field.Name)
+		}
+		if err := appendColumnValues(builder.Field(idx), values, field.Name); err != nil {
+			return nil, err
+		}
+	}
+	return builder.NewRecordBatch(), nil
+}
+
+func appendColumnValues(builder array.Builder, values interface{}, name string) error {
+	switch b := builder.(type) {
+	case *array.Int64Builder:
+		col, ok := values.([]int64)
+		if !ok {
+			return fmt.Errorf("column %s: expected []int64, got %T", name, values)
+		}
+		b.AppendValues(col, nil)
+	case *array.StringBuilder:
+		col, ok := values.([]string)
+		if !ok {
+			return fmt.Errorf("column %s: expected []string, got %T", name, values)
+		}
+		b.AppendValues(col, nil)
+	default:
+		return fmt.Errorf("column %s: unsupported builder %T", name, builder)
+	}
+	return nil
+}
+
+func buildCases(n int, fixtureDir string, mode importMode) (map[string]benchCase, func(), error) {
+	csvPath := filepath.Join(fixtureDir, fmt.Sprintf("polars_compare_%d.csv", n))
+	parquetPath := filepath.Join(fixtureDir, fmt.Sprintf("polars_compare_%d.parquet", n))
+	sinkPath := filepath.Join(fixtureDir, fmt.Sprintf("bench-%d.jsonl", n))
+	baseColumns := benchmarkColumns(n)
+	leftColumns, rightColumns := joinColumns(n)
+	baseSchema := benchmarkArrowSchema()
+	leftSchema := joinLeftArrowSchema()
+	rightSchema := joinRightArrowSchema()
+
+	newBaseFrame := func() (*pl.DataFrame, error) {
+		return newDataFrameFromColumnsWithMode(baseColumns, baseSchema, mode)
+	}
+	newJoinFrames := func() (*pl.DataFrame, *pl.DataFrame, error) {
+		left, err := newDataFrameFromColumnsWithMode(leftColumns, leftSchema, mode)
+		if err != nil {
+			return nil, nil, err
+		}
+		right, err := newDataFrameFromColumnsWithMode(rightColumns, rightSchema, mode)
+		if err != nil {
+			left.Close()
+			return nil, nil, err
+		}
+		return left, right, nil
+	}
+
+	return map[string]benchCase{
+		"query_collect_like": {
+			label: "  QueryCollectLike(df.filter.select.collect.to_maps)",
+			run: func() (int, error) {
+				df, err := newBaseFrame()
+				if err != nil {
+					return 0, err
+				}
+				defer df.Close()
+				return collectToMapsCount(df.Filter(pl.Col("age").Gt(pl.Lit(30))).Select(pl.Col("name"), pl.Col("salary"), pl.Col("department")))
+			},
+		},
+		"to_maps": {
+			label: "  ToMaps",
+			run: func() (int, error) {
+				df, err := newBaseFrame()
+				if err != nil {
+					return 0, err
+				}
+				defer df.Close()
+				return toMapsCount(df)
+			},
+		},
+		"to_structs": {
+			label: "  ToStructs",
+			run: func() (int, error) {
+				df, err := newBaseFrame()
+				if err != nil {
+					return 0, err
+				}
+				defer df.Close()
+				return toStructsCount(df)
+			},
+		},
+		"scan_csv": {
+			label: "  ScanCSV(filter+select+collect+ToMaps)",
+			run: func() (int, error) {
+				return collectToMapsCount(
+					pl.ScanCSV(csvPath).
+						Filter(pl.Col("age").Gt(pl.Lit(30))).
+						Select(pl.Col("name"), pl.Col("salary"), pl.Col("department")),
+				)
+			},
+		},
+		"scan_parquet": {
+			label: "  ScanParquet(filter+select+collect+ToMaps)",
+			run: func() (int, error) {
+				return collectToMapsCount(
+					pl.ScanParquet(parquetPath).
+						Filter(pl.Col("age").Gt(pl.Lit(30))).
+						Select(pl.Col("name"), pl.Col("salary"), pl.Col("department")),
+				)
+			},
+		},
+		"group_by_agg": {
+			label: "  GroupByAgg(to_maps)",
+			run: func() (int, error) {
+				df, err := newBaseFrame()
+				if err != nil {
+					return 0, err
+				}
+				defer df.Close()
+				return collectToMapsCount(
+					df.GroupBy("department").Agg(
+						pl.Col("salary").Sum().Alias("salary_sum"),
+						pl.Col("id").Count().Alias("employee_count"),
+						pl.Col("age").Mean().Alias("avg_age"),
+					),
+				)
+			},
+		},
+		"join_inner": {
+			label: "  JoinInner(select.to_maps)",
+			run: func() (int, error) {
+				left, right, err := newJoinFrames()
+				if err != nil {
+					return 0, err
+				}
+				defer left.Close()
+				defer right.Close()
+				return collectToMapsCount(
+					left.Join(right, pl.JoinOptions{On: []string{"id"}, How: pl.JoinInner}).
+						Select(pl.Col("id"), pl.Col("salary"), pl.Col("bonus")),
+				)
+			},
+		},
+		"sink_ndjson_file": {
+			label: "  SinkNDJSONFile",
+			run: func() (int, error) {
+				df, err := newBaseFrame()
+				if err != nil {
+					return 0, err
+				}
+				defer df.Close()
+				return sinkNDJSONCount(
+					df.Filter(pl.Col("age").Gt(pl.Lit(30))).Select(pl.Col("id"), pl.Col("name"), pl.Col("department")),
+					sinkPath,
+				)
+			},
+		},
+	}, func() {}, nil
+}
+
 func main() {
 	fixtureDir := flag.String("fixture-dir", "/tmp/polars-go-compare", "directory that contains shared CSV/Parquet fixtures")
 	sizesFlag := flag.String("sizes", "4000,16000", "comma-separated row counts to benchmark")
+	importModeFlag := flag.String("import-mode", "json", "Go in-memory dataframe import mode: json or arrow")
+	caseName := flag.String("case", "", "run only one case in this process and print a machine-readable RESULT line")
+	singleSize := flag.Int("size", 0, "single row count used together with --case")
 	flag.Parse()
 
 	sizes, err := parseSizes(*sizesFlag)
 	if err != nil {
 		panic(err)
 	}
+	mode, err := parseImportMode(*importModeFlag)
+	if err != nil {
+		panic(err)
+	}
+	if *caseName != "" {
+		if *singleSize <= 0 {
+			panic("--size is required when --case is set")
+		}
+		loops := loopsForSize(*singleSize)
+		cases, cleanup, err := buildCases(*singleSize, *fixtureDir, mode)
+		if err != nil {
+			panic(err)
+		}
+		defer cleanup()
+		current, ok := cases[*caseName]
+		if !ok {
+			panic(fmt.Sprintf("unknown case: %s", *caseName))
+		}
+		usPerOp := runCase(current.label, loops, current.run)
+		fmt.Printf("RESULT case=%s size=%d us_per_op=%.0f maxrss_mib=%.1f\n", *caseName, *singleSize, usPerOp, maxRSSMiB())
+		return
+	}
 
-	fmt.Printf("fixture_dir: %s\n\n", *fixtureDir)
+	fmt.Printf("fixture_dir: %s\n", *fixtureDir)
+	fmt.Printf("import_mode: %s\n\n", mode)
 	for _, n := range sizes {
 		loops := loopsForSize(n)
-		rows := benchmarkRows(n)
-		df, err := pl.NewDataFrame(rows)
+		cases, cleanup, err := buildCases(n, *fixtureDir, mode)
 		if err != nil {
 			panic(err)
 		}
-
-		left, right, err := joinFrames(n)
-		if err != nil {
-			df.Close()
-			panic(err)
-		}
-
-		csvPath := filepath.Join(*fixtureDir, fmt.Sprintf("polars_compare_%d.csv", n))
-		parquetPath := filepath.Join(*fixtureDir, fmt.Sprintf("polars_compare_%d.parquet", n))
-		sinkPath := filepath.Join(*fixtureDir, fmt.Sprintf("bench-%d.jsonl", n))
 
 		fmt.Printf("Rows%d\n", n)
-		runCase("  QueryCollectLike(df.filter.select.collect.to_maps)", loops, func() (int, error) {
-			return collectToMapsCount(df.Filter(pl.Col("age").Gt(pl.Lit(30))).Select(pl.Col("name"), pl.Col("salary"), pl.Col("department")))
-		})
-		runCase("  ToMaps", loops, func() (int, error) {
-			return toMapsCount(df)
-		})
-		runCase("  ToStructs", loops, func() (int, error) {
-			return toStructsCount(df)
-		})
-		runCase("  ScanCSV(filter+select+collect+ToMaps)", loops, func() (int, error) {
-			return collectToMapsCount(
-				pl.ScanCSV(csvPath).
-					Filter(pl.Col("age").Gt(pl.Lit(30))).
-					Select(pl.Col("name"), pl.Col("salary"), pl.Col("department")),
-			)
-		})
-		runCase("  ScanParquet(filter+select+collect+ToMaps)", loops, func() (int, error) {
-			return collectToMapsCount(
-				pl.ScanParquet(parquetPath).
-					Filter(pl.Col("age").Gt(pl.Lit(30))).
-					Select(pl.Col("name"), pl.Col("salary"), pl.Col("department")),
-			)
-		})
-		runCase("  GroupByAgg(to_maps)", loops, func() (int, error) {
-			return collectToMapsCount(
-				df.GroupBy("department").Agg(
-					pl.Col("salary").Sum().Alias("salary_sum"),
-					pl.Col("id").Count().Alias("employee_count"),
-					pl.Col("age").Mean().Alias("avg_age"),
-				),
-			)
-		})
-		runCase("  JoinInner(select.to_maps)", loops, func() (int, error) {
-			return collectToMapsCount(
-				left.Join(right, pl.JoinOptions{On: []string{"id"}, How: pl.JoinInner}).
-					Select(pl.Col("id"), pl.Col("salary"), pl.Col("bonus")),
-			)
-		})
-		runCase("  SinkNDJSONFile", loops, func() (int, error) {
-			return sinkNDJSONCount(
-				df.Filter(pl.Col("age").Gt(pl.Lit(30))).Select(pl.Col("id"), pl.Col("name"), pl.Col("department")),
-				sinkPath,
-			)
-		})
+		order := []string{"query_collect_like", "to_maps", "to_structs", "scan_csv", "scan_parquet", "group_by_agg", "join_inner", "sink_ndjson_file"}
+		for _, name := range order {
+			current := cases[name]
+			runCase(current.label, loops, current.run)
+		}
 		fmt.Println()
-
-		left.Close()
-		right.Close()
-		df.Close()
+		cleanup()
 	}
 }
