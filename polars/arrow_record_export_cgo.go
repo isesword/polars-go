@@ -5,6 +5,7 @@ package polars
 
 import (
 	"fmt"
+	"runtime"
 	"unsafe"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -15,8 +16,10 @@ import (
 func exportDataFrameToArrowRecordBatch(brg *bridge.Bridge, handle uint64) (arrow.RecordBatch, error) {
 	schema, array, err := brg.ExportDataFrameToArrow(handle)
 	if err != nil {
+		runtime.KeepAlive(brg)
 		return nil, err
 	}
+	runtime.KeepAlive(brg)
 
 	recordBatch, err := cdata.ImportCRecordBatch(
 		(*cdata.CArrowArray)(unsafe.Pointer(array)),

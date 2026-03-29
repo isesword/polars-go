@@ -3,6 +3,7 @@ package polars
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 
 	"github.com/apache/arrow-go/v18/arrow"
 )
@@ -25,15 +26,21 @@ func ToSlice[T any](f sliceExportFrame, column string) ([]T, error) {
 	recordBatch, err := f.ToArrow()
 	if err == nil {
 		defer recordBatch.Release()
-		return recordBatchToSlice[T]("polars.ToSlice", recordBatch, column)
+		values, sliceErr := recordBatchToSlice[T]("polars.ToSlice", recordBatch, column)
+		runtime.KeepAlive(f)
+		return values, sliceErr
 	}
 	if !bridgeArrowExportSupported() {
 		rows, mapErr := f.ToMaps()
 		if mapErr != nil {
+			runtime.KeepAlive(f)
 			return nil, wrapOp("polars.ToSlice", mapErr)
 		}
-		return rowsColumnToSlice[T]("polars.ToSlice", rows, column)
+		values, sliceErr := rowsColumnToSlice[T]("polars.ToSlice", rows, column)
+		runtime.KeepAlive(f)
+		return values, sliceErr
 	}
+	runtime.KeepAlive(f)
 	return nil, wrapOp("polars.ToSlice", err)
 }
 

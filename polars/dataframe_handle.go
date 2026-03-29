@@ -68,8 +68,10 @@ func (df *EagerFrame) ToMaps() ([]map[string]interface{}, error) {
 
 	recordBatch, err := exportDataFrameToArrowRecordBatch(df.brg, df.handle)
 	if err != nil {
+		runtime.KeepAlive(df)
 		return nil, fmt.Errorf("failed to export dataframe: %w", err)
 	}
+	runtime.KeepAlive(df)
 	defer recordBatch.Release()
 
 	rows, err := parseArrowRecordBatch(recordBatch)
@@ -93,8 +95,10 @@ func (df *EagerFrame) ToArrow() (arrow.RecordBatch, error) {
 
 	recordBatch, err := exportDataFrameToArrowRecordBatch(df.brg, df.handle)
 	if err != nil {
+		runtime.KeepAlive(df)
 		return nil, fmt.Errorf("failed to export dataframe: %w", err)
 	}
+	runtime.KeepAlive(df)
 	return recordBatch, nil
 }
 

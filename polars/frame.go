@@ -340,7 +340,9 @@ func (f *DataFrame) ToMaps() ([]map[string]interface{}, error) {
 	if err := invalidDataFrameError(f); err != nil {
 		return nil, wrapOp("DataFrame.ToMaps", err)
 	}
-	return f.df.ToMaps()
+	rows, err := f.df.ToMaps()
+	runtime.KeepAlive(f)
+	return rows, err
 }
 
 // ToArrow exports the DataFrame to an Arrow RecordBatch.
@@ -350,7 +352,9 @@ func (f *DataFrame) ToArrow() (arrow.RecordBatch, error) {
 	if err := invalidDataFrameError(f); err != nil {
 		return nil, wrapOp("DataFrame.ToArrow", err)
 	}
-	return f.df.ToArrow()
+	recordBatch, err := f.df.ToArrow()
+	runtime.KeepAlive(f)
+	return recordBatch, err
 }
 
 // Describe returns a summary dataframe.

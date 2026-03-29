@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"runtime"
 
 	pb "github.com/isesword/polars-go/proto"
 	"google.golang.org/protobuf/proto"
@@ -1015,11 +1016,19 @@ func (lf *LazyFrame) Collect() (*EagerFrame, error) {
 	}
 	dfHandle, err := brg.CollectPlanDF(handle, inputHandles)
 	if err != nil {
+		runtime.KeepAlive(lf)
+		for _, src := range lf.memorySources {
+			runtime.KeepAlive(src)
+		}
 		return nil, fmt.Errorf(
 			"LazyFrame.Collect: failed during dataframe collection (memory_sources=%d): %w",
 			len(lf.memorySources),
 			err,
 		)
+	}
+	runtime.KeepAlive(lf)
+	for _, src := range lf.memorySources {
+		runtime.KeepAlive(src)
 	}
 
 	return newDataFrame(dfHandle, brg), nil
