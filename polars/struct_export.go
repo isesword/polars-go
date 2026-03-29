@@ -3,7 +3,9 @@ package polars
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -15,7 +17,11 @@ func ToStructs[T any](f *DataFrame) ([]T, error) {
 	if err := invalidDataFrameError(f); err != nil {
 		return nil, wrapOp("polars.ToStructs", err)
 	}
-	targetType, err := targetStructType[T]("polars.ToStructs")
+	return exportStructsFromFrame[T]("polars.ToStructs", f)
+}
+
+func exportStructsFromFrame[T any](op string, f sliceExportFrame) ([]T, error) {
+	targetType, err := targetStructType[T](op)
 	if err != nil {
 		return nil, err
 	}
@@ -23,16 +29,21 @@ func ToStructs[T any](f *DataFrame) ([]T, error) {
 	recordBatch, err := f.ToArrow()
 	if err == nil {
 		defer recordBatch.Release()
-		return recordBatchToStructs[T]("polars.ToStructs", recordBatch, targetType)
+		out, convErr := recordBatchToStructs[T](op, recordBatch, targetType)
+		runtime.KeepAlive(f)
+		return out, convErr
 	}
 	if !bridgeArrowExportSupported() {
 		rows, mapErr := f.ToMaps()
 		if mapErr != nil {
-			return nil, wrapOp("polars.ToStructs", mapErr)
+			return nil, wrapOp(op, mapErr)
 		}
-		return rowsToStructsWithType[T]("polars.ToStructs", rows, targetType)
+		out, convErr := rowsToStructsWithType[T](op, rows, targetType)
+		runtime.KeepAlive(f)
+		return out, convErr
 	}
-	return nil, wrapOp("polars.ToStructs", err)
+	runtime.KeepAlive(f)
+	return nil, wrapOp(op, err)
 }
 
 // ToStructPointers materializes the dataframe into a slice of struct pointers.
@@ -590,7 +601,7 @@ func newDirectStructColumnBinding(field structFieldMeta, col arrow.Array) (struc
 						dest.Set(reflect.Zero(dest.Type()))
 						return nil
 					}
-					return setStringValue(dest, c.Value(rowIdx))
+					return setStringValue(dest, strings.Clone(c.Value(rowIdx)))
 				},
 			}, true
 		}
@@ -603,7 +614,7 @@ func newDirectStructColumnBinding(field structFieldMeta, col arrow.Array) (struc
 						dest.Set(reflect.Zero(dest.Type()))
 						return nil
 					}
-					return setStringValue(dest, c.Value(rowIdx))
+					return setStringValue(dest, strings.Clone(c.Value(rowIdx)))
 				},
 			}, true
 		}
@@ -616,7 +627,7 @@ func newDirectStructColumnBinding(field structFieldMeta, col arrow.Array) (struc
 						dest.Set(reflect.Zero(dest.Type()))
 						return nil
 					}
-					return setStringValue(dest, c.Value(rowIdx))
+					return setStringValue(dest, strings.Clone(c.Value(rowIdx)))
 				},
 			}, true
 		}

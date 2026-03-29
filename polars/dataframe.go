@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"time"
 
 	pb "github.com/isesword/polars-go/proto"
 	"google.golang.org/protobuf/proto"
@@ -1032,6 +1033,118 @@ func (lf *LazyFrame) Collect() (*EagerFrame, error) {
 	}
 
 	return newDataFrame(dfHandle, brg), nil
+}
+
+// CollectMaps collects the lazy query into Go maps and frees the intermediate
+// eager frame automatically.
+func (lf *LazyFrame) CollectMaps() ([]map[string]interface{}, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectMaps", err)
+	}
+	defer df.Free()
+	return df.ToMaps()
+}
+
+// CollectSlice collects the lazy query into a []any and frees the intermediate
+// eager frame automatically.
+func (lf *LazyFrame) CollectSlice(column ...string) ([]any, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSlice", err)
+	}
+	defer df.Free()
+	return df.ToSlice(column...)
+}
+
+func (lf *LazyFrame) CollectSliceString(column ...string) ([]string, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceString", err)
+	}
+	defer df.Free()
+	return df.ToSliceString(column...)
+}
+
+func (lf *LazyFrame) CollectSliceInt64(column ...string) ([]int64, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceInt64", err)
+	}
+	defer df.Free()
+	return df.ToSliceInt64(column...)
+}
+
+func (lf *LazyFrame) CollectSliceUInt64(column ...string) ([]uint64, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceUInt64", err)
+	}
+	defer df.Free()
+	return df.ToSliceUInt64(column...)
+}
+
+func (lf *LazyFrame) CollectSliceInt32(column ...string) ([]int32, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceInt32", err)
+	}
+	defer df.Free()
+	return df.ToSliceInt32(column...)
+}
+
+func (lf *LazyFrame) CollectSliceUInt32(column ...string) ([]uint32, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceUInt32", err)
+	}
+	defer df.Free()
+	return df.ToSliceUInt32(column...)
+}
+
+func (lf *LazyFrame) CollectSliceFloat64(column ...string) ([]float64, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceFloat64", err)
+	}
+	defer df.Free()
+	return df.ToSliceFloat64(column...)
+}
+
+func (lf *LazyFrame) CollectSliceFloat32(column ...string) ([]float32, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceFloat32", err)
+	}
+	defer df.Free()
+	return df.ToSliceFloat32(column...)
+}
+
+func (lf *LazyFrame) CollectSliceBool(column ...string) ([]bool, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceBool", err)
+	}
+	defer df.Free()
+	return df.ToSliceBool(column...)
+}
+
+func (lf *LazyFrame) CollectSliceTime(column ...string) ([]time.Time, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceTime", err)
+	}
+	defer df.Free()
+	return df.ToSliceTime(column...)
+}
+
+func (lf *LazyFrame) CollectSliceBytes(column ...string) ([][]byte, error) {
+	df, err := lf.Collect()
+	if err != nil {
+		return nil, wrapOp("LazyFrame.CollectSliceBytes", err)
+	}
+	defer df.Free()
+	return df.ToSliceBytes(column...)
 }
 
 // SinkJSON collects the lazy query and writes the resulting JSON to w.

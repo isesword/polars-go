@@ -115,6 +115,7 @@ Go (获取结果)
 | `ToArrow()` | `to_arrow()` |
 | `Collect()` | `collect()` |
 | `ToMaps()` | `to_dicts()` |
+| `df.ToSlice()` / `df.ToSlice("col")` | `series.to_list()` |
 | `pl.ToSlice[T](df, "col")` | `series.to_list()` |
 | `pl.ToStructs[T](df)` | `to_dicts()` 后绑定到 typed objects |
 
@@ -128,6 +129,7 @@ Go (获取结果)
   - `pl.NewDataFrame([]MyStruct{...})`
   - `pl.NewDataFrameFromStructs([]MyStruct{...})`
 - 导出：
+  - `df.ToSlice()` / `df.ToSlice("column")`
   - `pl.ToSlice[T](df, "column")`
   - `pl.ToStructs[MyStruct](df)`
   - `pl.ToStructPointers[MyStruct](df)`
@@ -177,7 +179,7 @@ if err != nil {
 }
 defer namesDF.Free()
 
-names, err := pl.ToSlice[string](namesDF, "")
+names, err := namesDF.ToSlice()
 if err != nil {
     log.Fatal(err)
 }
@@ -196,7 +198,99 @@ tag 规则：
 - 指针字段会映射为 nullable
 - 支持嵌套 struct、`[]string`、`[]byte`、常见数值类型、`time.Time`
 - `ToStructs` / `ToStructPointers` 当前优先走 Arrow 直转；常见标量列、嵌套 struct 和常见 list 列会命中快路径
+- `ToSlice()` 适合 Python 风格的单列结果导出，返回 `[]any`
 - `ToSlice[T]` 适合单列结果直接导出成 `[]T`；列名留空时，DataFrame 必须只有一列
+
+### CollectXxx Helpers
+
+如果你在业务代码里经常写：
+
+- `NewDataFrame(...)`
+- `defer df.Close()`
+- `lf.Collect()`
+- `defer eager.Free()`
+- 最后再 `ToMaps()` / `ToSliceXxx()` / `ToStructs()`
+
+现在也可以直接用自动收尾的 helper：
+
+- `pl.CollectMaps(...)`
+- `pl.CollectSlice(...)`
+- `pl.CollectSliceString(...)`
+- `pl.CollectSliceInt64(...)`
+- `pl.CollectSliceUInt64(...)`
+- `pl.CollectSliceInt32(...)`
+- `pl.CollectSliceUInt32(...)`
+- `pl.CollectSliceFloat64(...)`
+- `pl.CollectSliceFloat32(...)`
+- `pl.CollectSliceBool(...)`
+- `pl.CollectSliceTime(...)`
+- `pl.CollectSliceBytes(...)`
+- `pl.CollectStructs[T](...)`
+- `pl.CollectStructPointers[T](...)`
+
+示例：
+
+```go
+names, err := pl.CollectSliceString(rows, map[string]pl.DataType{
+    "id":   pl.DataTypeInt64,
+    "name": pl.DataTypeUTF8,
+}, func(df *pl.DataFrame) *pl.LazyFrame {
+    return df.Select(pl.Col("name")).Unique(pl.UniqueOptions{
+        Subset:        []string{"name"},
+        MaintainOrder: true,
+    })
+}, "")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(names)
+```
+
+这类 helper 会自动处理：
+
+- 内部 `DataFrame.Close()`
+- 内部 `Collect()` 返回值的 `Free()`
+
+适合“输入 rows -> 做一段查询 -> 直接拿最终 Go 结果”的后端场景。
+
+如果你已经有 `LazyFrame`，也可以直接这样写：
+
+- `lf.CollectMaps()`
+- `lf.CollectSliceString()`
+- `lf.CollectSliceInt64()`
+- `lf.CollectSliceUInt64()`
+- `lf.CollectSliceInt32()`
+- `lf.CollectSliceUInt32()`
+- `lf.CollectSliceFloat64()`
+- `lf.CollectSliceFloat32()`
+- `lf.CollectSliceBool()`
+- `lf.CollectSliceTime()`
+- `lf.CollectSliceBytes()`
+
+这样就不需要再手写：
+
+- `eager, err := lf.Collect()`
+- `defer eager.Free()`
+- `eager.ToSliceXxx(...)`
+
+如果你还想保留中间对象，但不想手写多个 `defer`，现在也有两层工具：
+
+- `pl.WithDataFrame(df, fn)`
+- `pl.WithCollect(lf, fn)`
+- `pl.NewReleaser()`
+
+示例：
+
+```go
+err := pl.WithCollect(df.Select(pl.Col("name")), func(eager *pl.EagerFrame) error {
+    names, err := eager.ToSliceString()
+    if err != nil {
+        return err
+    }
+    fmt.Println(names)
+    return nil
+})
+```
 
 当前限制：
 
@@ -1804,15 +1898,68 @@ func TestMemoryLeak(t *testing.T) {
 
 ### 总结
 
-| 方法 | 是否需要 Free | 说明 |
-|------|--------------|------|
-| `Print()` | ❌ 否 | 内部管理资源 |
-| `Collect()` + `ToMaps()` | ✅ 是 | 对 `Collect()` 返回的 `EagerFrame` 调用 `Free()` |
-| `Collect()` | ✅ 是 | 返回 `EagerFrame`，必须手动 Free |
-| `NewDataFrame()` | ❌ 否 | 返回托管 `DataFrame`，推荐 `Close()` 及时释放 |
-| `NewDataFrameFromArrow()` | ❌ 否 | 接管输入 Arrow RecordBatch，返回托管 `DataFrame` |
-| `NewEagerFrameFromMap()` | ✅ 是 | 低层兼容/高级入口，返回 `EagerFrame` |
-| `ExecuteArrow()` | ✅ 是 | 输出需要 ReleaseArrow* |
+先记住这一句就够了：
+
+- 高层 `DataFrame` 用 `Close()`
+- `Collect()` 返回的 `EagerFrame` 用 `Free()`
+- Arrow 对象用 `Release()`
+- 普通 Go 结果（`[]string`、`[]int64`、`[]map[string]any`）不用手动释放
+
+如果你只想看最常见场景，可以直接按下面写：
+
+| 你拿到的东西 | 常见来源 | 谁负责释放 | 正确写法 |
+|------|------|------|------|
+| `*DataFrame` | `NewDataFrame(...)` / `NewDataFrameFromMaps(...)` | 调用方 | `defer df.Close()` |
+| `*EagerFrame` | `lf.Collect()` | 调用方 | `defer eager.Free()` |
+| `arrow.RecordBatch` | `df.ToArrow()` | 调用方 | `defer batch.Release()` |
+| Arrow typed array | `df.ToArrayString(...)` / `df.ToArrayInt64(...)` / ... | 调用方 | `defer col.Release()` |
+| Go slice / map | `df.ToMaps()` / `df.ToSliceString(...)` / `pl.ToSlice[T](...)` | 无需释放 | 直接使用 |
+
+更细一点的对象对照：
+
+| 对象/返回值 | 获取方式 | 用完后要做什么 | 原因 |
+|------|------|------|------|
+| `*DataFrame` | `NewDataFrame(...)` / `NewDataFrameFromMaps(...)` / 其他高层构造器 | `Close()` | 这是托管包装，底层仍持有 Rust 侧资源 |
+| `*EagerFrame` | `lf.Collect()` / 低层 eager 构造器 | `Free()` | 这是直接持有 Rust DataFrame 句柄的底层对象 |
+| `arrow.RecordBatch` | `df.ToArrow()` | `Release()` | Arrow 对象使用引用计数管理内存 |
+| `*array.String` / `*array.Int64` / `*array.Float64` / ... | `df.ToArrayString(...)` / `df.ToArrayInt64(...)` / ... | `Release()` | 这些是 Arrow typed array，也使用引用计数 |
+| `[]map[string]any` | `df.ToMaps()` | 不需要 | 这是普通 Go 数据 |
+| `[]any` | `df.ToSlice()` / `df.ToList()` | 不需要 | 这是普通 Go 数据 |
+| `[]string` / `[]int64` / `[]float64` / ... | `df.ToSliceString(...)` / `df.ToSliceInt64(...)` / `pl.ToSlice[T](...)` | 不需要 | 这是普通 Go 数据 |
+
+最小示例：
+
+```go
+df, err := pl.NewDataFrame(rows)
+if err != nil {
+    return err
+}
+defer df.Close()
+
+eager, err := df.Select(pl.Col("name")).Collect()
+if err != nil {
+    return err
+}
+defer eager.Free()
+
+names, err := eager.ToSliceString()
+if err != nil {
+    return err
+}
+
+col, err := eager.ToArrayString()
+if err != nil {
+    return err
+}
+defer col.Release()
+```
+
+容易混淆的点：
+
+- `Close()` 只用于高层 `DataFrame`
+- `Free()` 只用于 `Collect()` 返回的 `EagerFrame`
+- `Release()` 只用于 Arrow 对象
+- 如果你拿到的是 Go slice / map，就不要再调用任何释放方法
 
 ## 📂 项目结构
 

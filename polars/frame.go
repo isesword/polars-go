@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/isesword/polars-go/bridge"
@@ -749,16 +750,16 @@ func pivotEagerFrame(brg *bridge.Bridge, handle uint64, opts PivotOptions) (*Eag
 	return newDataFrame(dfHandle, brg), nil
 }
 
-// QueryMaps imports rows into a managed DataFrame, executes the provided query
-// builder, materializes maps, and releases internal resources automatically.
-func QueryMaps(
+func collectFromRows[T any](
 	rows []map[string]any,
 	schema map[string]DataType,
 	build func(*DataFrame) *LazyFrame,
-) ([]map[string]interface{}, error) {
+	materialize func(*EagerFrame) (T, error),
+) (T, error) {
+	var zero T
 	frame, err := NewDataFrameFromRowsWithSchema(rows, schema)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	defer frame.Close()
 
@@ -769,18 +770,214 @@ func QueryMaps(
 		lf = frame.Lazy()
 	}
 	if lf == nil {
-		return nil, fmt.Errorf("query builder returned nil lazyframe")
+		return zero, fmt.Errorf("collect builder returned nil lazyframe")
 	}
 	df, err := lf.Collect()
 	if err != nil {
 		runtime.KeepAlive(frame)
-		return nil, err
+		return zero, err
 	}
 	defer df.Free()
 
-	result, err := df.ToMaps()
+	result, err := materialize(df)
 	runtime.KeepAlive(frame)
 	return result, err
+}
+
+// CollectMaps imports rows into a managed DataFrame, executes the provided
+// lazy builder, materializes maps, and releases internal resources
+// automatically.
+func CollectMaps(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+) ([]map[string]interface{}, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]map[string]interface{}, error) {
+		return df.ToMaps()
+	})
+}
+
+// QueryMaps is kept as a compatibility alias for CollectMaps.
+func QueryMaps(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+) ([]map[string]interface{}, error) {
+	return CollectMaps(rows, schema, build)
+}
+
+// CollectSlice materializes a single selected column into a []any and releases
+// internal resources automatically.
+func CollectSlice(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]any, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]any, error) {
+		return df.ToSlice(column)
+	})
+}
+
+// CollectSliceString materializes a single selected column into a []string and
+// releases internal resources automatically.
+func CollectSliceString(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]string, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]string, error) {
+		return df.ToSliceString(column)
+	})
+}
+
+// CollectSliceInt64 materializes a single selected column into a []int64 and
+// releases internal resources automatically.
+func CollectSliceInt64(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]int64, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]int64, error) {
+		return df.ToSliceInt64(column)
+	})
+}
+
+// CollectSliceUInt64 materializes a single selected column into a []uint64 and
+// releases internal resources automatically.
+func CollectSliceUInt64(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]uint64, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]uint64, error) {
+		return df.ToSliceUInt64(column)
+	})
+}
+
+// CollectSliceInt32 materializes a single selected column into a []int32 and
+// releases internal resources automatically.
+func CollectSliceInt32(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]int32, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]int32, error) {
+		return df.ToSliceInt32(column)
+	})
+}
+
+// CollectSliceUInt32 materializes a single selected column into a []uint32 and
+// releases internal resources automatically.
+func CollectSliceUInt32(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]uint32, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]uint32, error) {
+		return df.ToSliceUInt32(column)
+	})
+}
+
+// CollectSliceFloat64 materializes a single selected column into a []float64
+// and releases internal resources automatically.
+func CollectSliceFloat64(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]float64, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]float64, error) {
+		return df.ToSliceFloat64(column)
+	})
+}
+
+// CollectSliceFloat32 materializes a single selected column into a []float32
+// and releases internal resources automatically.
+func CollectSliceFloat32(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]float32, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]float32, error) {
+		return df.ToSliceFloat32(column)
+	})
+}
+
+// CollectSliceBool materializes a single selected column into a []bool and
+// releases internal resources automatically.
+func CollectSliceBool(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]bool, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]bool, error) {
+		return df.ToSliceBool(column)
+	})
+}
+
+// CollectSliceTime materializes a single selected column into a []time.Time
+// and releases internal resources automatically.
+func CollectSliceTime(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([]time.Time, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]time.Time, error) {
+		return df.ToSliceTime(column)
+	})
+}
+
+// CollectSliceBytes materializes a single selected column into a [][]byte and
+// releases internal resources automatically.
+func CollectSliceBytes(
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+	column string,
+) ([][]byte, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([][]byte, error) {
+		return df.ToSliceBytes(column)
+	})
+}
+
+// CollectStructs materializes query results into typed structs and releases
+// internal resources automatically.
+func CollectStructs[T any](
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+) ([]T, error) {
+	return collectFromRows(rows, schema, build, func(df *EagerFrame) ([]T, error) {
+		return exportStructsFromFrame[T]("polars.CollectStructs", df)
+	})
+}
+
+// CollectStructPointers materializes query results into typed struct pointers
+// and releases internal resources automatically.
+func CollectStructPointers[T any](
+	rows []map[string]any,
+	schema map[string]DataType,
+	build func(*DataFrame) *LazyFrame,
+) ([]*T, error) {
+	values, err := CollectStructs[T](rows, schema, build)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*T, len(values))
+	for i := range values {
+		v := values[i]
+		out[i] = &v
+	}
+	return out, nil
 }
 
 func applyImportOptions(opts ...ImportOption) importConfig {
