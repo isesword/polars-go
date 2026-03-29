@@ -7,8 +7,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -801,4 +803,100 @@ func collectToMapsBenchmark(lf *LazyFrame) ([]map[string]interface{}, error) {
 	}
 	defer df.Free()
 	return df.ToMaps()
+}
+
+func BenchmarkManagedDataFrameLifetimeSoak(b *testing.B) {
+	makeTemporaryFrame := func(i int) error {
+		frame, err := NewDataFrame([]map[string]any{
+			{"id": int64(i), "name": fmt.Sprintf("user-%d", i), "score": float64(i) * 1.5},
+			{"id": int64(i + 1), "name": fmt.Sprintf("user-%d-b", i), "score": float64(i+1) * 1.5},
+			{"id": int64(i + 2), "name": fmt.Sprintf("user-%d-c", i), "score": float64(i+2) * 1.5},
+		}, WithSchema(map[string]DataType{
+			"id":    DataTypeInt64,
+			"name":  DataTypeUTF8,
+			"score": DataTypeFloat64,
+		}))
+		if err != nil {
+			return err
+		}
+
+		rows, err := frame.ToMaps()
+		if err != nil {
+			return fmt.Errorf("temporary frame ToMaps failed: %w", err)
+		}
+		if len(rows) != 3 {
+			return fmt.Errorf("expected 3 rows from temporary frame, got %d", len(rows))
+		}
+		return nil
+	}
+
+	b.Run("SingleThread", func(b *testing.B) {
+		b.ReportAllocs()
+		runtime.GC()
+		var before runtime.MemStats
+		runtime.ReadMemStats(&before)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if err := makeTemporaryFrame(i); err != nil {
+				b.Fatalf("temporary frame iteration %d failed: %v", i, err)
+			}
+		}
+		b.StopTimer()
+
+		for i := 0; i < 8; i++ {
+			runtime.GC()
+			runtime.Gosched()
+		}
+
+		var after runtime.MemStats
+		runtime.ReadMemStats(&after)
+		heapGrowthMiB := float64(after.HeapAlloc-before.HeapAlloc) / (1024 * 1024)
+		sysGrowthMiB := float64(after.Sys-before.Sys) / (1024 * 1024)
+		b.ReportMetric(heapGrowthMiB, "heap_growth_mib")
+		b.ReportMetric(sysGrowthMiB, "sys_growth_mib")
+	})
+
+	b.Run("Concurrent8", func(b *testing.B) {
+		b.ReportAllocs()
+		runtime.GC()
+		var before runtime.MemStats
+		runtime.ReadMemStats(&before)
+
+		b.ResetTimer()
+		errCh := make(chan error, 8)
+		var wg sync.WaitGroup
+		for worker := 0; worker < 8; worker++ {
+			wg.Add(1)
+			go func(workerID int) {
+				defer wg.Done()
+				for iter := workerID; iter < b.N; iter += 8 {
+					if err := makeTemporaryFrame(workerID*1_000_000 + iter); err != nil {
+						errCh <- err
+						return
+					}
+				}
+			}(worker)
+		}
+		wg.Wait()
+		close(errCh)
+		for err := range errCh {
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+		b.StopTimer()
+
+		for i := 0; i < 8; i++ {
+			runtime.GC()
+			runtime.Gosched()
+		}
+
+		var after runtime.MemStats
+		runtime.ReadMemStats(&after)
+		heapGrowthMiB := float64(after.HeapAlloc-before.HeapAlloc) / (1024 * 1024)
+		sysGrowthMiB := float64(after.Sys-before.Sys) / (1024 * 1024)
+		b.ReportMetric(heapGrowthMiB, "heap_growth_mib")
+		b.ReportMetric(sysGrowthMiB, "sys_growth_mib")
+	})
 }

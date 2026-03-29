@@ -191,6 +191,38 @@ scripts/compare_memory_with_python_polars.sh \
 - Python Polars：`1.35.2`
 - 口径：按列输入，Go 侧显式走 `NewDataFrameFromColumns(...)`，Python 侧使用 `dict of lists`
 
+## 生命周期 / Soak Benchmark
+
+除了 Python 对照脚本，这个仓库还补了一组专门观察 `DataFrame` 生命周期的 Go benchmark：
+
+- `BenchmarkManagedDataFrameLifetimeSoak/SingleThread`
+- `BenchmarkManagedDataFrameLifetimeSoak/Concurrent8`
+
+运行方式：
+
+```bash
+GOCACHE=/tmp/go-build \
+POLARS_BRIDGE_LIB=$PWD/rust/target/debug/libpolars_bridge.dylib \
+go test ./polars -run '^$' -bench 'BenchmarkManagedDataFrameLifetimeSoak' -benchmem -benchtime=10000x
+```
+
+它关注的是“函数内高频创建短命 `DataFrame` 后，内存是否有明显累积趋势”，并额外输出：
+
+- `heap_growth_mib`
+- `sys_growth_mib`
+
+当前样例结果（Apple M4 Pro，`10000x`）：
+
+| Benchmark | ns/op | heap_growth_mib | sys_growth_mib | B/op | allocs/op |
+|---|---:|---:|---:|---:|---:|
+| `BenchmarkManagedDataFrameLifetimeSoak/SingleThread` | `34204` | `0.009430` | `4.750` | `10384` | `155` |
+| `BenchmarkManagedDataFrameLifetimeSoak/Concurrent8` | `8931` | `0.01311` | `4.500` | `10484` | `157` |
+
+解读：
+
+- `heap_growth_mib` 在这两组下都接近 `0`，没有看到明显的 Go heap 泄漏趋势
+- `sys_growth_mib` 有增长，但更接近 Go runtime 保留的已申请内存，不应直接当作对象泄漏
+
 ### 吞吐对比
 
 | 场景 | Python | Go JSON | Go Arrow |

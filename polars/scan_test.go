@@ -476,6 +476,7 @@ func TestGroupByJoinSortUnique(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unique failed: %v", err)
 		}
+		fmt.Println(rows)
 
 		expected := []string{"Engineering", "Marketing", "Sales"}
 		if len(rows) != len(expected) {

@@ -115,6 +115,7 @@ Go (获取结果)
 | `ToArrow()` | `to_arrow()` |
 | `Collect()` | `collect()` |
 | `ToMaps()` | `to_dicts()` |
+| `pl.ToSlice[T](df, "col")` | `series.to_list()` |
 | `pl.ToStructs[T](df)` | `to_dicts()` 后绑定到 typed objects |
 
 如果你是从 Python Polars 迁移过来，可以优先按这张表找对应入口。
@@ -127,6 +128,7 @@ Go (获取结果)
   - `pl.NewDataFrame([]MyStruct{...})`
   - `pl.NewDataFrameFromStructs([]MyStruct{...})`
 - 导出：
+  - `pl.ToSlice[T](df, "column")`
   - `pl.ToStructs[MyStruct](df)`
   - `pl.ToStructPointers[MyStruct](df)`
 
@@ -165,6 +167,21 @@ if err != nil {
     log.Fatal(err)
 }
 fmt.Println(typed[0].Name)
+
+namesDF, err := df.Select(pl.Col("name")).Unique(pl.UniqueOptions{
+    Subset:        []string{"name"},
+    MaintainOrder: true,
+}).Collect()
+if err != nil {
+    log.Fatal(err)
+}
+defer namesDF.Free()
+
+names, err := pl.ToSlice[string](namesDF, "")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(names)
 ```
 
 tag 规则：
@@ -179,6 +196,7 @@ tag 规则：
 - 指针字段会映射为 nullable
 - 支持嵌套 struct、`[]string`、`[]byte`、常见数值类型、`time.Time`
 - `ToStructs` / `ToStructPointers` 当前优先走 Arrow 直转；常见标量列、嵌套 struct 和常见 list 列会命中快路径
+- `ToSlice[T]` 适合单列结果直接导出成 `[]T`；列名留空时，DataFrame 必须只有一列
 
 当前限制：
 
@@ -689,6 +707,32 @@ go test ./polars -run '^$' -bench 'BenchmarkExcel' -benchmem
 - NDJSON：`BenchmarkNDJSON`
 - Excel：`BenchmarkExcel`
 - 表达式回调：`BenchmarkExprMapBatches` / `BenchmarkExprVsMapBatches`
+- 生命周期 / soak：`BenchmarkManagedDataFrameLifetimeSoak`
+
+生命周期 / soak benchmark 用法：
+
+```bash
+GOCACHE=/tmp/go-build \
+POLARS_BRIDGE_LIB=$PWD/rust/target/debug/libpolars_bridge.dylib \
+go test ./polars -run '^$' -bench 'BenchmarkManagedDataFrameLifetimeSoak' -benchmem -benchtime=10000x
+```
+
+这个 benchmark 关注的是“函数内高频创建短命 `DataFrame` 后，内存是否有明显累积趋势”，会额外输出：
+
+- `heap_growth_mib`：benchmark 前后 `runtime.MemStats.HeapAlloc` 的变化
+- `sys_growth_mib`：benchmark 前后 `runtime.MemStats.Sys` 的变化
+
+当前样例结果（Apple M4 Pro，`10000x`）：
+
+| Benchmark | ns/op | heap_growth_mib | sys_growth_mib | B/op | allocs/op |
+|---|---:|---:|---:|---:|---:|
+| `BenchmarkManagedDataFrameLifetimeSoak/SingleThread` | `34204` | `0.009430` | `4.750` | `10384` | `155` |
+| `BenchmarkManagedDataFrameLifetimeSoak/Concurrent8` | `8931` | `0.01311` | `4.500` | `10484` | `157` |
+
+这组结果说明：
+
+- 在 `10000x` 单线程 / `8` 路并发短命 `DataFrame` 创建下，没有看到明显的 Go heap 累积增长
+- `sys_growth_mib` 更像 Go runtime 保留的已申请内存，不等同对象泄漏
 
 当前基线（Apple M4 Pro, `go test ./polars -run '^$' -bench 'Benchmark(ImportRows|QueryCollect|ToMaps|ToStructs|ToStructPointers|StructImport|Join|GroupBy|NDJSON|Excel|ExprVsMapBatches)' -benchtime=3x -benchmem`；其中 `ImportRows` 两行按当前 rows importer 额外刷新）：
 
