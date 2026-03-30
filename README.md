@@ -591,12 +591,20 @@ go get github.com/isesword/polars-go
 
 #### 2. 下载预编译的动态库
 
-从 [GitHub Releases](https://github.com/isesword/polars-go/releases) 下载对应平台的动态库：
+从 [GitHub Releases](https://github.com/isesword/polars-go/releases) 下载对应平台的压缩包：
 
-- **macOS (Intel)**: `libpolars_bridge.dylib` (x86_64-apple-darwin)
-- **macOS (Apple Silicon)**: `libpolars_bridge.dylib` (aarch64-apple-darwin)
-- **Linux**: `libpolars_bridge.so` (x86_64-unknown-linux-gnu)
-- **Windows**: `polars_bridge.dll` (x86_64-pc-windows-msvc)
+- **macOS (Intel)**: `polars_bridge-x86_64-apple-darwin.tar.gz`
+- **macOS (Apple Silicon)**: `polars_bridge-aarch64-apple-darwin.tar.gz`
+- **Linux**: `polars_bridge-x86_64-unknown-linux-gnu.tar.gz`
+- **Windows**: `polars_bridge-x86_64-pc-windows-msvc.zip`
+
+压缩包内的动态库文件名如下：
+- **macOS (Intel)**: `libpolars_bridge-intel.dylib`
+- **macOS (Apple Silicon)**: `libpolars_bridge-apple-silicon.dylib`
+- **Linux**: `libpolars_bridge.so`
+- **Windows**: `polars_bridge.dll`
+
+发布构建默认会做符号裁剪（`strip`）并上传压缩包，因此 GitHub Releases 上看到的下载体积会明显小于本地未处理的 release 动态库。
 
 将动态库放置在以下位置之一：
 - 项目根目录
