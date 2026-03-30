@@ -132,15 +132,23 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release-assets
+          cp artifacts/x86_64-pc-windows-msvc/polars_bridge.dll release-assets/polars_bridge-x86_64-pc-windows-msvc.dll
+          cp artifacts/x86_64-unknown-linux-gnu/libpolars_bridge.so release-assets/libpolars_bridge-x86_64-unknown-linux-gnu.so
+          cp artifacts/x86_64-apple-darwin/libpolars_bridge.dylib release-assets/libpolars_bridge-x86_64-apple-darwin.dylib
+          cp artifacts/aarch64-apple-darwin/libpolars_bridge.dylib release-assets/libpolars_bridge-aarch64-apple-darwin.dylib
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/x86_64-pc-windows-msvc/polars_bridge.dll
-            artifacts/x86_64-unknown-linux-gnu/libpolars_bridge.so
-            artifacts/x86_64-apple-darwin/libpolars_bridge.dylib
-            artifacts/aarch64-apple-darwin/libpolars_bridge.dylib
+            release-assets/polars_bridge-x86_64-pc-windows-msvc.dll
+            release-assets/libpolars_bridge-x86_64-unknown-linux-gnu.so
+            release-assets/libpolars_bridge-x86_64-apple-darwin.dylib
+            release-assets/libpolars_bridge-aarch64-apple-darwin.dylib
           draft: false
           prerelease: false
         env:
